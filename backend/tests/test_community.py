@@ -28,8 +28,6 @@ def publish_a_route(token):
     }, headers={"Authorization": f"Bearer {token}"})
 
 
-# ── Publish Route ─────────────────────────────────────────────────────────────
-
 def test_publish_route():
     token = get_token(email="publish@roadbuddy.com")
     response = publish_a_route(token)
@@ -47,8 +45,6 @@ def test_publish_route_without_token():
     })
     assert response.status_code == 401 or response.status_code == 403
 
-
-# ── Browse Routes ─────────────────────────────────────────────────────────────
 
 def test_browse_routes():
     response = client.get("/api/community/routes")
@@ -68,13 +64,10 @@ def test_browse_routes_by_min_rating():
     assert response.status_code == 200
 
 
-# ── Get Single Route ──────────────────────────────────────────────────────────
-
 def test_get_route():
     token = get_token(email="getroute@roadbuddy.com")
     publish_response = publish_a_route(token)
     route_id = publish_response.json()["id"]
-
     response = client.get(f"/api/community/routes/{route_id}")
     assert response.status_code == 200
     assert response.json()["id"] == route_id
@@ -85,27 +78,22 @@ def test_get_nonexistent_route():
     assert response.status_code == 404
 
 
-# ── Clone Route ───────────────────────────────────────────────────────────────
-
 def test_clone_route():
     token = get_token(email="cloneroute@roadbuddy.com")
     publish_response = publish_a_route(token)
     route_id = publish_response.json()["id"]
-
     response = client.post(f"/api/community/routes/{route_id}/clone",
                            headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
     assert "cloned" in response.json()["message"].lower()
 
 
-# ── Reviews ───────────────────────────────────────────────────────────────────
-
 def test_add_review():
     token = get_token(email="review@roadbuddy.com")
     publish_response = publish_a_route(token)
     route_id = publish_response.json()["id"]
-
     response = client.post(f"/api/community/routes/{route_id}/review", json={
+        "route_id": route_id,
         "rating": 5,
         "review_text": "Amazing road trip!",
         "tags": ["scenic"],
@@ -117,8 +105,8 @@ def test_add_invalid_rating():
     token = get_token(email="badrating@roadbuddy.com")
     publish_response = publish_a_route(token)
     route_id = publish_response.json()["id"]
-
     response = client.post(f"/api/community/routes/{route_id}/review", json={
+        "route_id": route_id,
         "rating": 10,
         "review_text": "Too good!",
         "tags": [],
@@ -130,7 +118,6 @@ def test_get_reviews():
     token = get_token(email="getreviews@roadbuddy.com")
     publish_response = publish_a_route(token)
     route_id = publish_response.json()["id"]
-
     response = client.get(f"/api/community/routes/{route_id}/reviews")
     assert response.status_code == 200
     assert isinstance(response.json(), list)
