@@ -4,7 +4,12 @@ pydantic>=2.0
 pydantic-settings
 pydantic[email]
 python-jose[cryptography]
-passlib[bcrypt]
+bcrypt
 httpx
 python-multipart
 pytest
+sqlalchemy
+alembic
+asyncpg
+psycopg2-binary
+python-dotenv
