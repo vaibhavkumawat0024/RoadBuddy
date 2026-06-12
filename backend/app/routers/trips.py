@@ -7,6 +7,7 @@ from app.services.waypoint_suggester import suggest_waypoints
 from app.schemas.schemas import TripCreate, TripOut, TravelMode
 from app.services.ai_planner import generate_itinerary
 from app.core.auth import get_current_user
+from app.services.route_safety import analyze_route_safety
 from app.core.database import get_db
 from app.models.models import Trip, TripStop, Vehicle
 
@@ -266,6 +267,33 @@ async def trip_chat(request: ChatMessage):
         result = await chat_with_roadbuddy(
             message=request.message,
             history=request.history,
+        )
+        return result
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+class SafetyCheckRequest(BaseModel):
+    origin: str
+    destination: str
+    travel_date: str
+    departure_time: Optional[str] = "08:00"
+    vehicle_type: Optional[str] = "car"
+    num_people: Optional[int] = 2
+
+
+@router.post("/safety-check")
+async def check_route_safety(request: SafetyCheckRequest):
+    """
+    AI-powered route safety analyzer.
+    Flags dangerous stretches, seasonal hazards and gives safety score.
+    """
+    try:
+        result = await analyze_route_safety(
+            origin=request.origin,
+            destination=request.destination,
+            travel_date=request.travel_date,
+            departure_time=request.departure_time,
+            vehicle_type=request.vehicle_type,
+            num_people=request.num_people,
         )
         return result
     except RuntimeError as e:
