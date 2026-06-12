@@ -11,8 +11,8 @@ def get_token(email="community@roadbuddy.com"):
         "name": "Community Tester",
         "home_city": "Mumbai",
     })
-    response = client.post("/api/users/login", json={
-        "email": email,
+    response = client.post("/api/users/login", data={
+        "username": email,
         "password": "Test123",
     })
     return response.json()["access_token"]

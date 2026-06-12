@@ -15,8 +15,8 @@ def register_user(email="test@roadbuddy.com", password="Test123", name="Test Use
 
 
 def login_user(email="test@roadbuddy.com", password="Test123"):
-    return client.post("/api/users/login", json={
-        "email": email,
+    return client.post("/api/users/login", data={
+        "username": email,
         "password": password,
     })
 
@@ -30,9 +30,11 @@ def get_token():
 # ── Register ──────────────────────────────────────────────────────────────────
 
 def test_register_success():
-    response = register_user(email="newuser@roadbuddy.com")
+    import time
+    unique_email = f"newuser_{int(time.time())}@roadbuddy.com"
+    response = register_user(email=unique_email)
     assert response.status_code == 201
-    assert response.json()["email"] == "newuser@roadbuddy.com"
+    assert response.json()["email"] == unique_email
 
 
 def test_register_duplicate_email():
@@ -53,16 +55,16 @@ def test_login_success():
 
 def test_login_wrong_password():
     register_user(email="wrongpass@roadbuddy.com")
-    response = client.post("/api/users/login", json={
-        "email": "wrongpass@roadbuddy.com",
+    response = client.post("/api/users/login", data={
+        "username": "wrongpass@roadbuddy.com",
         "password": "WrongPassword",
     })
     assert response.status_code == 401
 
 
 def test_login_nonexistent_user():
-    response = client.post("/api/users/login", json={
-        "email": "ghost@roadbuddy.com",
+    response = client.post("/api/users/login", data={
+        "username": "ghost@roadbuddy.com",
         "password": "Test123",
     })
     assert response.status_code == 401
