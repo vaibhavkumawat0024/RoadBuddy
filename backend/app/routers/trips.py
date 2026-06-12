@@ -1,5 +1,8 @@
 from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel
+from typing import Optional
 from sqlalchemy.orm import Session
+from app.services.waypoint_suggester import suggest_waypoints
 from app.schemas.schemas import TripCreate, TripOut, TravelMode
 from app.services.ai_planner import generate_itinerary
 from app.core.auth import get_current_user
@@ -213,3 +216,34 @@ def delete_trip(
     db.query(TripStop).filter(TripStop.trip_id == trip.id).delete()
     db.delete(trip)
     db.commit()
+    from pydantic import BaseModel
+from typing import Optional
+
+
+class WaypointRequest(BaseModel):
+    origin: str
+    destination: str
+    preferences: Optional[list[str]] = []
+    travel_mode: Optional[str] = "own_vehicle"
+    num_people: Optional[int] = 2
+    group_type: Optional[str] = "friends"
+
+
+@router.post("/suggest-waypoints")
+async def get_waypoint_suggestions(request: WaypointRequest):
+    """
+    AI-powered waypoint suggestions between origin and destination.
+    Returns hidden gems, dhabas, viewpoints, and must-visit stops.
+    """
+    try:
+        result = await suggest_waypoints(
+            origin=request.origin,
+            destination=request.destination,
+            preferences=request.preferences,
+            travel_mode=request.travel_mode,
+            num_people=request.num_people,
+            group_type=request.group_type,
+        )
+        return result
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
