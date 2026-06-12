@@ -13,3 +13,4 @@ alembic
 asyncpg
 psycopg2-binary
 python-dotenv
+jinja2

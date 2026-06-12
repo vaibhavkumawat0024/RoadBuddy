@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — RoadBuddy{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+  <h1>Hello, {{ user.name }} 👋</h1>
+  <a href="/plan-trip" class="btn-primary">+ Plan a Trip</a>
+</div>
+
+<div class="stats-row">
+  <div class="stat-card">
+    <span class="stat-num">{{ trip_count }}</span>
+    <span class="stat-label">Trips planned</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-num">{{ vehicle_count }}</span>
+    <span class="stat-label">Vehicles added</span>
+  </div>
+</div>
+
+<h2>Recent trips</h2>
+{% if trips %}
+  <div class="trip-list">
+    {% for trip in trips %}
+    <div class="trip-card">
+      <div class="trip-route">{{ trip.origin }} → {{ trip.destination }}</div>
+      <div class="trip-meta">{{ trip.travel_mode }} &nbsp;·&nbsp; ₹{{ trip.total_cost_inr | int }}</div>
+      <div class="trip-date">{{ trip.start_date }}</div>
+    </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="empty">No trips yet. <a href="/plan-trip">Plan your first trip!</a></p>
+{% endif %}
+{% endblock %}
