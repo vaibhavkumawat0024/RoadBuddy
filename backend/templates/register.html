@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Register — RoadBuddy{% endblock %}
+
+{% block content %}
+<div class="auth-card">
+  <h1>Create account</h1>
+  <p class="subtitle">Join RoadBuddy and start planning trips</p>
+
+  {% if error %}
+    <p class="error">{{ error }}</p>
+  {% endif %}
+
+  <form method="POST" action="/register">
+    <label>Name</label>
+    <input type="text" name="name" required placeholder="Your full name">
+
+    <label>Email</label>
+    <input type="email" name="email" required placeholder="you@example.com">
+
+    <label>Password</label>
+    <input type="password" name="password" required placeholder="Min 8 characters">
+
+    <button type="submit">Send OTP & Continue</button>
+  </form>
+
+  <p>Already have an account? <a href="/login">Login here</a></p>
+</div>
+{% endblock %}
