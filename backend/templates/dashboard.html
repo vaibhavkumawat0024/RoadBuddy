@@ -1,12 +1,13 @@
 {% extends "base.html" %}
 {% block title %}Dashboard — RoadBuddy{% endblock %}
-
 {% block content %}
+
 <div class="dashboard-header">
   <h1>Hello, {{ user.name }} 👋</h1>
   <a href="/plan-trip" class="btn-primary">+ Plan a Trip</a>
 </div>
 
+<!-- Stats Row -->
 <div class="stats-row">
   <div class="stat-card">
     <span class="stat-num">{{ trip_count }}</span>
@@ -16,9 +17,130 @@
     <span class="stat-num">{{ vehicle_count }}</span>
     <span class="stat-label">Vehicles added</span>
   </div>
+  <div class="stat-card">
+    <span class="stat-num">7</span>
+    <span class="stat-label">AI features active</span>
+  </div>
 </div>
 
-<h2>Recent trips</h2>
+<!-- AI Features Grid -->
+<h2>🤖 AI Features</h2>
+<div class="ai-grid">
+
+  <!-- Chatbot -->
+  <div class="ai-card" id="chatbot-card">
+    <div class="ai-card-header">
+      <span class="ai-icon">💬</span>
+      <div>
+        <div class="ai-title">Trip Chatbot</div>
+        <div class="ai-subtitle">Ask anything about your trip</div>
+      </div>
+    </div>
+    <div class="chat-messages" id="chat-messages">
+      <div class="chat-msg ai-msg">🚗 Hi! I'm RoadBuddy AI. Ask me to plan a trip, suggest routes, or estimate costs!</div>
+    </div>
+    <div class="chat-input-row">
+      <input type="text" id="chat-input" placeholder="Plan a 3 day trip from Jaipur to Udaipur..." />
+      <button onclick="sendChat()">Send</button>
+    </div>
+  </div>
+
+  <!-- Smart Search -->
+  <div class="ai-card">
+    <div class="ai-card-header">
+      <span class="ai-icon">🔍</span>
+      <div>
+        <div class="ai-title">Smart Search</div>
+        <div class="ai-subtitle">Search trips in plain English</div>
+      </div>
+    </div>
+    <div class="ai-form">
+      <input type="text" id="search-input" placeholder="beach trip under 5000 for couple..." />
+      <button onclick="smartSearch()">Search</button>
+    </div>
+    <div id="search-result" class="ai-result hidden"></div>
+  </div>
+
+  <!-- Waypoint Suggestions -->
+  <div class="ai-card">
+    <div class="ai-card-header">
+      <span class="ai-icon">📍</span>
+      <div>
+        <div class="ai-title">Waypoint Suggestions</div>
+        <div class="ai-subtitle">Hidden gems on your route</div>
+      </div>
+    </div>
+    <div class="ai-form">
+      <input type="text" id="wp-origin" placeholder="From (e.g. Jaipur)" />
+      <input type="text" id="wp-dest" placeholder="To (e.g. Udaipur)" />
+      <button onclick="getWaypoints()">Suggest Stops</button>
+    </div>
+    <div id="waypoint-result" class="ai-result hidden"></div>
+  </div>
+
+  <!-- Safety Check -->
+  <div class="ai-card">
+    <div class="ai-card-header">
+      <span class="ai-icon">🛡️</span>
+      <div>
+        <div class="ai-title">Route Safety Check</div>
+        <div class="ai-subtitle">Know risks before you drive</div>
+      </div>
+    </div>
+    <div class="ai-form">
+      <input type="text" id="safety-origin" placeholder="From (e.g. Jaipur)" />
+      <input type="text" id="safety-dest" placeholder="To (e.g. Manali)" />
+      <input type="date" id="safety-date" />
+      <button onclick="safetyCheck()">Check Safety</button>
+    </div>
+    <div id="safety-result" class="ai-result hidden"></div>
+  </div>
+
+  <!-- Trip Recommendations -->
+  <div class="ai-card">
+    <div class="ai-card-header">
+      <span class="ai-icon">✨</span>
+      <div>
+        <div class="ai-title">Trip Recommendations</div>
+        <div class="ai-subtitle">Personalized trips just for you</div>
+      </div>
+    </div>
+    <div class="ai-form">
+      <input type="text" id="rec-city" placeholder="Your city (e.g. Jaipur)" />
+      <input type="number" id="rec-budget" placeholder="Budget in Rs (e.g. 15000)" />
+      <select id="rec-group">
+        <option value="friends">Friends</option>
+        <option value="couple">Couple</option>
+        <option value="family">Family</option>
+        <option value="solo">Solo</option>
+      </select>
+      <button onclick="getRecommendations()">Get Recommendations</button>
+    </div>
+    <div id="rec-result" class="ai-result hidden"></div>
+  </div>
+
+  <!-- Journal Summarizer -->
+  <div class="ai-card">
+    <div class="ai-card-header">
+      <span class="ai-icon">📔</span>
+      <div>
+        <div class="ai-title">Journal Summarizer</div>
+        <div class="ai-subtitle">Turn your notes into a story</div>
+      </div>
+    </div>
+    <div class="ai-form">
+      <input type="text" id="journal-origin" placeholder="From (e.g. Jaipur)" />
+      <input type="text" id="journal-dest" placeholder="To (e.g. Udaipur)" />
+      <textarea id="journal-entry" placeholder="Write your trip journal here... What did you see? How did you feel?" rows="3"></textarea>
+      <button onclick="summarizeJournal()">Generate Summary</button>
+    </div>
+    <div id="journal-result" class="ai-result hidden"></div>
+  </div>
+
+</div>
+
+<!-- Recent Trips -->
+<h2 style="margin-top: 32px;">Recent Trips</h2>
 {% if trips %}
   <div class="trip-list">
     {% for trip in trips %}
@@ -32,4 +154,228 @@
 {% else %}
   <p class="empty">No trips yet. <a href="/plan-trip">Plan your first trip!</a></p>
 {% endif %}
+
+<script>
+  const API = '';
+  let chatHistory = [];
+
+  // ── Chat ──────────────────────────────────────────────────────────────────
+  async function sendChat() {
+    const input = document.getElementById('chat-input');
+    const msg = input.value.trim();
+    if (!msg) return;
+
+    appendMsg(msg, 'user');
+    input.value = '';
+    appendMsg('Thinking...', 'ai', 'thinking');
+
+    try {
+      const res = await fetch(`${API}/api/trips/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: msg, history: chatHistory })
+      });
+      const data = await res.json();
+      removThinking();
+      appendMsg(data.response, 'ai');
+      chatHistory = data.history;
+    } catch (e) {
+      removThinking();
+      appendMsg('Sorry, something went wrong. Please try again.', 'ai');
+    }
+  }
+
+  function appendMsg(text, role, id) {
+    const box = document.getElementById('chat-messages');
+    const div = document.createElement('div');
+    div.className = `chat-msg ${role === 'user' ? 'user-msg' : 'ai-msg'}`;
+    if (id) div.id = id;
+    div.textContent = text;
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function removThinking() {
+    const t = document.getElementById('thinking');
+    if (t) t.remove();
+  }
+
+  document.getElementById('chat-input').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') sendChat();
+  });
+
+  // ── Smart Search ──────────────────────────────────────────────────────────
+  async function smartSearch() {
+    const query = document.getElementById('search-input').value.trim();
+    if (!query) return;
+    const result = document.getElementById('search-result');
+    result.innerHTML = 'Searching...';
+    result.classList.remove('hidden');
+
+    try {
+      const res = await fetch(`${API}/api/community/smart-search`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query })
+      });
+      const data = await res.json();
+      const f = data.filters;
+      result.innerHTML = `
+        <div class="result-title">🔍 ${f.understood_query}</div>
+        <div class="result-tags">
+          ${f.destination_type ? `<span class="tag">${f.destination_type}</span>` : ''}
+          ${f.max_budget_inr ? `<span class="tag">₹${f.max_budget_inr}</span>` : ''}
+          ${f.group_type ? `<span class="tag">${f.group_type}</span>` : ''}
+          ${f.duration_days ? `<span class="tag">${f.duration_days} days</span>` : ''}
+        </div>
+        <div class="result-label">Suggested destinations:</div>
+        ${f.suggested_destinations.map(d => `<div class="result-item">📍 ${d}</div>`).join('')}
+        <div class="result-tip">💡 ${f.search_tips}</div>
+      `;
+    } catch (e) {
+      result.innerHTML = 'Search failed. Please try again.';
+    }
+  }
+
+  // ── Waypoints ─────────────────────────────────────────────────────────────
+  async function getWaypoints() {
+    const origin = document.getElementById('wp-origin').value.trim();
+    const dest = document.getElementById('wp-dest').value.trim();
+    if (!origin || !dest) return alert('Please enter origin and destination');
+    const result = document.getElementById('waypoint-result');
+    result.innerHTML = 'Finding hidden gems...';
+    result.classList.remove('hidden');
+
+    try {
+      const res = await fetch(`${API}/api/trips/suggest-waypoints`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ origin, destination: dest, preferences: [], travel_mode: 'own_vehicle', num_people: 2, group_type: 'friends' })
+      });
+      const data = await res.json();
+      result.innerHTML = `
+        <div class="result-title">🗺️ ${data.route_summary}</div>
+        <div class="result-label">${data.total_waypoints} stops found:</div>
+        ${data.waypoints.slice(0, 4).map(w => `
+          <div class="result-item">
+            <strong>${w.name}</strong>
+            <span class="tag">${w.type}</span>
+            <div style="font-size:12px;color:#888;margin-top:2px">${w.why_visit}</div>
+          </div>
+        `).join('')}
+      `;
+    } catch (e) {
+      result.innerHTML = 'Failed to get waypoints. Please try again.';
+    }
+  }
+
+  // ── Safety Check ──────────────────────────────────────────────────────────
+  async function safetyCheck() {
+    const origin = document.getElementById('safety-origin').value.trim();
+    const dest = document.getElementById('safety-dest').value.trim();
+    const date = document.getElementById('safety-date').value;
+    if (!origin || !dest || !date) return alert('Please fill all fields');
+    const result = document.getElementById('safety-result');
+    result.innerHTML = 'Analyzing route safety...';
+    result.classList.remove('hidden');
+
+    try {
+      const res = await fetch(`${API}/api/trips/safety-check`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ origin, destination: dest, travel_date: date, departure_time: '08:00', vehicle_type: 'car', num_people: 2 })
+      });
+      const data = await res.json();
+      const r = data.safety_report;
+      const scoreColor = r.overall_safety_score >= 8 ? '#1D9E75' : r.overall_safety_score >= 6 ? '#f39c12' : '#e74c3c';
+      result.innerHTML = `
+        <div class="result-title">
+          <span style="color:${scoreColor};font-size:20px;font-weight:700">${r.overall_safety_score}/10</span>
+          <span class="tag" style="background:${scoreColor}20;color:${scoreColor}">${r.overall_safety_level}</span>
+        </div>
+        <div style="font-size:13px;color:#555;margin:8px 0">${r.summary}</div>
+        <div class="result-label">⚠️ Hazards:</div>
+        ${r.hazards.slice(0, 2).map(h => `
+          <div class="result-item">
+            <strong>${h.name}</strong>
+            <span class="tag severity-${h.severity}">${h.severity}</span>
+            <div style="font-size:12px;color:#888;margin-top:2px">${h.advice}</div>
+          </div>
+        `).join('')}
+        <div class="result-tip">🕐 Best departure: ${r.best_departure_time}</div>
+      `;
+    } catch (e) {
+      result.innerHTML = 'Safety check failed. Please try again.';
+    }
+  }
+
+  // ── Recommendations ───────────────────────────────────────────────────────
+  async function getRecommendations() {
+    const city = document.getElementById('rec-city').value.trim();
+    const budget = document.getElementById('rec-budget').value;
+    const group = document.getElementById('rec-group').value;
+    if (!city || !budget) return alert('Please enter city and budget');
+    const result = document.getElementById('rec-result');
+    result.innerHTML = 'Finding best trips for you...';
+    result.classList.remove('hidden');
+
+    try {
+      const res = await fetch(`${API}/api/trips/recommendations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ home_city: city, budget_inr: parseFloat(budget), group_type: group, num_people: 2, duration_days: 3, season: 'winter', interests: ['heritage', 'nature', 'food'] })
+      });
+      const data = await res.json();
+      result.innerHTML = `
+        <div class="result-label">Top ${data.total_recommendations} trips for you:</div>
+        ${data.recommendations.slice(0, 3).map(r => `
+          <div class="result-item">
+            <strong>${r.rank}. ${r.title}</strong>
+            <span class="tag">₹${r.estimated_cost_inr}</span>
+            <span class="tag">${r.distance_km} km</span>
+            <div style="font-size:12px;color:#888;margin-top:2px">${r.why_recommended}</div>
+            <div style="font-size:12px;color:#1D9E75;margin-top:2px">🍽️ Try: ${r.must_try_food}</div>
+          </div>
+        `).join('')}
+        <div class="result-tip">💡 ${data.recommendation_tip}</div>
+      `;
+    } catch (e) {
+      result.innerHTML = 'Failed to get recommendations. Please try again.';
+    }
+  }
+
+  // ── Journal Summarizer ────────────────────────────────────────────────────
+  async function summarizeJournal() {
+    const origin = document.getElementById('journal-origin').value.trim();
+    const dest = document.getElementById('journal-dest').value.trim();
+    const text = document.getElementById('journal-entry').value.trim();
+    if (!origin || !dest || !text) return alert('Please fill all fields');
+    const result = document.getElementById('journal-result');
+    result.innerHTML = 'Generating your trip story...';
+    result.classList.remove('hidden');
+
+    try {
+      const res = await fetch(`${API}/api/journal/summarize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          origin, destination: dest, total_days: 2, num_people: 2,
+          group_type: 'friends', total_cost_inr: 5000,
+          entries: [{ day: 1, date: new Date().toISOString().split('T')[0], location: dest, mood: 'excited', text, expenses_inr: 2500 }]
+        })
+      });
+      const data = await res.json();
+      const s = data.summary;
+      result.innerHTML = `
+        <div class="result-title">📖 ${s.title}</div>
+        <div style="font-size:13px;color:#555;margin:8px 0;line-height:1.6">${s.narrative.split('\n')[0]}</div>
+        <div class="result-label">✨ Highlights:</div>
+        ${s.highlights.slice(0, 3).map(h => `<div class="result-item">⭐ ${h}</div>`).join('')}
+        <div class="result-tip">📱 ${s.social_caption}</div>
+      `;
+    } catch (e) {
+      result.innerHTML = 'Failed to generate summary. Please try again.';
+    }
+  }
+</script>
 {% endblock %}
