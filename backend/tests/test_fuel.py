@@ -18,6 +18,15 @@ def get_token():
     return response.json()["access_token"]
 
 
+def get_vehicle_id(token):
+    response = client.post("/api/users/vehicles", json={
+        "name": "Test Car",
+        "fuel_type": "petrol",
+        "category": "car",
+        "mileage_kmpl": 15.0,
+    }, headers={"Authorization": f"Bearer {token}"})
+    return response.json()["id"]
+
 # ── Fuel Prices ───────────────────────────────────────────────────────────────
 
 def test_get_fuel_prices():
@@ -47,8 +56,9 @@ def test_toll_estimate():
 
 def test_calculate_trip_cost():
     token = get_token()
+    vehicle_id = get_vehicle_id(token)
     response = client.post("/api/fuel/calculate", json={
-        "vehicle_id": "v_test",
+        "vehicle_id": vehicle_id,
         "origin": "Delhi",
         "destination": "Jaipur",
         "include_return": False,
@@ -61,13 +71,17 @@ def test_calculate_trip_cost():
 
 def test_calculate_trip_cost_with_return():
     token = get_token()
+    vehicle_id = get_vehicle_id(token)
     response = client.post("/api/fuel/calculate", json={
-        "vehicle_id": "v_test",
+        "vehicle_id": vehicle_id,
         "origin": "Mumbai",
         "destination": "Pune",
         "include_return": True,
     }, headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
+
+
+
 
 
 def test_calculate_without_token():

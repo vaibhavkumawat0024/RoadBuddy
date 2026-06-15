@@ -114,3 +114,72 @@ class Booking(Base):
     created_at          = Column(DateTime, server_default=func.now())
 
     user = relationship("User")
+
+# ── Community Routes ──────────────────────────────────────────────────────────
+
+class CommunityRoute(Base):
+    __tablename__ = "community_routes"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    user_id     = Column(Integer, ForeignKey("users.id"), nullable=False)
+    trip_id     = Column(String,  nullable=False)
+    title       = Column(String,  nullable=False)
+    description = Column(String,  nullable=False)
+    tags        = Column(String,  nullable=True)   # stored as comma separated
+    is_public   = Column(Boolean, default=True)
+    origin      = Column(String,  default="Unknown")
+    destination = Column(String,  default="Unknown")
+    avg_rating  = Column(Float,   default=0.0)
+    total_reviews = Column(Integer, default=0)
+    clone_count = Column(Integer, default=0)
+    created_at  = Column(DateTime, server_default=func.now())
+
+    user    = relationship("User")
+    reviews = relationship("RouteReview", back_populates="route")
+
+
+# ── Route Reviews ─────────────────────────────────────────────────────────────
+
+class RouteReview(Base):
+    __tablename__ = "route_reviews"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    route_id    = Column(Integer, ForeignKey("community_routes.id"), nullable=False)
+    user_id     = Column(Integer, ForeignKey("users.id"), nullable=False)
+    rating      = Column(Integer, nullable=False)
+    review_text = Column(String,  nullable=False)
+    tags        = Column(String,  nullable=True)
+    created_at  = Column(DateTime, server_default=func.now())
+
+    route = relationship("CommunityRoute", back_populates="reviews")
+    user  = relationship("User")
+
+# ── Journal ───────────────────────────────────────────────────────────────────
+
+class Journal(Base):
+    __tablename__ = "journals"
+
+    id                = Column(Integer, primary_key=True, index=True)
+    trip_id           = Column(String,  nullable=False, unique=True)
+    user_id           = Column(Integer, ForeignKey("users.id"), nullable=False)
+    total_expense_inr = Column(Float,   default=0.0)
+    is_public         = Column(Boolean, default=False)
+    created_at        = Column(DateTime, server_default=func.now())
+
+    user    = relationship("User")
+    entries = relationship("JournalEntry", back_populates="journal")
+
+
+class JournalEntry(Base):
+    __tablename__ = "journal_entries"
+
+    id         = Column(Integer, primary_key=True, index=True)
+    journal_id = Column(Integer, ForeignKey("journals.id"), nullable=False)
+    stop_name  = Column(String,  nullable=False)
+    notes      = Column(String,  nullable=True)
+    expense_inr = Column(Float,  default=0.0)
+    lat        = Column(Float,   nullable=True)
+    lng        = Column(Float,   nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+    journal = relationship("Journal", back_populates="entries")
