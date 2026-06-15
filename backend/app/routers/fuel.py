@@ -1,28 +1,40 @@
 from fastapi import APIRouter, HTTPException, Depends
+from sqlalchemy.orm import Session
 from app.schemas.schemas import FuelCalcRequest, FuelCalcOut
 from app.services.fuel_calculator import build_fuel_calc_response
 from app.core.auth import get_current_user
+from app.core.database import get_db
+from app.models.models import Vehicle
 
 router = APIRouter()
 
-# Mock vehicle store (replace with DB lookup)
-_vehicles: dict = {}
-
 
 @router.post("/calculate", response_model=FuelCalcOut)
-def calculate_trip_cost(data: FuelCalcRequest, current_user: dict = Depends(get_current_user)):
+def calculate_trip_cost(
+    data: FuelCalcRequest,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     """
     Calculate fuel cost + NHAI toll for a route.
-
-    Pass your vehicle_id to get vehicle-specific calculations.
-    Optionally set include_return=true to get the round-trip estimate.
+    Fetches real vehicle data from DB for accurate calculations.
     """
-    # In production: fetch vehicle from DB by data.vehicle_id
-    # Using defaults so the endpoint works without a real DB during dev
+    # Fetch real vehicle from DB
+    vehicle = db.query(Vehicle).filter(
+        Vehicle.id == int(data.vehicle_id),
+        Vehicle.user_id == int(current_user["user_id"])
+    ).first()
+
+    if not vehicle:
+        raise HTTPException(
+            status_code=404,
+            detail="Vehicle not found. Please add a vehicle first."
+        )
+
     vehicle_info = {
-        "fuel_type": "petrol",
-        "mileage_kmpl": 15.0,
-        "category": "car",
+        "fuel_type":    vehicle.fuel_type,
+        "mileage_kmpl": vehicle.mileage_kmpl,
+        "category":     vehicle.category,
     }
 
     try:
@@ -56,7 +68,11 @@ def get_fuel_prices():
 
 
 @router.get("/toll-estimate")
-def get_toll_estimate(origin: str, destination: str, vehicle_category: str = "car"):
+def get_toll_estimate(
+    origin: str,
+    destination: str,
+    vehicle_category: str = "car"
+):
     """
     Quick toll estimate without authentication.
     Useful for the pre-login trip preview screen.
