@@ -1,8 +1,13 @@
 from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel
+from app.services.trip_chatbot import chat_with_roadbuddy
+from typing import Optional
 from sqlalchemy.orm import Session
+from app.services.waypoint_suggester import suggest_waypoints
 from app.schemas.schemas import TripCreate, TripOut, TravelMode
 from app.services.ai_planner import generate_itinerary
 from app.core.auth import get_current_user
+from app.services.route_safety import analyze_route_safety
 from app.core.database import get_db
 from app.models.models import Trip, TripStop, Vehicle
 
@@ -213,3 +218,83 @@ def delete_trip(
     db.query(TripStop).filter(TripStop.trip_id == trip.id).delete()
     db.delete(trip)
     db.commit()
+    from pydantic import BaseModel
+from typing import Optional
+
+
+class WaypointRequest(BaseModel):
+    origin: str
+    destination: str
+    preferences: Optional[list[str]] = []
+    travel_mode: Optional[str] = "own_vehicle"
+    num_people: Optional[int] = 2
+    group_type: Optional[str] = "friends"
+
+
+@router.post("/suggest-waypoints")
+async def get_waypoint_suggestions(request: WaypointRequest):
+    """
+    AI-powered waypoint suggestions between origin and destination.
+    Returns hidden gems, dhabas, viewpoints, and must-visit stops.
+    """
+    try:
+        result = await suggest_waypoints(
+            origin=request.origin,
+            destination=request.destination,
+            preferences=request.preferences,
+            travel_mode=request.travel_mode,
+            num_people=request.num_people,
+            group_type=request.group_type,
+        )
+        return result
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    from app.services.trip_chatbot import chat_with_roadbuddy
+
+
+class ChatMessage(BaseModel):
+    message: str
+    history: Optional[list[dict]] = []
+
+
+@router.post("/chat")
+async def trip_chat(request: ChatMessage):
+    """
+    AI-powered conversational trip planning chatbot.
+    Supports multi-turn conversation with history.
+    """
+    try:
+        result = await chat_with_roadbuddy(
+            message=request.message,
+            history=request.history,
+        )
+        return result
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+class SafetyCheckRequest(BaseModel):
+    origin: str
+    destination: str
+    travel_date: str
+    departure_time: Optional[str] = "08:00"
+    vehicle_type: Optional[str] = "car"
+    num_people: Optional[int] = 2
+
+
+@router.post("/safety-check")
+async def check_route_safety(request: SafetyCheckRequest):
+    """
+    AI-powered route safety analyzer.
+    Flags dangerous stretches, seasonal hazards and gives safety score.
+    """
+    try:
+        result = await analyze_route_safety(
+            origin=request.origin,
+            destination=request.destination,
+            travel_date=request.travel_date,
+            departure_time=request.departure_time,
+            vehicle_type=request.vehicle_type,
+            num_people=request.num_people,
+        )
+        return result
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))

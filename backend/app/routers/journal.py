@@ -1,6 +1,9 @@
 from fastapi import APIRouter, HTTPException, Depends
 from app.schemas.schemas import JournalEntryCreate, JournalOut
 from app.core.auth import get_current_user
+from app.services.journal_summarizer import summarize_trip_journal
+from pydantic import BaseModel
+from typing import Optional
 
 router = APIRouter()
 
@@ -96,3 +99,42 @@ def expense_summary(trip_id: str, current_user: dict = Depends(get_current_user)
         "num_stops": len(entries),
         "stops": [{"name": e["stop_name"], "expense_inr": e["expense_inr"]} for e in entries],
     }
+class JournalEntry(BaseModel):
+    day: int
+    date: Optional[str] = ""
+    location: Optional[str] = ""
+    mood: Optional[str] = "neutral"
+    text: str
+    expenses_inr: Optional[float] = 0
+
+
+class SummarizeRequest(BaseModel):
+    origin: str
+    destination: str
+    entries: list[JournalEntry]
+    total_days: int
+    total_cost_inr: Optional[float] = 0
+    group_type: Optional[str] = "friends"
+    num_people: Optional[int] = 2
+
+
+@router.post("/summarize")
+async def summarize_journal(request: SummarizeRequest):
+    """
+    AI-powered trip journal summarizer.
+    Generates a beautiful narrative, highlights, stats and social caption.
+    """
+    try:
+        entries_dict = [e.dict() for e in request.entries]
+        result = await summarize_trip_journal(
+            origin=request.origin,
+            destination=request.destination,
+            entries=entries_dict,
+            total_days=request.total_days,
+            total_cost_inr=request.total_cost_inr,
+            group_type=request.group_type,
+            num_people=request.num_people,
+        )
+        return result
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
