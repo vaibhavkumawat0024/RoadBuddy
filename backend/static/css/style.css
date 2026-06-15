@@ -890,3 +890,39 @@ justify-content:space-between;
 margin:15px 0;
 
 }
+
+.profile-container{
+    padding:30px;
+}
+
+
+.profile-card{
+
+    max-width:500px;
+    background:white;
+    padding:30px;
+    border-radius:15px;
+    box-shadow:0 5px 20px #ddd;
+
+}
+
+
+.profile-card input{
+
+    width:100%;
+    padding:12px;
+    margin:10px 0 20px;
+    border-radius:8px;
+    border:1px solid #ccc;
+
+}
+
+
+.profile-card button{
+
+    padding:12px 25px;
+    border:none;
+    border-radius:8px;
+    cursor:pointer;
+
+}

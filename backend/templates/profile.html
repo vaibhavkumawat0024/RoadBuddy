@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1>👤 My Profile</h1>
+
+<form method="post" action="/profile/update">
+
+<label>Name</label>
+<input 
+type="text"
+name="name"
+value="{{ user.name }}"
+required>
+
+
+<label>Email</label>
+<input 
+type="email"
+name="email"
+value="{{ user.email }}"
+required>
+
+
+<label>New Password</label>
+<input 
+type="password"
+name="password"
+placeholder="Optional">
+
+
+<button type="submit">
+Save Changes
+</button>
+
+</form>
+
+{% endblock %}
