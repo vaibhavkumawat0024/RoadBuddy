@@ -14,6 +14,8 @@
   <div class="step" id="step-indicator-2">2. AI Itinerary</div>
   <div class="step-divider">→</div>
   <div class="step" id="step-indicator-3">3. Safety Check</div>
+  <div class="step-divider">→</div>
+  <div class="step" id="step-indicator-4">4. Book & Map</div>
 </div>
 
 <!-- Step 1 — Trip Details Form -->
@@ -124,7 +126,43 @@
   <div id="safety-report"></div>
 
   <div class="action-row" style="margin-top: 20px;">
-    <a href="/dashboard" class="btn-plan">✅ Go to Dashboard</a>
+    <button class="btn-plan" onclick="goToStep(4)">🗺️ View Map & Book</button>
+    <button class="btn-secondary" onclick="saveTrip()">💾 Save Trip</button>
+  </div>
+</div>
+
+<!-- Step 4 — Map & Booking -->
+<div id="step-4" class="plan-card hidden">
+  <div class="itinerary-header">
+    <h2>🗺️ Route Map & Bookings</h2>
+    <button class="btn-secondary" onclick="goToStep(3)">← Back to Safety</button>
+  </div>
+
+  <!-- Google Maps Embed -->
+  <h3 style="font-size:15px;margin-bottom:12px;">📍 Route on Map</h3>
+  <div id="map-container" style="border-radius:10px;overflow:hidden;border:1px solid #e5e5e5;margin-bottom:24px;">
+    <iframe
+      id="map-frame"
+      width="100%"
+      height="300"
+      frameborder="0"
+      style="border:0;"
+      allowfullscreen=""
+      loading="lazy"
+      src="">
+    </iframe>
+  </div>
+
+  <!-- Booking Options -->
+  <h3 style="font-size:15px;margin-bottom:12px;">🎫 Book Your Trip</h3>
+  <div class="booking-grid" id="booking-grid"></div>
+
+  <!-- Hotels -->
+  <h3 style="font-size:15px;margin:20px 0 12px;">🏨 Find Hotels</h3>
+  <div class="booking-grid" id="hotel-grid"></div>
+
+  <div class="action-row" style="margin-top:24px;">
+    <a href="/my-trips" class="btn-plan">✅ View My Trips</a>
     <button class="btn-secondary" onclick="saveTrip()">💾 Save Trip</button>
   </div>
 </div>
@@ -157,12 +195,13 @@
   }
 
   function goToStep(n) {
-    [1, 2, 3].forEach(i => {
+    [1, 2, 3, 4].forEach(i => {
       document.getElementById(`step-${i}`).classList.add('hidden');
       document.getElementById(`step-indicator-${i}`).classList.remove('active');
     });
     document.getElementById(`step-${n}`).classList.remove('hidden');
     document.getElementById(`step-indicator-${n}`).classList.add('active');
+    if (n === 4) renderMapAndBookings();
     window.scrollTo(0, 0);
   }
 
@@ -228,13 +267,12 @@
       `${data.origin} → ${data.destination}`;
     document.getElementById('itinerary-summary').textContent = data.ai_summary;
 
-    // Cost breakdown
     const costGrid = document.getElementById('cost-grid');
     const costs = [
-      { label: 'Fuel Cost', value: data.fuel_cost_inr, icon: '⛽' },
-      { label: 'Toll Cost', value: data.toll_cost_inr, icon: '🛣️' },
-      { label: 'Hotel Cost', value: data.hotel_cost_inr, icon: '🏨' },
-      { label: 'Food Cost', value: data.food_cost_inr, icon: '🍽️' },
+      { label: 'Fuel Cost',  value: data.fuel_cost_inr,            icon: '⛽' },
+      { label: 'Toll Cost',  value: data.toll_cost_inr,            icon: '🛣️' },
+      { label: 'Hotel Cost', value: data.hotel_cost_inr,           icon: '🏨' },
+      { label: 'Food Cost',  value: data.food_cost_inr,            icon: '🍽️' },
       { label: 'Total Cost', value: data.total_estimated_cost_inr, icon: '💰', highlight: true },
     ];
     costGrid.innerHTML = costs.map(c => `
@@ -245,7 +283,6 @@
       </div>
     `).join('');
 
-    // Group stops by day
     const byDay = {};
     (data.stops || []).forEach(stop => {
       if (!byDay[stop.day]) byDay[stop.day] = [];
@@ -267,7 +304,7 @@
       <div class="day-section">
         <div class="day-header">Day ${day}</div>
         ${stops.map(stop => `
-          <div class="stop-card" style="border-left: 3px solid #1D9E75; background: ${stopColors[stop.place_type] || '#fafafa'}">
+          <div class="stop-card" style="border-left:3px solid #1D9E75;background:${stopColors[stop.place_type] || '#fafafa'}">
             <div class="stop-top">
               <span class="stop-icon">${stopIcons[stop.place_type] || '📍'}</span>
               <div class="stop-info">
@@ -315,8 +352,7 @@
             <div class="safety-summary">${r.summary}</div>
           </div>
         </div>
-
-        <h3 style="margin: 16px 0 8px; font-size: 14px;">⚠️ Hazards on this route:</h3>
+        <h3 style="margin:16px 0 8px;font-size:14px;">⚠️ Hazards on this route:</h3>
         ${r.hazards.map(h => `
           <div class="hazard-card">
             <div class="hazard-top">
@@ -327,14 +363,12 @@
             <div class="hazard-advice">💡 ${h.advice}</div>
           </div>
         `).join('')}
-
-        <h3 style="margin: 16px 0 8px; font-size: 14px;">✅ Safety Tips:</h3>
+        <h3 style="margin:16px 0 8px;font-size:14px;">✅ Safety Tips:</h3>
         <div class="tips-list">
           ${r.safety_tips.map(t => `<div class="tip-item">• ${t}</div>`).join('')}
         </div>
-
         <div class="emergency-row">
-          <h3 style="font-size: 14px; margin-bottom: 8px;">🚨 Emergency Contacts:</h3>
+          <h3 style="font-size:14px;margin-bottom:8px;">🚨 Emergency Contacts:</h3>
           ${r.emergency_contacts.map(c => `
             <div class="emergency-card">
               <span>${c.name}</span>
@@ -342,8 +376,7 @@
             </div>
           `).join('')}
         </div>
-
-        <div class="result-tip" style="margin-top: 12px;">
+        <div class="result-tip" style="margin-top:12px;">
           🕐 Best departure time: <strong>${r.best_departure_time}</strong>
         </div>
       `;
@@ -355,19 +388,208 @@
     }
   }
 
+  // ── Map & Bookings ────────────────────────────────────────────────────────
+  function renderMapAndBookings() {
+    if (!tripData) return;
+
+    const origin      = tripData.origin;
+    const destination = tripData.destination;
+    const date        = document.getElementById('start-date').value;
+    const travelMode  = document.getElementById('travel-mode').value;
+    const numPeople   = document.getElementById('num-people').value;
+
+    // Google Maps embed
+    const mapSrc = `https://maps.google.com/maps?q=${encodeURIComponent(origin)}+to+${encodeURIComponent(destination)}&output=embed`;
+    document.getElementById('map-frame').src = mapSrc;
+
+    // Booking links based on travel mode
+    const bookingLinks = [];
+
+    if (travelMode === 'train') {
+      bookingLinks.push({
+        icon: '🚂',
+        name: 'Book Train on IRCTC',
+        desc: 'Official Indian Railways booking',
+        url: `https://www.irctc.co.in/nget/train-search?from=${encodeURIComponent(origin)}&to=${encodeURIComponent(destination)}&date=${date}`,
+        color: '#1a73e8'
+      });
+      bookingLinks.push({
+        icon: '🚂',
+        name: 'Check Trains on Ixigo',
+        desc: 'Compare trains and prices',
+        url: `https://www.ixigo.com/trains/results/${encodeURIComponent(origin)}/${encodeURIComponent(destination)}/${date}/`,
+        color: '#e64c3c'
+      });
+    }
+
+    if (travelMode === 'bus') {
+      bookingLinks.push({
+        icon: '🚌',
+        name: 'Book Bus on RedBus',
+        desc: 'India\'s largest bus booking platform',
+        url: `https://www.redbus.in/bus-tickets/${encodeURIComponent(origin.toLowerCase())}-to-${encodeURIComponent(destination.toLowerCase())}`,
+        color: '#d84315'
+      });
+      bookingLinks.push({
+        icon: '🚌',
+        name: 'Book Bus on Ixigo',
+        desc: 'Compare bus options and prices',
+        url: `https://www.ixigo.com/bus/results/${encodeURIComponent(origin)}/${encodeURIComponent(destination)}/${date}`,
+        color: '#e64c3c'
+      });
+    }
+
+    if (travelMode === 'flight') {
+      bookingLinks.push({
+        icon: '✈️',
+        name: 'Search Flights on Google',
+        desc: 'Compare all airlines and prices',
+        url: `https://www.google.com/travel/flights?q=flights+from+${encodeURIComponent(origin)}+to+${encodeURIComponent(destination)}+on+${date}`,
+        color: '#1a73e8'
+      });
+      bookingLinks.push({
+        icon: '✈️',
+        name: 'Book on MakeMyTrip',
+        desc: 'India\'s top flight booking platform',
+        url: `https://www.makemytrip.com/flights/domestic/results?tripType=O&itinerary=${encodeURIComponent(origin)}-${encodeURIComponent(destination)}-${date.replace(/-/g,'')}&paxType=A-${numPeople}_C-0_I-0`,
+        color: '#e91e63'
+      });
+      bookingLinks.push({
+        icon: '✈️',
+        name: 'Book on EaseMyTrip',
+        desc: 'Cheapest flight deals',
+        url: `https://www.easemytrip.com/flights/domestic-flights.aspx`,
+        color: '#2196F3'
+      });
+    }
+
+    if (travelMode === 'own_vehicle') {
+      bookingLinks.push({
+        icon: '🗺️',
+        name: 'Get Directions on Google Maps',
+        desc: 'Full route with turn-by-turn directions',
+        url: `https://www.google.com/maps/dir/${encodeURIComponent(origin)}/${encodeURIComponent(destination)}`,
+        color: '#1a73e8'
+      });
+      bookingLinks.push({
+        icon: '⛽',
+        name: 'Check Fuel Prices',
+        desc: 'Today\'s petrol and diesel prices',
+        url: `https://www.google.com/search?q=petrol+price+today+${encodeURIComponent(origin)}`,
+        color: '#FF9800'
+      });
+      bookingLinks.push({
+        icon: '🛣️',
+        name: 'Check Toll on FASTag',
+        desc: 'NHAI toll calculator',
+        url: `https://tis.nhai.gov.in/`,
+        color: '#4CAF50'
+      });
+    }
+
+    // Render booking links
+    document.getElementById('booking-grid').innerHTML = bookingLinks.map(b => `
+      <a href="${b.url}" target="_blank" class="booking-card" style="border-top:3px solid ${b.color}">
+        <span class="booking-icon">${b.icon}</span>
+        <div class="booking-info">
+          <div class="booking-name">${b.name}</div>
+          <div class="booking-desc">${b.desc}</div>
+        </div>
+        <span class="booking-arrow">→</span>
+      </a>
+    `).join('');
+
+    // Hotel links
+    const hotelLinks = [
+      {
+        icon: '🏨',
+        name: 'Search Hotels on Booking.com',
+        desc: 'Best hotel deals worldwide',
+        url: `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(destination)}&checkin=${date}`,
+        color: '#003580'
+      },
+      {
+        icon: '🏨',
+        name: 'Book on MakeMyTrip',
+        desc: 'Hotels with Indian payment options',
+        url: `https://www.makemytrip.com/hotels/${encodeURIComponent(destination.toLowerCase())}-hotels.html`,
+        color: '#e91e63'
+      },
+      {
+        icon: '🏠',
+        name: 'Find Homestays on OYO',
+        desc: 'Budget hotels and homestays',
+        url: `https://www.oyorooms.com/s/?q=${encodeURIComponent(destination)}`,
+        color: '#EE2E24'
+      },
+      {
+        icon: '🏕️',
+        name: 'Find Unique Stays on Airbnb',
+        desc: 'Homes, villas and unique stays',
+        url: `https://www.airbnb.co.in/s/${encodeURIComponent(destination)}`,
+        color: '#FF5A5F'
+      },
+    ];
+
+    document.getElementById('hotel-grid').innerHTML = hotelLinks.map(b => `
+      <a href="${b.url}" target="_blank" class="booking-card" style="border-top:3px solid ${b.color}">
+        <span class="booking-icon">${b.icon}</span>
+        <div class="booking-info">
+          <div class="booking-name">${b.name}</div>
+          <div class="booking-desc">${b.desc}</div>
+        </div>
+        <span class="booking-arrow">→</span>
+      </a>
+    `).join('');
+  }
+
   async function saveTrip() {
     alert('Trip saved to your dashboard! ✅');
-    window.location.href = '/dashboard';
+    window.location.href = '/my-trips';
   }
 
   // Set default dates
-  const today = new Date();
+  const today    = new Date();
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
   const nextWeek = new Date(today);
   nextWeek.setDate(nextWeek.getDate() + 7);
   document.getElementById('start-date').value = tomorrow.toISOString().split('T')[0];
-  document.getElementById('end-date').value = nextWeek.toISOString().split('T')[0];
+  document.getElementById('end-date').value   = nextWeek.toISOString().split('T')[0];
 </script>
+
+<!-- Booking Card Styles -->
+<style>
+.booking-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.booking-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 10px;
+  padding: 14px;
+  text-decoration: none;
+  color: inherit;
+  transition: box-shadow 0.2s;
+}
+
+.booking-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  transform: translateY(-1px);
+}
+
+.booking-icon { font-size: 24px; flex-shrink: 0; }
+.booking-info { flex: 1; }
+.booking-name { font-weight: 600; font-size: 13px; }
+.booking-desc { font-size: 11px; color: #888; margin-top: 2px; }
+.booking-arrow { color: #1D9E75; font-weight: 600; font-size: 16px; }
+</style>
 
 {% endblock %}

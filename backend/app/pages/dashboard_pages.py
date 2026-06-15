@@ -189,10 +189,14 @@ def delete_trip(trip_id: int, request: Request, db: Session = Depends(get_db)):
 async def community_page(request: Request, db: Session = Depends(get_db)):
     user = get_user_from_cookie(request, db)
 
-    from app.models.models import CommunityRoute
-    routes = db.query(CommunityRoute).filter(
-        CommunityRoute.is_public == True
-    ).order_by(CommunityRoute.created_at.desc()).all()
+    try:
+        from app.models.models import CommunityRoute
+        routes = db.query(CommunityRoute).filter(
+            CommunityRoute.is_public == True
+        ).order_by(CommunityRoute.created_at.desc()).all()
+    except Exception:
+        db.rollback()
+        routes = []
 
     token = request.cookies.get("access_token")
 
@@ -201,8 +205,6 @@ async def community_page(request: Request, db: Session = Depends(get_db)):
         "routes": routes,
         "token": token,
     })
-
-
 # ---------------- PROFILE ----------------
 
 @router.get("/profile", response_class=HTMLResponse)
