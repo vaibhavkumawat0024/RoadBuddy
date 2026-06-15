@@ -174,3 +174,16 @@ def delete_trip(
         db.commit()
  
     return RedirectResponse("/my-trips", status_code=303)
+
+
+
+@router.get("/community", response_class=HTMLResponse)
+async def community_page(request: Request):
+
+    return templates.TemplateResponse(
+        request,
+        "community.html",
+        {
+            "request": request
+        }
+    )

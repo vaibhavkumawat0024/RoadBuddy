@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="community-container">
+
+    <div class="community-header">
+        <h1>🌍 Community Routes</h1>
+        <p>Discover trips shared by RoadBuddy travellers</p>
+    </div>
+
+
+    <!-- Search -->
+    <div class="search-box">
+        <input 
+            type="text" 
+            id="searchRoute"
+            placeholder="Search destination..."
+            onkeyup="searchRoutes()"
+        >
+    </div>
+
+
+    <!-- Publish -->
+    <div class="publish-card">
+        <h2>Share Your Trip</h2>
+
+        <p>
+            Publish your favourite route and help other travellers.
+        </p>
+
+        <button onclick="window.location='/publish-route'">
+            + Publish Route
+        </button>
+    </div>
+
+
+
+    <!-- Routes -->
+
+    <div id="routesGrid" class="routes-grid">
+
+
+        <div class="route-card">
+
+            <h3>Jaipur → Udaipur</h3>
+
+            <div class="tags">
+                <span>🏰 Heritage</span>
+                <span>🍛 Food</span>
+                <span>🌄 Nature</span>
+            </div>
+
+
+            <p>
+                Scenic highway journey through Rajasthan.
+                Includes forts, lakes and local food stops.
+            </p>
+
+
+            <div class="route-info">
+
+                <span>
+                ⭐ 4.8 Rating
+                </span>
+
+                <span>
+                🚗 400 km
+                </span>
+
+            </div>
+
+
+            <button>
+                View Route
+            </button>
+
+        </div>
+
+
+
+
+        <div class="route-card">
+
+            <h3>Delhi → Manali</h3>
+
+
+            <div class="tags">
+                <span>🏔 Mountains</span>
+                <span>🔥 Adventure</span>
+            </div>
+
+
+            <p>
+                Perfect mountain road trip with scenic viewpoints.
+            </p>
+
+
+            <div class="route-info">
+
+                <span>
+                ⭐ 4.6 Rating
+                </span>
+
+                <span>
+                🚗 520 km
+                </span>
+
+            </div>
+
+
+            <button>
+                View Route
+            </button>
+
+
+        </div>
+
+
+
+    </div>
+
+
+</div>
+
+
+
+<script>
+
+function searchRoutes(){
+
+    let input =
+    document.getElementById("searchRoute").value.toLowerCase();
+
+
+    let cards =
+    document.querySelectorAll(".route-card");
+
+
+    cards.forEach(card=>{
+
+        let text =
+        card.innerText.toLowerCase();
+
+
+        if(text.includes(input)){
+            card.style.display="block";
+        }
+        else{
+            card.style.display="none";
+        }
+
+    });
+
+}
+
+</script>
+
+
+{% endblock %}

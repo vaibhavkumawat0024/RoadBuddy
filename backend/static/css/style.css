@@ -807,3 +807,86 @@ h2 { font-size: 16px; font-weight: 500; margin-bottom: 14px; }
 .empty-icon { font-size: 48px; margin-bottom: 16px; }
 .empty-state h2 { font-size: 20px; color: #333; margin-bottom: 8px; }
 .empty-state p { font-size: 14px; }
+
+.community-container{
+    padding:30px;
+}
+
+
+.community-header{
+    margin-bottom:30px;
+}
+
+
+.search-box input{
+
+    width:100%;
+    padding:15px;
+    border-radius:10px;
+    border:1px solid #ccc;
+
+}
+
+
+
+.publish-card{
+
+    margin:25px 0;
+    padding:25px;
+    border-radius:15px;
+    background:#f5f5f5;
+
+}
+
+
+.publish-card button,
+.route-card button{
+
+    padding:10px 20px;
+    border:none;
+    border-radius:8px;
+    cursor:pointer;
+
+}
+
+
+
+.routes-grid{
+
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+gap:20px;
+
+}
+
+
+
+.route-card{
+
+padding:20px;
+border-radius:15px;
+background:white;
+box-shadow:0 5px 15px #ddd;
+
+}
+
+
+
+.tags span{
+
+background:#eee;
+padding:5px 10px;
+border-radius:20px;
+margin:5px;
+
+}
+
+
+
+.route-info{
+
+display:flex;
+justify-content:space-between;
+margin:15px 0;
+
+}
