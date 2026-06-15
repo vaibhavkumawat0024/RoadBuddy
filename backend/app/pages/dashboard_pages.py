@@ -22,140 +22,75 @@ pwd_context = CryptContext(
 # ---------------- USER FROM COOKIE ----------------
 
 def get_user_from_cookie(request: Request, db: Session):
-
     token = request.cookies.get("access_token")
-
     if not token:
         return None
-
     try:
         from jose import jwt
         from app.core.config import settings
-
-        payload = jwt.decode(
-            token,
-            settings.secret_key,
-            algorithms=["HS256"]
-        )
-
-        user = db.query(User).filter(
-            User.id == int(payload["sub"])
-        ).first()
-
+        payload = jwt.decode(token, settings.secret_key, algorithms=["HS256"])
+        user = db.query(User).filter(User.id == int(payload["sub"])).first()
         return user
-
     except Exception:
         return None
 
 
-
 # ---------------- DASHBOARD ----------------
 
-
 @router.get("/dashboard", response_class=HTMLResponse)
-def dashboard(
-    request: Request,
-    db: Session = Depends(get_db)
-):
-
+def dashboard(request: Request, db: Session = Depends(get_db)):
     user = get_user_from_cookie(request, db)
-
     if not user:
-        return RedirectResponse(
-            "/login",
-            status_code=303
-        )
-
+        return RedirectResponse("/login", status_code=303)
 
     trips = db.query(Trip).filter(
         Trip.user_id == user.id
-    ).order_by(
-        Trip.created_at.desc()
-    ).limit(5).all()
+    ).order_by(Trip.created_at.desc()).limit(5).all()
 
+    vehicles = db.query(Vehicle).filter(Vehicle.user_id == user.id).all()
 
-    vehicles = db.query(Vehicle).filter(
-        Vehicle.user_id == user.id
-    ).all()
-
-
-    return templates.TemplateResponse(
-        request,
-        "dashboard.html",
-        {
-            "user": user,
-            "trips": trips,
-            "trip_count": len(trips),
-            "vehicle_count": len(vehicles)
-        }
-    )
-
+    return templates.TemplateResponse(request, "dashboard.html", {
+        "user": user,
+        "trips": trips,
+        "trip_count": len(trips),
+        "vehicle_count": len(vehicles)
+    })
 
 
 # ---------------- PLAN TRIP ----------------
 
-
 @router.get("/plan-trip", response_class=HTMLResponse)
-def plan_trip_page(
-    request: Request,
-    db: Session = Depends(get_db)
-):
-
+def plan_trip_page(request: Request, db: Session = Depends(get_db)):
     user = get_user_from_cookie(request, db)
-
     if not user:
         return RedirectResponse("/login", status_code=303)
 
-
-    vehicles = db.query(Vehicle).filter(
-        Vehicle.user_id == user.id
-    ).all()
-
-
+    vehicles = db.query(Vehicle).filter(Vehicle.user_id == user.id).all()
     token = request.cookies.get("access_token")
 
-
-    return templates.TemplateResponse(
-        request,
-        "plan_trip.html",
-        {
-            "user": user,
-            "vehicles": vehicles,
-            "token": token
-        }
-    )
-
+    return templates.TemplateResponse(request, "plan_trip.html", {
+        "user": user,
+        "vehicles": vehicles,
+        "token": token
+    })
 
 
 # ---------------- ADD VEHICLE ----------------
 
-
 @router.get("/add-vehicle", response_class=HTMLResponse)
-def add_vehicle_page(
-    request: Request,
-    db: Session = Depends(get_db)
-):
-
+def add_vehicle_page(request: Request, db: Session = Depends(get_db)):
     user = get_user_from_cookie(request, db)
-
     if not user:
         return RedirectResponse("/login", status_code=303)
 
+    vehicles = db.query(Vehicle).filter(Vehicle.user_id == user.id).all()
+    success = request.query_params.get("success")
 
-    vehicles = db.query(Vehicle).filter(
-        Vehicle.user_id == user.id
-    ).all()
-
-
-    return templates.TemplateResponse(
-        request,
-        "add_vehicle.html",
-        {
-            "user": user,
-            "vehicles": vehicles
-        }
-    )
-
+    return templates.TemplateResponse(request, "add_vehicle.html", {
+        "user": user,
+        "vehicles": vehicles,
+        "success": success,
+    })
 
 
 @router.post("/add-vehicle")
@@ -167,12 +102,9 @@ def add_vehicle_submit(
     mileage_kmpl: float = Form(...),
     db: Session = Depends(get_db)
 ):
-
     user = get_user_from_cookie(request, db)
-
     if not user:
-        return RedirectResponse("/login")
-
+        return RedirectResponse("/login", status_code=303)
 
     vehicle = Vehicle(
         user_id=user.id,
@@ -181,114 +113,117 @@ def add_vehicle_submit(
         category=category,
         mileage_kmpl=mileage_kmpl
     )
-
-
     db.add(vehicle)
     db.commit()
 
+    return RedirectResponse("/add-vehicle?success=Vehicle added successfully!", status_code=303)
 
-    return RedirectResponse(
-        "/add-vehicle",
-        status_code=303
-    )
 
+@router.post("/delete-vehicle/{vehicle_id}")
+def delete_vehicle(vehicle_id: int, request: Request, db: Session = Depends(get_db)):
+    user = get_user_from_cookie(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=303)
+
+    vehicle = db.query(Vehicle).filter(
+        Vehicle.id == vehicle_id,
+        Vehicle.user_id == user.id
+    ).first()
+
+    if vehicle:
+        db.delete(vehicle)
+        db.commit()
+
+    return RedirectResponse("/add-vehicle?success=Vehicle deleted.", status_code=303)
 
 
 # ---------------- MY TRIPS ----------------
 
-
 @router.get("/my-trips", response_class=HTMLResponse)
-def my_trips_page(
-    request: Request,
-    db: Session = Depends(get_db)
-):
-
+def my_trips_page(request: Request, db: Session = Depends(get_db)):
     user = get_user_from_cookie(request, db)
-
     if not user:
-        return RedirectResponse("/login")
-
+        return RedirectResponse("/login", status_code=303)
 
     from app.models.models import TripStop
 
-
     trips = db.query(Trip).filter(
         Trip.user_id == user.id
-    ).order_by(
-        Trip.created_at.desc()
-    ).all()
-
+    ).order_by(Trip.created_at.desc()).all()
 
     for trip in trips:
-
         trip.stops = db.query(TripStop).filter(
             TripStop.trip_id == trip.id
-        ).all()
+        ).order_by(TripStop.day, TripStop.time_slot).all()
+
+    return templates.TemplateResponse(request, "my_trips.html", {
+        "user": user,
+        "trips": trips
+    })
 
 
-    return templates.TemplateResponse(
-        request,
-        "my_trips.html",
-        {
-            "user": user,
-            "trips": trips
-        }
-    )
+@router.post("/delete-trip/{trip_id}")
+def delete_trip(trip_id: int, request: Request, db: Session = Depends(get_db)):
+    user = get_user_from_cookie(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=303)
 
+    from app.models.models import TripStop
+
+    trip = db.query(Trip).filter(
+        Trip.id == trip_id,
+        Trip.user_id == user.id
+    ).first()
+
+    if trip:
+        db.query(TripStop).filter(TripStop.trip_id == trip.id).delete()
+        db.delete(trip)
+        db.commit()
+
+    return RedirectResponse("/my-trips", status_code=303)
 
 
 # ---------------- COMMUNITY ----------------
 
-
 @router.get("/community", response_class=HTMLResponse)
-async def community_page(
-    request: Request,
-    db: Session = Depends(get_db)
-):
-
+async def community_page(request: Request, db: Session = Depends(get_db)):
     user = get_user_from_cookie(request, db)
 
+    from app.models.models import CommunityRoute
+    routes = db.query(CommunityRoute).filter(
+        CommunityRoute.is_public == True
+    ).order_by(CommunityRoute.created_at.desc()).all()
 
-    return templates.TemplateResponse(
-        request,
-        "community.html",
-        {
-            "user": user
-        }
-    )
+    token = request.cookies.get("access_token")
 
+    return templates.TemplateResponse(request, "community.html", {
+        "user": user,
+        "routes": routes,
+        "token": token,
+    })
 
 
 # ---------------- PROFILE ----------------
 
-
 @router.get("/profile", response_class=HTMLResponse)
-async def profile_page(
-    request: Request,
-    db: Session = Depends(get_db)
-):
-
-    user = get_user_from_cookie(
-        request,
-        db
-    )
-
-
+async def profile_page(request: Request, db: Session = Depends(get_db)):
+    user = get_user_from_cookie(request, db)
     if not user:
-        return RedirectResponse(
-            "/login",
-            status_code=303
-        )
+        return RedirectResponse("/login", status_code=303)
 
+    from app.models.models import TripStop
 
-    return templates.TemplateResponse(
-        request,
-        "profile.html",
-        {
-            "user": user
-        }
-    )
+    trips = db.query(Trip).filter(
+        Trip.user_id == user.id
+    ).order_by(Trip.created_at.desc()).all()
 
+    vehicles = db.query(Vehicle).filter(Vehicle.user_id == user.id).all()
+
+    return templates.TemplateResponse(request, "profile.html", {
+        "user": user,
+        "trip_count": len(trips),
+        "vehicle_count": len(vehicles),
+    })
 
 
 @router.post("/profile/update")
@@ -299,35 +234,16 @@ async def update_profile(
     password: str = Form(""),
     db: Session = Depends(get_db)
 ):
-
-    user = get_user_from_cookie(
-        request,
-        db
-    )
-
-
+    user = get_user_from_cookie(request, db)
     if not user:
-        return RedirectResponse(
-            "/login",
-            status_code=303
-        )
-
+        return RedirectResponse("/login", status_code=303)
 
     user.name = name
     user.email = email
 
-
     if password:
-
-        user.hashed_password = pwd_context.hash(
-            password
-        )
-
+        user.password_hash = pwd_context.hash(password)
 
     db.commit()
 
-
-    return RedirectResponse(
-        "/profile",
-        status_code=303
-    )
+    return RedirectResponse("/profile?success=Profile updated!", status_code=303)
