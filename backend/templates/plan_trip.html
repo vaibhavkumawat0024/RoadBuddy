@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+{% block title %}Plan a Trip — RoadBuddy{% endblock %}
+{% block content %}
+
+<div class="dashboard-header">
+  <h1>🗺️ Plan a Trip</h1>
+  <a href="/dashboard" class="btn-secondary">← Back to Dashboard</a>
+</div>
+
+<!-- Progress Steps -->
+<div class="steps-row">
+  <div class="step active" id="step-indicator-1">1. Trip Details</div>
+  <div class="step-divider">→</div>
+  <div class="step" id="step-indicator-2">2. AI Itinerary</div>
+  <div class="step-divider">→</div>
+  <div class="step" id="step-indicator-3">3. Safety Check</div>
+</div>
+
+<!-- Step 1 — Trip Details Form -->
+<div id="step-1" class="plan-card">
+  <h2>Tell us about your trip</h2>
+
+  <div class="form-grid">
+    <div class="form-group">
+      <label>From (Origin) *</label>
+      <input type="text" id="origin" placeholder="e.g. Jaipur" />
+    </div>
+    <div class="form-group">
+      <label>To (Destination) *</label>
+      <input type="text" id="destination" placeholder="e.g. Udaipur" />
+    </div>
+    <div class="form-group">
+      <label>Start Date *</label>
+      <input type="date" id="start-date" />
+    </div>
+    <div class="form-group">
+      <label>End Date *</label>
+      <input type="date" id="end-date" />
+    </div>
+    <div class="form-group">
+      <label>Budget (₹) *</label>
+      <input type="number" id="budget" placeholder="e.g. 15000" />
+    </div>
+    <div class="form-group">
+      <label>Number of People *</label>
+      <input type="number" id="num-people" value="2" min="1" />
+    </div>
+    <div class="form-group">
+      <label>Group Type *</label>
+      <select id="group-type">
+        <option value="friends">Friends</option>
+        <option value="couple">Couple</option>
+        <option value="family">Family</option>
+        <option value="solo">Solo</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Travel Mode *</label>
+      <select id="travel-mode" onchange="toggleVehicle()">
+        <option value="own_vehicle">Own Vehicle</option>
+        <option value="bus">Bus</option>
+        <option value="train">Train</option>
+        <option value="flight">Flight</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Vehicle Section -->
+  <div id="vehicle-section">
+    <h3 style="margin: 20px 0 12px; font-size: 15px;">Vehicle Details</h3>
+    {% if vehicles %}
+    <div class="form-group">
+      <label>Select your vehicle</label>
+      <select id="vehicle-id">
+        {% for v in vehicles %}
+        <option value="{{ v.id }}">{{ v.name }} — {{ v.fuel_type }} ({{ v.mileage_kmpl }} kmpl)</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% else %}
+    <div class="info-box">
+      No vehicles added yet.
+      <a href="/add-vehicle">Add a vehicle</a> to get accurate fuel estimates.
+    </div>
+    <input type="hidden" id="vehicle-id" value="" />
+    {% endif %}
+  </div>
+
+  <button class="btn-plan" onclick="generateTrip()">
+    ✨ Generate AI Itinerary
+  </button>
+</div>
+
+<!-- Step 2 — AI Itinerary Results -->
+<div id="step-2" class="plan-card hidden">
+  <div class="itinerary-header">
+    <div>
+      <h2 id="itinerary-title">Your Trip Itinerary</h2>
+      <p id="itinerary-summary" class="itinerary-summary"></p>
+    </div>
+    <button class="btn-secondary" onclick="goBack()">← Edit Trip</button>
+  </div>
+
+  <!-- Cost Breakdown -->
+  <div class="cost-grid" id="cost-grid"></div>
+
+  <!-- Day by Day Stops -->
+  <h3 style="margin: 24px 0 12px; font-size: 15px;">📅 Day by Day Itinerary</h3>
+  <div id="stops-list"></div>
+
+  <div class="action-row">
+    <button class="btn-plan" onclick="proceedToSafety()">🛡️ Check Route Safety</button>
+    <button class="btn-secondary" onclick="saveTrip()">💾 Save Trip</button>
+  </div>
+</div>
+
+<!-- Step 3 — Safety Check -->
+<div id="step-3" class="plan-card hidden">
+  <div class="itinerary-header">
+    <h2>🛡️ Route Safety Report</h2>
+    <button class="btn-secondary" onclick="goToStep(2)">← Back to Itinerary</button>
+  </div>
+
+  <div id="safety-report"></div>
+
+  <div class="action-row" style="margin-top: 20px;">
+    <a href="/dashboard" class="btn-plan">✅ Go to Dashboard</a>
+    <button class="btn-secondary" onclick="saveTrip()">💾 Save Trip</button>
+  </div>
+</div>
+
+<!-- Loading Overlay -->
+<div id="loading" class="loading-overlay hidden">
+  <div class="loading-box">
+    <div class="spinner"></div>
+    <div id="loading-text">Generating your AI itinerary...</div>
+  </div>
+</div>
+
+<script>
+  let tripData = null;
+  const TOKEN = "{{ token }}";
+
+  function toggleVehicle() {
+    const mode = document.getElementById('travel-mode').value;
+    document.getElementById('vehicle-section').style.display =
+      mode === 'own_vehicle' ? 'block' : 'none';
+  }
+
+  function showLoading(text) {
+    document.getElementById('loading-text').textContent = text;
+    document.getElementById('loading').classList.remove('hidden');
+  }
+
+  function hideLoading() {
+    document.getElementById('loading').classList.add('hidden');
+  }
+
+  function goToStep(n) {
+    [1, 2, 3].forEach(i => {
+      document.getElementById(`step-${i}`).classList.add('hidden');
+      document.getElementById(`step-indicator-${i}`).classList.remove('active');
+    });
+    document.getElementById(`step-${n}`).classList.remove('hidden');
+    document.getElementById(`step-indicator-${n}`).classList.add('active');
+    window.scrollTo(0, 0);
+  }
+
+  function goBack() { goToStep(1); }
+
+  async function generateTrip() {
+    const origin      = document.getElementById('origin').value.trim();
+    const destination = document.getElementById('destination').value.trim();
+    const startDate   = document.getElementById('start-date').value;
+    const endDate     = document.getElementById('end-date').value;
+    const budget      = document.getElementById('budget').value;
+    const numPeople   = document.getElementById('num-people').value;
+    const groupType   = document.getElementById('group-type').value;
+    const travelMode  = document.getElementById('travel-mode').value;
+    const vehicleId   = document.getElementById('vehicle-id')?.value;
+
+    if (!origin || !destination || !startDate || !endDate || !budget) {
+      alert('Please fill in all required fields!');
+      return;
+    }
+
+    showLoading('✨ Generating your AI itinerary...');
+
+    try {
+      const res = await fetch('/api/trips/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${TOKEN}`
+        },
+        body: JSON.stringify({
+          origin, destination,
+          start_date: startDate,
+          end_date: endDate,
+          budget_inr: parseFloat(budget),
+          num_people: parseInt(numPeople),
+          group_type: groupType,
+          travel_mode: travelMode,
+          vehicle_id: vehicleId || null,
+        })
+      });
+
+      const data = await res.json();
+      hideLoading();
+
+      if (!res.ok) {
+        alert(data.detail || 'Failed to generate itinerary. Please try again.');
+        return;
+      }
+
+      tripData = data;
+      renderItinerary(data);
+      goToStep(2);
+
+    } catch (e) {
+      hideLoading();
+      alert('Something went wrong. Please try again.');
+    }
+  }
+
+  function renderItinerary(data) {
+    document.getElementById('itinerary-title').textContent =
+      `${data.origin} → ${data.destination}`;
+    document.getElementById('itinerary-summary').textContent = data.ai_summary;
+
+    // Cost breakdown
+    const costGrid = document.getElementById('cost-grid');
+    const costs = [
+      { label: 'Fuel Cost', value: data.fuel_cost_inr, icon: '⛽' },
+      { label: 'Toll Cost', value: data.toll_cost_inr, icon: '🛣️' },
+      { label: 'Hotel Cost', value: data.hotel_cost_inr, icon: '🏨' },
+      { label: 'Food Cost', value: data.food_cost_inr, icon: '🍽️' },
+      { label: 'Total Cost', value: data.total_estimated_cost_inr, icon: '💰', highlight: true },
+    ];
+    costGrid.innerHTML = costs.map(c => `
+      <div class="cost-card ${c.highlight ? 'cost-highlight' : ''}">
+        <span class="cost-icon">${c.icon}</span>
+        <span class="cost-value">₹${Math.round(c.value).toLocaleString()}</span>
+        <span class="cost-label">${c.label}</span>
+      </div>
+    `).join('');
+
+    // Group stops by day
+    const byDay = {};
+    (data.stops || []).forEach(stop => {
+      if (!byDay[stop.day]) byDay[stop.day] = [];
+      byDay[stop.day].push(stop);
+    });
+
+    const stopColors = {
+      fuel: '#fff8e1', food: '#e8f5e9', hotel: '#e3f2fd',
+      sightseeing: '#f3e5f5', destination_food: '#e8f5e9',
+      going_route: '#fafafa', return_route: '#fafafa', toll: '#fff3e0',
+    };
+    const stopIcons = {
+      fuel: '⛽', food: '🍽️', hotel: '🏨', sightseeing: '🏛️',
+      destination_food: '🍴', going_route: '🚗', return_route: '🏠', toll: '🛣️',
+    };
+
+    const stopsList = document.getElementById('stops-list');
+    stopsList.innerHTML = Object.entries(byDay).map(([day, stops]) => `
+      <div class="day-section">
+        <div class="day-header">Day ${day}</div>
+        ${stops.map(stop => `
+          <div class="stop-card" style="border-left: 3px solid #1D9E75; background: ${stopColors[stop.place_type] || '#fafafa'}">
+            <div class="stop-top">
+              <span class="stop-icon">${stopIcons[stop.place_type] || '📍'}</span>
+              <div class="stop-info">
+                <div class="stop-name">${stop.place_name}</div>
+                <div class="stop-slot">${stop.time_slot}</div>
+              </div>
+              ${stop.estimated_cost_inr ? `<span class="stop-cost">₹${Math.round(stop.estimated_cost_inr).toLocaleString()}</span>` : ''}
+            </div>
+            ${stop.description ? `<div class="stop-desc">${stop.description}</div>` : ''}
+            ${stop.highway ? `<span class="tag">${stop.highway}</span>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    `).join('');
+  }
+
+  async function proceedToSafety() {
+    if (!tripData) return;
+    showLoading('🛡️ Analyzing route safety...');
+
+    try {
+      const res = await fetch('/api/trips/safety-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          origin: tripData.origin,
+          destination: tripData.destination,
+          travel_date: document.getElementById('start-date').value,
+          departure_time: '08:00',
+          vehicle_type: 'car',
+          num_people: parseInt(document.getElementById('num-people').value),
+        })
+      });
+      const data = await res.json();
+      hideLoading();
+
+      const r = data.safety_report;
+      const scoreColor = r.overall_safety_score >= 8 ? '#1D9E75' : r.overall_safety_score >= 6 ? '#f39c12' : '#e74c3c';
+
+      document.getElementById('safety-report').innerHTML = `
+        <div class="safety-score-row">
+          <div class="safety-score" style="color:${scoreColor}">${r.overall_safety_score}<span>/10</span></div>
+          <div>
+            <div class="safety-level" style="color:${scoreColor}">${r.overall_safety_level.toUpperCase()}</div>
+            <div class="safety-summary">${r.summary}</div>
+          </div>
+        </div>
+
+        <h3 style="margin: 16px 0 8px; font-size: 14px;">⚠️ Hazards on this route:</h3>
+        ${r.hazards.map(h => `
+          <div class="hazard-card">
+            <div class="hazard-top">
+              <strong>${h.name}</strong>
+              <span class="tag severity-${h.severity}">${h.severity}</span>
+            </div>
+            <div class="hazard-desc">${h.description}</div>
+            <div class="hazard-advice">💡 ${h.advice}</div>
+          </div>
+        `).join('')}
+
+        <h3 style="margin: 16px 0 8px; font-size: 14px;">✅ Safety Tips:</h3>
+        <div class="tips-list">
+          ${r.safety_tips.map(t => `<div class="tip-item">• ${t}</div>`).join('')}
+        </div>
+
+        <div class="emergency-row">
+          <h3 style="font-size: 14px; margin-bottom: 8px;">🚨 Emergency Contacts:</h3>
+          ${r.emergency_contacts.map(c => `
+            <div class="emergency-card">
+              <span>${c.name}</span>
+              <a href="tel:${c.number}" class="emergency-num">${c.number}</a>
+            </div>
+          `).join('')}
+        </div>
+
+        <div class="result-tip" style="margin-top: 12px;">
+          🕐 Best departure time: <strong>${r.best_departure_time}</strong>
+        </div>
+      `;
+
+      goToStep(3);
+    } catch (e) {
+      hideLoading();
+      alert('Safety check failed. Please try again.');
+    }
+  }
+
+  async function saveTrip() {
+    alert('Trip saved to your dashboard! ✅');
+    window.location.href = '/dashboard';
+  }
+
+  // Set default dates
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const nextWeek = new Date(today);
+  nextWeek.setDate(nextWeek.getDate() + 7);
+  document.getElementById('start-date').value = tomorrow.toISOString().split('T')[0];
+  document.getElementById('end-date').value = nextWeek.toISOString().split('T')[0];
+</script>
+
+{% endblock %}

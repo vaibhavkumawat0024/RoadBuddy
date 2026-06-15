@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}My Trips — RoadBuddy{% endblock %}
+{% block content %}
+
+<div class="dashboard-header">
+  <h1>🗺️ My Trips</h1>
+  <a href="/plan-trip" class="btn-primary">+ Plan a Trip</a>
+</div>
+
+{% if trips %}
+<p style="font-size:13px;color:#888;margin-bottom:20px;">{{ trips|length }} trip{{ 's' if trips|length != 1 }} planned</p>
+
+<div class="trips-grid">
+  {% for trip in trips %}
+  <div class="trip-detail-card">
+
+    <!-- Trip Header -->
+    <div class="trip-detail-header">
+      <div>
+        <div class="trip-detail-route">{{ trip.origin }} → {{ trip.destination }}</div>
+        <div class="trip-detail-meta">
+          📅 {{ trip.start_date }} &nbsp;·&nbsp;
+          🚗 {{ trip.travel_mode | replace('_', ' ') | title }} &nbsp;·&nbsp;
+          👥 {{ trip.group_type | default('N/A') | title if trip.group_type else '' }}
+        </div>
+      </div>
+      <form method="POST" action="/delete-trip/{{ trip.id }}" onsubmit="return confirm('Delete this trip?')">
+        <button type="submit" class="btn-delete">🗑️</button>
+      </form>
+    </div>
+
+    <!-- AI Summary -->
+    {% if trip.ai_summary %}
+    <div class="trip-ai-summary">{{ trip.ai_summary }}</div>
+    {% endif %}
+
+    <!-- Cost Breakdown -->
+    <div class="trip-costs">
+      {% if trip.fuel_cost_inr %}
+      <div class="trip-cost-item">
+        <span>⛽ Fuel</span>
+        <span>₹{{ trip.fuel_cost_inr | int }}</span>
+      </div>
+      {% endif %}
+      {% if trip.toll_cost_inr %}
+      <div class="trip-cost-item">
+        <span>🛣️ Toll</span>
+        <span>₹{{ trip.toll_cost_inr | int }}</span>
+      </div>
+      {% endif %}
+      {% if trip.hotel_cost_inr %}
+      <div class="trip-cost-item">
+        <span>🏨 Hotel</span>
+        <span>₹{{ trip.hotel_cost_inr | int }}</span>
+      </div>
+      {% endif %}
+      {% if trip.food_cost_inr %}
+      <div class="trip-cost-item">
+        <span>🍽️ Food</span>
+        <span>₹{{ trip.food_cost_inr | int }}</span>
+      </div>
+      {% endif %}
+      <div class="trip-cost-item trip-cost-total">
+        <span>💰 Total</span>
+        <span>₹{{ trip.total_cost_inr | int }}</span>
+      </div>
+    </div>
+
+    <!-- Stops -->
+    {% if trip.stops %}
+    <div class="trip-stops-toggle" onclick="toggleStops({{ trip.id }})">
+      📍 View {{ trip.stops|length }} stops
+      <span id="arrow-{{ trip.id }}">▼</span>
+    </div>
+    <div id="stops-{{ trip.id }}" class="trip-stops hidden">
+      {% set stop_icons = {
+        'fuel': '⛽', 'food': '🍽️', 'hotel': '🏨',
+        'sightseeing': '🏛️', 'destination_food': '🍴',
+        'going_route': '🚗', 'return_route': '🏠', 'toll': '🛣️'
+      } %}
+      {% for stop in trip.stops %}
+      <div class="mini-stop">
+        <span class="mini-stop-icon">{{ stop_icons.get(stop.place_type, '📍') }}</span>
+        <div>
+          <div class="mini-stop-name">{{ stop.place_name }}</div>
+          <div class="mini-stop-meta">Day {{ stop.day }} · {{ stop.time_slot }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Actions -->
+    <div class="trip-actions">
+      <a href="/plan-trip" class="btn-secondary" style="font-size:12px;padding:6px 12px;">🔄 Plan Similar</a>
+    </div>
+
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="empty-state">
+  <div class="empty-icon">🗺️</div>
+  <h2>No trips yet!</h2>
+  <p>Plan your first AI-powered road trip and it will appear here.</p>
+  <a href="/plan-trip" class="btn-plan" style="margin-top:16px;display:inline-block">+ Plan a Trip</a>
+</div>
+{% endif %}
+
+<script>
+function toggleStops(tripId) {
+  const stops = document.getElementById(`stops-${tripId}`);
+  const arrow = document.getElementById(`arrow-${tripId}`);
+  stops.classList.toggle('hidden');
+  arrow.textContent = stops.classList.contains('hidden') ? '▼' : '▲';
+}
+</script>
+
+{% endblock %}
