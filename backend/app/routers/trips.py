@@ -10,6 +10,7 @@ from app.core.auth import get_current_user
 from app.services.route_safety import analyze_route_safety
 from app.core.database import get_db
 from app.models.models import Trip, TripStop, Vehicle
+from app.services.trip_recommender import get_trip_recommendations
 
 router = APIRouter()
 
@@ -294,6 +295,35 @@ async def check_route_safety(request: SafetyCheckRequest):
             departure_time=request.departure_time,
             vehicle_type=request.vehicle_type,
             num_people=request.num_people,
+        )
+        return result
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+class RecommendationRequest(BaseModel):
+    home_city: str
+    budget_inr: float
+    group_type: Optional[str] = "friends"
+    num_people: Optional[int] = 2
+    duration_days: Optional[int] = 3
+    season: Optional[str] = "winter"
+    interests: Optional[list[str]] = ["sightseeing"]
+
+
+@router.post("/recommendations")
+async def trip_recommendations(request: RecommendationRequest):
+    """
+    AI-powered personalized trip recommendations.
+    Suggests 5 trips based on budget, group type, season and interests.
+    """
+    try:
+        result = await get_trip_recommendations(
+            home_city=request.home_city,
+            budget_inr=request.budget_inr,
+            group_type=request.group_type,
+            num_people=request.num_people,
+            duration_days=request.duration_days,
+            season=request.season,
+            interests=request.interests,
         )
         return result
     except RuntimeError as e:
