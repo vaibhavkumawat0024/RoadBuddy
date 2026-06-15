@@ -10,9 +10,9 @@ class Settings(BaseSettings):
 
     # AI
     openai_api_key: str = ""
-    gemini_api_key: str = ""
+    groq_api_key: str = ""
 
-    # Google Maps
+    # Google Mapsgit a
     google_maps_api_key: str = ""
 
     # JWT Auth

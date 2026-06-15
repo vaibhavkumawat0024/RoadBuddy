@@ -18,7 +18,7 @@ nav .brand { font-weight: 600; font-size: 18px; text-decoration: none; color: #1
 nav a { margin-left: 16px; text-decoration: none; color: #555; font-size: 14px; }
 nav a:hover { color: #1D9E75; }
 
-main { max-width: 960px; margin: 0 auto; padding: 32px 24px; }
+main { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
 
 /* Auth pages */
 .auth-card {
@@ -80,7 +80,7 @@ main { max-width: 960px; margin: 0 auto; padding: 32px 24px; }
   margin-bottom: 12px;
 }
 
-/* Dashboard */
+/* Dashboard header */
 .dashboard-header {
   display: flex;
   justify-content: space-between;
@@ -99,7 +99,8 @@ main { max-width: 960px; margin: 0 auto; padding: 32px 24px; }
 }
 .btn-primary:hover { background: #0F6E56; }
 
-.stats-row { display: flex; gap: 12px; margin-bottom: 28px; }
+/* Stats */
+.stats-row { display: flex; gap: 12px; margin-bottom: 28px; flex-wrap: wrap; }
 .stat-card {
   background: #fff;
   border: 1px solid #e5e5e5;
@@ -112,6 +113,220 @@ main { max-width: 960px; margin: 0 auto; padding: 32px 24px; }
 
 h2 { font-size: 16px; font-weight: 500; margin-bottom: 14px; }
 
+/* AI Grid */
+.ai-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.ai-card {
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ai-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ai-icon {
+  font-size: 24px;
+  width: 44px;
+  height: 44px;
+  background: #f0faf6;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ai-title { font-weight: 600; font-size: 15px; }
+.ai-subtitle { font-size: 12px; color: #888; margin-top: 2px; }
+
+/* AI Form */
+.ai-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ai-form input,
+.ai-form select,
+.ai-form textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  background: #fafafa;
+}
+
+.ai-form input:focus,
+.ai-form select:focus,
+.ai-form textarea:focus {
+  outline: none;
+  border-color: #1D9E75;
+  background: #fff;
+}
+
+.ai-form textarea { resize: vertical; min-height: 80px; }
+
+.ai-form button {
+  padding: 9px 16px;
+  background: #1D9E75;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.ai-form button:hover { background: #0F6E56; }
+
+/* Chat */
+.chat-messages {
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  padding: 12px;
+  min-height: 140px;
+  max-height: 200px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chat-msg {
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  max-width: 90%;
+}
+
+.ai-msg {
+  background: #f0faf6;
+  color: #1a1a1a;
+  align-self: flex-start;
+  border-bottom-left-radius: 2px;
+}
+
+.user-msg {
+  background: #1D9E75;
+  color: #fff;
+  align-self: flex-end;
+  border-bottom-right-radius: 2px;
+}
+
+.chat-input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.chat-input-row input {
+  flex: 1;
+  padding: 9px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 13px;
+  background: #fafafa;
+}
+
+.chat-input-row input:focus {
+  outline: none;
+  border-color: #1D9E75;
+  background: #fff;
+}
+
+.chat-input-row button {
+  padding: 9px 16px;
+  background: #1D9E75;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.chat-input-row button:hover { background: #0F6E56; }
+
+/* AI Results */
+.ai-result {
+  background: #f8fffe;
+  border: 1px solid #d4f0e8;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.ai-result.hidden { display: none; }
+
+.result-title {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.result-label {
+  font-weight: 500;
+  font-size: 12px;
+  color: #555;
+  margin: 8px 0 4px;
+}
+
+.result-item {
+  padding: 6px 8px;
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 6px;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+
+.result-tip {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #666;
+  background: #fffbf0;
+  border: 1px solid #fdecc8;
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
+  background: #e1f5ee;
+  color: #0F6E56;
+  margin-left: 4px;
+}
+
+.severity-high { background: #fdf0f0; color: #c0392b; }
+.severity-medium { background: #fff8e1; color: #f39c12; }
+.severity-low { background: #e1f5ee; color: #0F6E56; }
+.severity-critical { background: #fdf0f0; color: #8e0000; }
+
+/* Trips */
 .trip-list { display: flex; flex-direction: column; gap: 10px; }
 .trip-card {
   background: #fff;
@@ -123,3 +338,9 @@ h2 { font-size: 16px; font-weight: 500; margin-bottom: 14px; }
 .trip-meta { font-size: 12px; color: #888; margin-top: 4px; }
 .trip-date { font-size: 12px; color: #aaa; margin-top: 2px; }
 .empty { color: #888; font-size: 14px; }
+
+/* Responsive */
+@media (max-width: 600px) {
+  .ai-grid { grid-template-columns: 1fr; }
+  .stats-row { flex-direction: column; }
+}

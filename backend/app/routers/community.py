@@ -2,7 +2,8 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from app.schemas.schemas import RoutePost, RouteReview, RouteOut
 from app.core.auth import get_current_user
 from typing import Optional
-
+from app.services.smart_search import smart_search
+from pydantic import BaseModel
 router = APIRouter()
 
 # In-memory stores (replace with PostgreSQL in production)
@@ -117,3 +118,19 @@ def get_reviews(route_id: str):
     if route_id not in _routes:
         raise HTTPException(status_code=404, detail="Route not found")
     return _reviews.get(route_id, [])
+
+class SmartSearchRequest(BaseModel):
+    query: str
+
+
+@router.post("/smart-search")
+async def ai_smart_search(request: SmartSearchRequest):
+    """
+    AI-powered natural language search for community routes.
+    Example: "beach trip under 5000" or "family trip to hill station 3 days"
+    """
+    try:
+        result = await smart_search(query=request.query)
+        return result
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
