@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.core.otp import generate_otp, verify_otp, _otp_store
+from app.core.email_otp import generate_and_send_otp, verify_otp, clear_otp, _otp_store
 from app.core.auth import hash_password, verify_password, create_access_token
 from app.models.models import User
 
@@ -29,7 +29,7 @@ def register_submit(
         return templates.TemplateResponse(request, "register.html", {
             "error": "Email already registered."
         })
-    generate_otp(email)
+    generate_and_send_otp(email, name)
     _otp_store[email]["name"] = name
     _otp_store[email]["password"] = hash_password(password)
     return templates.TemplateResponse(request, "verify_otp.html", {
@@ -45,7 +45,7 @@ def verify_otp_submit(
     db: Session = Depends(get_db)
 ):
     record = _otp_store.get(email)
-    if not record or record["otp"] != otp:
+    if not verify_otp(email, otp):
         return templates.TemplateResponse(request, "verify_otp.html", {
             "email": email,
             "error": "Invalid OTP. Please enter 1234."
