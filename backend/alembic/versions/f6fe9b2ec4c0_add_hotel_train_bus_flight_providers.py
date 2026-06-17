@@ -185,36 +185,70 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_provider_bookings_id'), 'provider_bookings', ['id'], unique=False)
-    op.drop_index(op.f('ix_service_providers_email'), table_name='service_providers')
-    op.drop_index(op.f('ix_service_providers_id'), table_name='service_providers')
-    op.drop_table('service_providers')
+
+    # ── Drop old tables in correct order (children before parents) ──────────
+
+    # 1. Deepest children first: bus_ticket_bookings & vehicle_rental_bookings
+    op.drop_index(op.f('ix_bus_ticket_bookings_id'), table_name='bus_ticket_bookings')
+    op.drop_table('bus_ticket_bookings')
+
+    op.drop_index(op.f('ix_vehicle_rental_bookings_id'), table_name='vehicle_rental_bookings')
+    op.drop_table('vehicle_rental_bookings')
+
+    # 2. bus_seat_availability depends on provider_bus_services
     op.drop_index(op.f('ix_bus_seat_availability_id'), table_name='bus_seat_availability')
     op.drop_index(op.f('ix_bus_seat_availability_travel_date'), table_name='bus_seat_availability')
     op.drop_table('bus_seat_availability')
+
+    # 3. provider_bus_services depends on service_providers
     op.drop_index(op.f('ix_provider_bus_services_destination_city'), table_name='provider_bus_services')
     op.drop_index(op.f('ix_provider_bus_services_id'), table_name='provider_bus_services')
     op.drop_index(op.f('ix_provider_bus_services_origin_city'), table_name='provider_bus_services')
     op.drop_table('provider_bus_services')
-    op.drop_index(op.f('ix_vehicle_rental_bookings_id'), table_name='vehicle_rental_bookings')
-    op.drop_table('vehicle_rental_bookings')
-    op.drop_index(op.f('ix_bus_ticket_bookings_id'), table_name='bus_ticket_bookings')
-    op.drop_table('bus_ticket_bookings')
-    op.add_column('provider_vehicles', sa.Column('vehicle_name', sa.String(), nullable=False))
+
+    # 4. Drop FK from provider_vehicles -> service_providers so we can drop service_providers
+    op.drop_constraint('provider_vehicles_provider_id_fkey', 'provider_vehicles', type_='foreignkey')
+
+    # 5. Now safe to drop service_providers
+    op.drop_index(op.f('ix_service_providers_email'), table_name='service_providers')
+    op.drop_index(op.f('ix_service_providers_id'), table_name='service_providers')
+    op.drop_table('service_providers')
+
+    # ── Alter provider_vehicles ──────────────────────────────────────────────
+
+    # Add nullable=True first, backfill, then enforce NOT NULL
+    op.add_column('provider_vehicles', sa.Column('vehicle_name', sa.String(), nullable=True))
+    op.execute("UPDATE provider_vehicles SET vehicle_name = 'Unknown' WHERE vehicle_name IS NULL")
+    op.alter_column('provider_vehicles', 'vehicle_name', nullable=False)
+
     op.add_column('provider_vehicles', sa.Column('driver_included', sa.Boolean(), nullable=True))
-    op.add_column('provider_vehicles', sa.Column('origin', sa.String(), nullable=False))
-    op.add_column('provider_vehicles', sa.Column('destination', sa.String(), nullable=False))
+
+    op.add_column('provider_vehicles', sa.Column('origin', sa.String(), nullable=True))
+    op.execute("UPDATE provider_vehicles SET origin = 'Unknown' WHERE origin IS NULL")
+    op.alter_column('provider_vehicles', 'origin', nullable=False)
+
+    op.add_column('provider_vehicles', sa.Column('destination', sa.String(), nullable=True))
+    op.execute("UPDATE provider_vehicles SET destination = 'Unknown' WHERE destination IS NULL")
+    op.alter_column('provider_vehicles', 'destination', nullable=False)
+
     op.add_column('provider_vehicles', sa.Column('departure_time', sa.String(), nullable=True))
     op.add_column('provider_vehicles', sa.Column('price_per_km_inr', sa.Float(), nullable=True))
     op.add_column('provider_vehicles', sa.Column('fixed_fare_inr', sa.Float(), nullable=True))
     op.add_column('provider_vehicles', sa.Column('total_seats', sa.Integer(), nullable=True))
     op.add_column('provider_vehicles', sa.Column('seats_booked', sa.Integer(), nullable=True))
     op.add_column('provider_vehicles', sa.Column('is_active', sa.Boolean(), nullable=True))
+
     op.drop_index(op.f('ix_provider_vehicles_base_city'), table_name='provider_vehicles')
     op.drop_index(op.f('ix_provider_vehicles_registration_number'), table_name='provider_vehicles')
     op.create_index(op.f('ix_provider_vehicles_destination'), 'provider_vehicles', ['destination'], unique=False)
     op.create_index(op.f('ix_provider_vehicles_origin'), 'provider_vehicles', ['origin'], unique=False)
-    op.drop_constraint(op.f('provider_vehicles_provider_id_fkey'), 'provider_vehicles', type_='foreignkey')
+
+    # FK was already dropped above; recreate pointing to new `providers` table
+    # Clear orphaned provider_vehicles rows that reference old service_providers data
+    op.execute('DELETE FROM provider_vehicles WHERE provider_id NOT IN (SELECT id FROM providers)')
+    # Recreate FK pointing to new `providers` table
     op.create_foreign_key(None, 'provider_vehicles', 'providers', ['provider_id'], ['id'])
+
     op.drop_column('provider_vehicles', 'is_available')
     op.drop_column('provider_vehicles', 'seating_capacity')
     op.drop_column('provider_vehicles', 'fuel_type')
