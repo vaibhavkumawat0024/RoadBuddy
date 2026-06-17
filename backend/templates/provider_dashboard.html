@@ -1,0 +1,62 @@
+{% extends "provider_base.html" %}
+{% block title %}Partner Dashboard — RoadBuddy{% endblock %}
+{% block content %}
+
+<div class="dashboard-header">
+  <h1>Welcome, {{ provider.company_name }} 👋</h1>
+  <a href="/provider/vehicles" class="btn-primary">+ Add Vehicle</a>
+</div>
+
+<div class="stats-row">
+  <div class="stat-card">
+    <span class="stat-num">{{ vehicle_count }}</span>
+    <span class="stat-label">Vehicles listed</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-num">{{ total_bookings }}</span>
+    <span class="stat-label">Total bookings</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-num">{{ total_seats_booked }}</span>
+    <span class="stat-label">Seats booked</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-num">₹{{ "{:,.0f}".format(total_revenue) }}</span>
+    <span class="stat-label">Total revenue</span>
+  </div>
+</div>
+
+<h2>Your Vehicles</h2>
+{% if vehicles %}
+<div class="vehicle-list">
+  {% for v in vehicles %}
+  <div class="vehicle-card">
+    <div class="vehicle-icon">
+      {% if 'bus' in v.vehicle_type %}🚌
+      {% elif v.vehicle_type == 'suv' %}🚙
+      {% else %}🚗
+      {% endif %}
+    </div>
+    <div class="vehicle-info">
+      <div class="vehicle-name">{{ v.vehicle_name }}</div>
+      <div class="vehicle-meta">
+        📍 {{ v.origin }} → {{ v.destination }}
+        {% if v.departure_time %} · 🕐 {{ v.departure_time }}{% endif %}
+      </div>
+      <div class="vehicle-meta">
+        💺 {{ v.seats_available }}/{{ v.total_seats }} seats available
+        {% if v.fixed_fare_inr %} · ₹{{ v.fixed_fare_inr|int }} fixed fare{% endif %}
+        {% if v.price_per_km_inr %} · ₹{{ v.price_per_km_inr }}/km{% endif %}
+      </div>
+    </div>
+    <span class="status-badge {{ 'active' if v.is_active else 'inactive' }}">
+      {{ 'Active' if v.is_active else 'Inactive' }}
+    </span>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<p class="empty">No vehicles listed yet. <a href="/provider/vehicles">Add your first vehicle!</a></p>
+{% endif %}
+
+{% endblock %}

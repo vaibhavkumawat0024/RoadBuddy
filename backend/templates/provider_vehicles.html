@@ -1,0 +1,95 @@
+{% extends "provider_base.html" %}
+{% block title %}My Vehicles — RoadBuddy Partner{% endblock %}
+{% block content %}
+
+<div class="dashboard-header">
+  <h1>🚗 My Vehicles</h1>
+  <a href="/provider/dashboard" class="btn-secondary">← Dashboard</a>
+</div>
+
+<div class="plan-card">
+  <h2>Add a New Vehicle</h2>
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+  {% if success %}<div class="success">{{ success }}</div>{% endif %}
+
+  <form method="POST" action="/provider/vehicles">
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Vehicle Type *</label>
+        <select name="vehicle_type" required>
+          <option value="hatchback">Hatchback</option>
+          <option value="sedan">Sedan</option>
+          <option value="suv">SUV</option>
+          <option value="muv">MUV</option>
+          <option value="mini_bus">Mini Bus</option>
+          <option value="traveller_bus">Traveller Bus</option>
+          <option value="luxury_bus">Luxury Bus</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Vehicle Name *</label>
+        <input type="text" name="vehicle_name" placeholder="e.g. Toyota Innova" required />
+      </div>
+      <div class="form-group">
+        <label>From (Origin) *</label>
+        <input type="text" name="origin" placeholder="e.g. Jaipur" required />
+      </div>
+      <div class="form-group">
+        <label>To (Destination) *</label>
+        <input type="text" name="destination" placeholder="e.g. Udaipur" required />
+      </div>
+      <div class="form-group">
+        <label>Departure Time</label>
+        <input type="time" name="departure_time" />
+      </div>
+      <div class="form-group">
+        <label>Total Seats *</label>
+        <input type="number" name="total_seats" value="4" min="1" required />
+      </div>
+      <div class="form-group">
+        <label>Fixed Fare (₹)</label>
+        <input type="number" name="fixed_fare_inr" placeholder="e.g. 6000" />
+      </div>
+      <div class="form-group">
+        <label>Price per KM (₹)</label>
+        <input type="number" name="price_per_km_inr" placeholder="e.g. 15" step="0.5" />
+      </div>
+      <div class="form-group">
+        <label>Driver Included?</label>
+        <select name="driver_included">
+          <option value="true">Yes</option>
+          <option value="false">No (Self Drive)</option>
+        </select>
+      </div>
+    </div>
+    <button type="submit" class="btn-plan">+ Add Vehicle</button>
+  </form>
+</div>
+
+{% if vehicles %}
+<h2>Your Listed Vehicles ({{ vehicles|length }})</h2>
+<div class="vehicle-list">
+  {% for v in vehicles %}
+  <div class="vehicle-card">
+    <div class="vehicle-icon">
+      {% if 'bus' in v.vehicle_type %}🚌
+      {% elif v.vehicle_type == 'suv' %}🚙
+      {% else %}🚗
+      {% endif %}
+    </div>
+    <div class="vehicle-info">
+      <div class="vehicle-name">{{ v.vehicle_name }}</div>
+      <div class="vehicle-meta">📍 {{ v.origin }} → {{ v.destination }}</div>
+      <div class="vehicle-meta">💺 {{ v.seats_available }}/{{ v.total_seats }} available</div>
+    </div>
+    <form method="POST" action="/provider/vehicles/{{ v.id }}/delete" onsubmit="return confirm('Delete this vehicle?')">
+      <button type="submit" class="btn-delete">🗑️</button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<p class="empty" style="margin-top:16px;">No vehicles added yet.</p>
+{% endif %}
+
+{% endblock %}

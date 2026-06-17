@@ -158,6 +158,12 @@
   <div class="booking-grid" id="booking-grid"></div>
 
   <!-- Hotels -->
+  <!-- RoadBuddy Partner Vehicles -->
+  <h3 style="font-size:15px;margin:20px 0 12px;">🚐 Book a Car or Bus on RoadBuddy</h3>
+  <div id="partner-search-status" style="font-size:13px;color:#888;margin-bottom:10px;">Searching available vehicles on this route...</div>
+  <div class="booking-grid" id="partner-grid"></div>
+
+  <!-- Hotels -->
   <h3 style="font-size:15px;margin:20px 0 12px;">🏨 Find Hotels</h3>
   <div class="booking-grid" id="hotel-grid"></div>
 
@@ -389,6 +395,83 @@
   }
 
   // ── Map & Bookings ────────────────────────────────────────────────────────
+  async function searchPartnerVehicles() {
+    const origin      = tripData.origin;
+    const destination = tripData.destination;
+    const numPeople    = parseInt(document.getElementById('num-people').value);
+    const statusEl = document.getElementById('partner-search-status');
+    const gridEl = document.getElementById('partner-grid');
+
+    try {
+      const res = await fetch('/api/provider/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ origin, destination, num_seats: numPeople })
+      });
+      const results = await res.json();
+
+      if (!results.length) {
+        statusEl.textContent = 'No RoadBuddy partner vehicles found on this route yet — try the options below.';
+        gridEl.innerHTML = '';
+        return;
+      }
+
+      statusEl.textContent = `${results.length} partner vehicle${results.length > 1 ? 's' : ''} found on this route:`;
+
+      gridEl.innerHTML = results.map(v => `
+        <div class="partner-vehicle-card">
+          <div class="partner-vehicle-top">
+            <span class="booking-icon">${v.vehicle_type.includes('bus') ? '🚌' : '🚗'}</span>
+            <div>
+              <div class="booking-name">${v.vehicle_name}</div>
+              <div class="booking-desc">${v.provider_name} ${v.driver_included ? '· with driver' : '· self drive'}</div>
+            </div>
+          </div>
+          <div class="partner-vehicle-details">
+            <span>🕐 ${v.departure_time || 'Flexible'}</span>
+            <span>💺 ${v.seats_available} seats left</span>
+          </div>
+          <div class="partner-vehicle-footer">
+            <span class="partner-vehicle-fare">₹${Math.round(v.estimated_fare_inr).toLocaleString()}</span>
+            <button class="btn-plan" style="margin:0;padding:6px 14px;font-size:12px;" onclick="bookPartnerVehicle(${v.id}, '${v.vehicle_name}')">Book Now</button>
+          </div>
+        </div>
+      `).join('');
+
+    } catch (e) {
+      statusEl.textContent = 'Could not load partner vehicles right now.';
+    }
+  }
+
+  async function bookPartnerVehicle(vehicleId, vehicleName) {
+    const passengerName = prompt(`Booking ${vehicleName}\n\nEnter passenger name:`);
+    if (!passengerName) return;
+
+    try {
+      const res = await fetch('/api/provider/book', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vehicle_id: vehicleId,
+          passenger_name: passengerName,
+          travel_date: document.getElementById('start-date').value,
+          num_seats: parseInt(document.getElementById('num-people').value),
+          pickup_location: tripData.origin,
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(`✅ Booked! Total fare: ₹${Math.round(data.total_fare_inr).toLocaleString()}`);
+        searchPartnerVehicles();
+      } else {
+        alert(data.detail || 'Booking failed. Please try again.');
+      }
+    } catch (e) {
+      alert('Something went wrong while booking.');
+    }
+  }
+
+
   function renderMapAndBookings() {
     if (!tripData) return;
 
@@ -398,6 +481,8 @@
     const travelMode  = document.getElementById('travel-mode').value;
     const numPeople   = document.getElementById('num-people').value;
 
+
+    searchPartnerVehicles();
     // Google Maps embed
     const mapSrc = `https://maps.google.com/maps?q=${encodeURIComponent(origin)}+to+${encodeURIComponent(destination)}&output=embed`;
     document.getElementById('map-frame').src = mapSrc;

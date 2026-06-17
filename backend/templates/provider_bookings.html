@@ -1,0 +1,25 @@
+{% extends "provider_base.html" %}
+{% block title %}Bookings — RoadBuddy Partner{% endblock %}
+{% block content %}
+
+<div class="dashboard-header">
+  <h1>📋 Bookings</h1>
+  <a href="/provider/dashboard" class="btn-secondary">← Dashboard</a>
+</div>
+
+{% if bookings %}
+<p style="font-size:13px;color:#888;margin-bottom:16px;">{{ bookings|length }} booking{{ 's' if bookings|length != 1 }}</p>
+<div class="trip-list">
+  {% for b in bookings %}
+  <div class="trip-card">
+    <div class="trip-route">{{ b.passenger_name }} — {{ b.num_seats }} seat{{ 's' if b.num_seats != 1 }}</div>
+    <div class="trip-meta">📅 {{ b.travel_date }} &nbsp;·&nbsp; ₹{{ b.total_fare_inr|int }} &nbsp;·&nbsp; {{ b.status|capitalize }}</div>
+    {% if b.pickup_location %}<div class="trip-date">📍 Pickup: {{ b.pickup_location }}</div>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<p class="empty">No bookings yet. They'll appear here once travellers book your vehicles.</p>
+{% endif %}
+
+{% endblock %}

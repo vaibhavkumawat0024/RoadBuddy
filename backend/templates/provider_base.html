@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}RoadBuddy Partner{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/provider.css">
+</head>
+<body>
+  <nav class="provider-nav">
+    <a href="/provider/dashboard" class="brand">🚐 RoadBuddy <span class="partner-badge">Partner</span></a>
+    <div>
+      {% if provider %}
+      <a href="/provider/dashboard">Dashboard</a>
+      <a href="/provider/vehicles">My Vehicles</a>
+      <a href="/provider/bookings">Bookings</a>
+      <a href="/provider/logout">Logout</a>
+      {% else %}
+      <a href="/provider/login">Login</a>
+      <a href="/provider/register">Register</a>
+      {% endif %}
+    </div>
+  </nav>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

@@ -1,0 +1,44 @@
+{% extends "provider_base.html" %}
+{% block title %}Partner Registration — RoadBuddy{% endblock %}
+{% block content %}
+
+<div class="auth-card">
+  <h1>🚐 Become a RoadBuddy Partner</h1>
+  <p class="subtitle">List your cars and buses, reach more travellers</p>
+
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+  <form method="POST" action="/provider/register">
+    <label>Company Name</label>
+    <input type="text" name="company_name" placeholder="e.g. Jaipur Cabs Pvt Ltd" required />
+
+    <label>Contact Person</label>
+    <input type="text" name="contact_person" placeholder="e.g. Ramesh Kumar" required />
+
+    <label>Email</label>
+    <input type="email" name="email" placeholder="you@company.com" required />
+
+    <label>Password</label>
+    <input type="password" name="password" placeholder="Min 6 characters" required />
+
+    <label>Phone Number</label>
+    <input type="tel" name="phone" placeholder="9876543210" required />
+
+    <label>City</label>
+    <input type="text" name="city" placeholder="e.g. Jaipur" required />
+
+    <label>Service Type</label>
+    <select name="service_type" required>
+      <option value="car_rental">Car Rental</option>
+      <option value="bus_operator">Bus Operator</option>
+      <option value="both">Both Cars & Buses</option>
+    </select>
+
+    <button type="submit">Register as Partner</button>
+  </form>
+
+  <p>Already a partner? <a href="/provider/login">Login here</a></p>
+  <p style="margin-top:8px;"><a href="/login">← Back to traveller login</a></p>
+</div>
+
+{% endblock %}
