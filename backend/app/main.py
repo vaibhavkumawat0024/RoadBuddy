@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from app.provider.router import router as provider_router
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers import trips, fuel, users, community, journal, transport
@@ -30,6 +31,7 @@ app.include_router(fuel.router,      prefix="/api/fuel",      tags=["Fuel & Toll
 app.include_router(community.router, prefix="/api/community", tags=["Community Routes"])
 app.include_router(journal.router,   prefix="/api/journal",   tags=["Trip Journal"])
 app.include_router(transport.router, prefix="/api/transport", tags=["Transport"])
+app.include_router(provider_router, prefix="/api/provider", tags=["Provider"])
 
 # UI page routes
 app.include_router(auth_pages.router)
