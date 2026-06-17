@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, Float, Date, DateTime, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, Date, DateTime, Boolean, ForeignKey,Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
+
 
 
 # ── Users ─────────────────────────────────────────────────────────────────────
@@ -183,3 +184,235 @@ class JournalEntry(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     journal = relationship("Journal", back_populates="entries")
+    
+# ── Hotels ─────────────────────────────────────────────────────────────────
+ 
+class Hotel(Base):
+    __tablename__ = "hotels"
+ 
+    id            = Column(Integer, primary_key=True, index=True)
+    name          = Column(String, nullable=False)
+    city          = Column(String, nullable=False, index=True)
+    address       = Column(String, nullable=True)
+    star_rating   = Column(Float, default=3.0)
+    price_per_night_inr = Column(Float, nullable=False)
+    total_rooms   = Column(Integer, default=10)
+    rooms_booked  = Column(Integer, default=0)
+    amenities     = Column(String, nullable=True)   # comma separated
+    image_url     = Column(String, nullable=True)
+    created_at    = Column(DateTime, server_default=func.now())
+ 
+    bookings = relationship("HotelBooking", back_populates="hotel")
+ 
+    @property
+    def rooms_available(self):
+        return max(self.total_rooms - self.rooms_booked, 0)
+ 
+ 
+class HotelBooking(Base):
+    __tablename__ = "hotel_bookings"
+ 
+    id            = Column(Integer, primary_key=True, index=True)
+    hotel_id      = Column(Integer, ForeignKey("hotels.id"), nullable=False)
+    user_id       = Column(Integer, ForeignKey("users.id"), nullable=False)
+    check_in_date = Column(String, nullable=False)
+    check_out_date= Column(String, nullable=False)
+    num_rooms     = Column(Integer, default=1)
+    num_guests    = Column(Integer, default=1)
+    total_price_inr = Column(Float, nullable=False)
+    status        = Column(String, default="confirmed")
+    created_at    = Column(DateTime, server_default=func.now())
+ 
+    hotel = relationship("Hotel", back_populates="bookings")
+    user  = relationship("User")
+ 
+ 
+# ── Trains ─────────────────────────────────────────────────────────────────
+ 
+class Train(Base):
+    __tablename__ = "trains"
+ 
+    id              = Column(Integer, primary_key=True, index=True)
+    train_name      = Column(String, nullable=False)
+    train_number    = Column(String, nullable=False)
+    origin          = Column(String, nullable=False, index=True)
+    destination     = Column(String, nullable=False, index=True)
+    departure_time  = Column(String, nullable=False)
+    arrival_time    = Column(String, nullable=False)
+    duration_hrs    = Column(Float, nullable=False)
+    fare_inr        = Column(Float, nullable=False)
+    total_seats     = Column(Integer, default=100)
+    seats_booked    = Column(Integer, default=0)
+    travel_class    = Column(String, default="Sleeper")  # Sleeper, AC3, AC2, AC1
+    created_at      = Column(DateTime, server_default=func.now())
+ 
+    bookings = relationship("TrainBooking", back_populates="train")
+ 
+    @property
+    def seats_available(self):
+        return max(self.total_seats - self.seats_booked, 0)
+ 
+ 
+class TrainBooking(Base):
+    __tablename__ = "train_bookings"
+ 
+    id              = Column(Integer, primary_key=True, index=True)
+    train_id        = Column(Integer, ForeignKey("trains.id"), nullable=False)
+    user_id         = Column(Integer, ForeignKey("users.id"), nullable=False)
+    passenger_name  = Column(String, nullable=False)
+    travel_date     = Column(String, nullable=False)
+    num_seats       = Column(Integer, default=1)
+    total_fare_inr  = Column(Float, nullable=False)
+    status          = Column(String, default="confirmed")
+    created_at      = Column(DateTime, server_default=func.now())
+ 
+    train = relationship("Train", back_populates="bookings")
+    user  = relationship("User")
+ 
+ 
+# ── Buses ──────────────────────────────────────────────────────────────────
+ 
+class Bus(Base):
+    __tablename__ = "buses"
+ 
+    id              = Column(Integer, primary_key=True, index=True)
+    operator_name   = Column(String, nullable=False)
+    bus_type        = Column(String, default="AC Sleeper")  # AC Seater, AC Sleeper, Non-AC
+    origin          = Column(String, nullable=False, index=True)
+    destination     = Column(String, nullable=False, index=True)
+    departure_time  = Column(String, nullable=False)
+    arrival_time    = Column(String, nullable=False)
+    duration_hrs    = Column(Float, nullable=False)
+    fare_inr        = Column(Float, nullable=False)
+    total_seats     = Column(Integer, default=40)
+    seats_booked    = Column(Integer, default=0)
+    created_at      = Column(DateTime, server_default=func.now())
+ 
+    bookings = relationship("BusBooking", back_populates="bus")
+ 
+    @property
+    def seats_available(self):
+        return max(self.total_seats - self.seats_booked, 0)
+ 
+ 
+class BusBooking(Base):
+    __tablename__ = "bus_bookings"
+ 
+    id              = Column(Integer, primary_key=True, index=True)
+    bus_id          = Column(Integer, ForeignKey("buses.id"), nullable=False)
+    user_id         = Column(Integer, ForeignKey("users.id"), nullable=False)
+    passenger_name  = Column(String, nullable=False)
+    travel_date     = Column(String, nullable=False)
+    num_seats       = Column(Integer, default=1)
+    total_fare_inr  = Column(Float, nullable=False)
+    status          = Column(String, default="confirmed")
+    created_at      = Column(DateTime, server_default=func.now())
+ 
+    bus  = relationship("Bus", back_populates="bookings")
+    user = relationship("User")
+ 
+ 
+# ── Flights ────────────────────────────────────────────────────────────────
+ 
+class Flight(Base):
+    __tablename__ = "flights"
+ 
+    id              = Column(Integer, primary_key=True, index=True)
+    airline         = Column(String, nullable=False)
+    flight_number   = Column(String, nullable=False)
+    origin          = Column(String, nullable=False, index=True)
+    destination     = Column(String, nullable=False, index=True)
+    departure_time  = Column(String, nullable=False)
+    arrival_time    = Column(String, nullable=False)
+    duration_hrs    = Column(Float, nullable=False)
+    fare_inr        = Column(Float, nullable=False)
+    total_seats     = Column(Integer, default=180)
+    seats_booked    = Column(Integer, default=0)
+    travel_class    = Column(String, default="Economy")
+    created_at      = Column(DateTime, server_default=func.now())
+ 
+    bookings = relationship("FlightBooking", back_populates="flight")
+ 
+    @property
+    def seats_available(self):
+        return max(self.total_seats - self.seats_booked, 0)
+ 
+ 
+class FlightBooking(Base):
+    __tablename__ = "flight_bookings"
+ 
+    id              = Column(Integer, primary_key=True, index=True)
+    flight_id       = Column(Integer, ForeignKey("flights.id"), nullable=False)
+    user_id         = Column(Integer, ForeignKey("users.id"), nullable=False)
+    passenger_name  = Column(String, nullable=False)
+    travel_date     = Column(String, nullable=False)
+    num_seats       = Column(Integer, default=1)
+    total_fare_inr  = Column(Float, nullable=False)
+    status          = Column(String, default="confirmed")
+    created_at      = Column(DateTime, server_default=func.now())
+ 
+    flight = relationship("Flight", back_populates="bookings")
+    user   = relationship("User")
+ 
+ 
+# ── Travel Service Providers ──────────────────────────────────────────────
+ 
+class Provider(Base):
+    __tablename__ = "providers"
+ 
+    id              = Column(Integer, primary_key=True, index=True)
+    company_name    = Column(String, nullable=False)
+    contact_person  = Column(String, nullable=False)
+    email           = Column(String, unique=True, nullable=False, index=True)
+    password_hash   = Column(String, nullable=False)
+    phone           = Column(String, nullable=False)
+    city            = Column(String, nullable=False)
+    service_type    = Column(String, nullable=False)   # car_rental, bus_operator, both
+    is_verified     = Column(Boolean, default=False)
+    created_at      = Column(DateTime, server_default=func.now())
+ 
+    vehicles = relationship("ProviderVehicle", back_populates="provider")
+ 
+ 
+class ProviderVehicle(Base):
+    __tablename__ = "provider_vehicles"
+ 
+    id              = Column(Integer, primary_key=True, index=True)
+    provider_id     = Column(Integer, ForeignKey("providers.id"), nullable=False)
+    vehicle_type    = Column(String, nullable=False)   # sedan, suv, hatchback, mini_bus, traveller_bus
+    vehicle_name    = Column(String, nullable=False)   # e.g. "Swift Dzire", "Tempo Traveller 12-seater"
+    driver_included = Column(Boolean, default=True)
+    origin          = Column(String, nullable=False, index=True)
+    destination     = Column(String, nullable=False, index=True)
+    departure_time  = Column(String, nullable=True)
+    price_per_km_inr = Column(Float, nullable=True)
+    fixed_fare_inr  = Column(Float, nullable=True)
+    total_seats     = Column(Integer, default=4)
+    seats_booked    = Column(Integer, default=0)
+    is_active       = Column(Boolean, default=True)
+    created_at      = Column(DateTime, server_default=func.now())
+ 
+    provider = relationship("Provider", back_populates="vehicles")
+    bookings = relationship("ProviderBooking", back_populates="vehicle")
+ 
+    @property
+    def seats_available(self):
+        return max(self.total_seats - self.seats_booked, 0)
+ 
+ 
+class ProviderBooking(Base):
+    __tablename__ = "provider_bookings"
+ 
+    id              = Column(Integer, primary_key=True, index=True)
+    vehicle_id      = Column(Integer, ForeignKey("provider_vehicles.id"), nullable=False)
+    user_id         = Column(Integer, ForeignKey("users.id"), nullable=False)
+    passenger_name  = Column(String, nullable=False)
+    travel_date     = Column(String, nullable=False)
+    num_seats       = Column(Integer, default=1)
+    pickup_location = Column(String, nullable=True)
+    total_fare_inr  = Column(Float, nullable=False)
+    status          = Column(String, default="confirmed")
+    created_at      = Column(DateTime, server_default=func.now())
+ 
+    vehicle = relationship("ProviderVehicle", back_populates="bookings")
+    user    = relationship("User")

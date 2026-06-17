@@ -19,6 +19,12 @@ class Settings(BaseSettings):
     secret_key: str = "change-this-to-a-long-random-secret"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24  # 24 hours
+    
+    mail_username: str = ""
+    mail_password: str = ""
+    mail_from: str = ""
+    mail_server: str = "smtp.gmail.com"
+    mail_port: int = 587
 
     class Config:
         env_file = ".env"
