@@ -22,12 +22,13 @@ class GroupType(str, Enum):
     couple = "couple"
     family = "family"
     friends = "friends"
-
+    
 class TravelMode(str, Enum):
     own_vehicle = "own_vehicle"
-    bus         = "bus"
-    train       = "train"
-    flight      = "flight"
+    cab_service = "cab_service"
+    bus = "bus"
+    train = "train"
+    flight = "flight"
 
 class TransportMode(str, Enum):
     bus    = "bus"

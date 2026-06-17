@@ -3,6 +3,7 @@ from fastapi.staticfiles import StaticFiles
 from app.provider.router import router as provider_router
 from fastapi.middleware.cors import CORSMiddleware
 from app.provider.pages import router as provider_pages_router
+from app.routers import booking
 
 from app.routers import trips, fuel, users, community, journal, transport
 from app.pages import auth_pages, dashboard_pages
@@ -34,6 +35,7 @@ app.include_router(journal.router,   prefix="/api/journal",   tags=["Trip Journa
 app.include_router(transport.router, prefix="/api/transport", tags=["Transport"])
 app.include_router(provider_router, prefix="/api/provider", tags=["Provider"])
 app.include_router(provider_pages_router)
+app.include_router(booking.router, prefix="/api/booking", tags=["Booking"])
 
 # UI page routes
 app.include_router(auth_pages.router)

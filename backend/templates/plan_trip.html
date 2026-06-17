@@ -59,10 +59,11 @@
     <div class="form-group">
       <label>Travel Mode *</label>
       <select id="travel-mode" onchange="toggleVehicle()">
-        <option value="own_vehicle">Own Vehicle</option>
-        <option value="bus">Bus</option>
-        <option value="train">Train</option>
-        <option value="flight">Flight</option>
+        <option value="own_vehicle">🚗 Own Vehicle</option>
+        <option value="cab_service">🚕 Cab Service (RoadBuddy Partner)</option>
+        <option value="bus">🚌 Bus</option>
+        <option value="train">🚂 Train</option>
+        <option value="flight">✈️ Flight</option>
       </select>
     </div>
   </div>
@@ -157,9 +158,8 @@
   <h3 style="font-size:15px;margin-bottom:12px;">🎫 Book Your Trip</h3>
   <div class="booking-grid" id="booking-grid"></div>
 
-  <!-- Hotels -->
   <!-- RoadBuddy Partner Vehicles -->
-  <h3 style="font-size:15px;margin:20px 0 12px;">🚐 Book a Car or Bus on RoadBuddy</h3>
+  <h3 id="partner-heading" style="font-size:15px;margin:20px 0 12px;">🚐 Book a Car or Bus on RoadBuddy</h3>
   <div id="partner-search-status" style="font-size:13px;color:#888;margin-bottom:10px;">Searching available vehicles on this route...</div>
   <div class="booking-grid" id="partner-grid"></div>
 
@@ -275,11 +275,11 @@
 
     const costGrid = document.getElementById('cost-grid');
     const costs = [
-      { label: 'Fuel Cost',  value: data.fuel_cost_inr,            icon: '⛽' },
-      { label: 'Toll Cost',  value: data.toll_cost_inr,            icon: '🛣️' },
-      { label: 'Hotel Cost', value: data.hotel_cost_inr,           icon: '🏨' },
-      { label: 'Food Cost',  value: data.food_cost_inr,            icon: '🍽️' },
-      { label: 'Total Cost', value: data.total_estimated_cost_inr, icon: '💰', highlight: true },
+      { label: 'Fuel Cost',      value: data.fuel_cost_inr,            icon: '⛽' },
+      { label: 'Toll Cost',      value: data.toll_cost_inr,            icon: '🛣️' },
+      { label: 'Hotel Cost',     value: data.hotel_cost_inr,           icon: '🏨' },
+      { label: 'Food Cost',      value: data.food_cost_inr,            icon: '🍽️' },
+      { label: 'Total Cost',     value: data.total_estimated_cost_inr, icon: '💰', highlight: true },
     ];
     costGrid.innerHTML = costs.map(c => `
       <div class="cost-card ${c.highlight ? 'cost-highlight' : ''}">
@@ -394,13 +394,32 @@
     }
   }
 
-  // ── Map & Bookings ────────────────────────────────────────────────────────
+  // ── External Links Helper ─────────────────────────────────────────────────
+  function externalLinks(links) {
+    return `
+      <div style="grid-column:1/-1;margin-top:12px;font-size:12px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;padding-top:12px;border-top:1px dashed #e5e5e5;">
+        Also book externally:
+      </div>
+      ${links.map(b => `
+        <a href="${b.url}" target="_blank" class="booking-card" style="border-top:3px solid ${b.color}">
+          <span class="booking-icon">${b.icon}</span>
+          <div class="booking-info">
+            <div class="booking-name">${b.name}</div>
+            <div class="booking-desc">${b.desc}</div>
+          </div>
+          <span class="booking-arrow">→</span>
+        </a>
+      `).join('')}
+    `;
+  }
+
+  // ── Partner Vehicles ──────────────────────────────────────────────────────
   async function searchPartnerVehicles() {
-    const origin      = tripData.origin;
+    const origin    = tripData.origin;
     const destination = tripData.destination;
-    const numPeople    = parseInt(document.getElementById('num-people').value);
-    const statusEl = document.getElementById('partner-search-status');
-    const gridEl = document.getElementById('partner-grid');
+    const numPeople = parseInt(document.getElementById('num-people').value);
+    const statusEl  = document.getElementById('partner-search-status');
+    const gridEl    = document.getElementById('partner-grid');
 
     try {
       const res = await fetch('/api/provider/search', {
@@ -411,7 +430,7 @@
       const results = await res.json();
 
       if (!results.length) {
-        statusEl.textContent = 'No RoadBuddy partner vehicles found on this route yet — try the options below.';
+        statusEl.textContent = 'No RoadBuddy partner vehicles found on this route yet.';
         gridEl.innerHTML = '';
         return;
       }
@@ -433,7 +452,8 @@
           </div>
           <div class="partner-vehicle-footer">
             <span class="partner-vehicle-fare">₹${Math.round(v.estimated_fare_inr).toLocaleString()}</span>
-            <button class="btn-plan" style="margin:0;padding:6px 14px;font-size:12px;" onclick="bookPartnerVehicle(${v.id}, '${v.vehicle_name}')">Book Now</button>
+            <button class="btn-plan" style="margin:0;padding:6px 14px;font-size:12px;"
+              onclick="bookPartnerVehicle(${v.id}, '${v.vehicle_name}')">Book Now</button>
           </div>
         </div>
       `).join('');
@@ -471,161 +491,248 @@
     }
   }
 
-
-  function renderMapAndBookings() {
+  // ── Map & Bookings ────────────────────────────────────────────────────────
+  async function renderMapAndBookings() {
     if (!tripData) return;
 
     const origin      = tripData.origin;
     const destination = tripData.destination;
     const date        = document.getElementById('start-date').value;
     const travelMode  = document.getElementById('travel-mode').value;
-    const numPeople   = document.getElementById('num-people').value;
+    const numPeople   = parseInt(document.getElementById('num-people').value);
 
-
-    searchPartnerVehicles();
     // Google Maps embed
     const mapSrc = `https://maps.google.com/maps?q=${encodeURIComponent(origin)}+to+${encodeURIComponent(destination)}&output=embed`;
     document.getElementById('map-frame').src = mapSrc;
 
-    // Booking links based on travel mode
-    const bookingLinks = [];
+    // Partner vehicles (always search)
+    searchPartnerVehicles();
 
-    if (travelMode === 'train') {
-      bookingLinks.push({
-        icon: '🚂',
-        name: 'Book Train on IRCTC',
-        desc: 'Official Indian Railways booking',
-        url: `https://www.irctc.co.in/nget/train-search?from=${encodeURIComponent(origin)}&to=${encodeURIComponent(destination)}&date=${date}`,
-        color: '#1a73e8'
-      });
-      bookingLinks.push({
-        icon: '🚂',
-        name: 'Check Trains on Ixigo',
-        desc: 'Compare trains and prices',
-        url: `https://www.ixigo.com/trains/results/${encodeURIComponent(origin)}/${encodeURIComponent(destination)}/${date}/`,
-        color: '#e64c3c'
-      });
+    // Update partner heading for cab mode
+    if (travelMode === 'cab_service') {
+      document.getElementById('partner-heading').textContent = '🚕 Your Cab Options — RoadBuddy Partners';
+    } else {
+      document.getElementById('partner-heading').textContent = '🚐 Book a Car or Bus on RoadBuddy';
     }
 
-    if (travelMode === 'bus') {
-      bookingLinks.push({
-        icon: '🚌',
-        name: 'Book Bus on RedBus',
-        desc: 'India\'s largest bus booking platform',
-        url: `https://www.redbus.in/bus-tickets/${encodeURIComponent(origin.toLowerCase())}-to-${encodeURIComponent(destination.toLowerCase())}`,
-        color: '#d84315'
-      });
-      bookingLinks.push({
-        icon: '🚌',
-        name: 'Book Bus on Ixigo',
-        desc: 'Compare bus options and prices',
-        url: `https://www.ixigo.com/bus/results/${encodeURIComponent(origin)}/${encodeURIComponent(destination)}/${date}`,
-        color: '#e64c3c'
-      });
+    const bookingGrid = document.getElementById('booking-grid');
+    bookingGrid.innerHTML = '<div style="font-size:13px;color:#888;">Searching available options...</div>';
+
+    try {
+      if (travelMode === 'train') {
+        const res = await fetch('/api/booking/trains/search', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ origin, destination, travel_date: date, num_seats: numPeople })
+        });
+        const trains = await res.json();
+        renderBookingResults(trains, 'train', bookingGrid);
+        bookingGrid.innerHTML += externalLinks([
+          { icon:'🚂', name:'Book on IRCTC', desc:'Official Indian Railways booking', url:`https://www.irctc.co.in/nget/train-search?from=${encodeURIComponent(origin)}&to=${encodeURIComponent(destination)}&date=${date}`, color:'#1a73e8' },
+          { icon:'🚂', name:'Check on Ixigo', desc:'Compare trains & prices', url:`https://www.ixigo.com/trains/results/${encodeURIComponent(origin)}/${encodeURIComponent(destination)}/${date}/`, color:'#e64c3c' },
+          { icon:'🚂', name:'Book on MakeMyTrip', desc:'Trains with easy payment', url:`https://www.makemytrip.com/railways/`, color:'#e91e63' },
+        ]);
+      }
+
+      else if (travelMode === 'bus') {
+        const res = await fetch('/api/booking/buses/search', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ origin, destination, travel_date: date, num_seats: numPeople })
+        });
+        const buses = await res.json();
+        renderBookingResults(buses, 'bus', bookingGrid);
+        bookingGrid.innerHTML += externalLinks([
+          { icon:'🚌', name:'Book on RedBus', desc:"India's largest bus booking platform", url:`https://www.redbus.in/bus-tickets/${encodeURIComponent(origin.toLowerCase())}-to-${encodeURIComponent(destination.toLowerCase())}`, color:'#d84315' },
+          { icon:'🚌', name:'Book on Ixigo Bus', desc:'Compare bus options & prices', url:`https://www.ixigo.com/bus/results/${encodeURIComponent(origin)}/${encodeURIComponent(destination)}/${date}`, color:'#e64c3c' },
+          { icon:'🚌', name:'RSRTC Official', desc:'Rajasthan State Bus Booking', url:`https://rsrtc.rajasthan.gov.in/`, color:'#1D9E75' },
+        ]);
+      }
+
+      else if (travelMode === 'flight') {
+        const res = await fetch('/api/booking/flights/search', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ origin, destination, travel_date: date, num_seats: numPeople })
+        });
+        const flights = await res.json();
+        renderBookingResults(flights, 'flight', bookingGrid);
+        bookingGrid.innerHTML += externalLinks([
+          { icon:'✈️', name:'Search on Google Flights', desc:'Compare all airlines & prices', url:`https://www.google.com/travel/flights?q=flights+from+${encodeURIComponent(origin)}+to+${encodeURIComponent(destination)}+on+${date}`, color:'#1a73e8' },
+          { icon:'✈️', name:'Book on MakeMyTrip', desc:"India's top flight booking", url:`https://www.makemytrip.com/flights/domestic/results?tripType=O&itinerary=${encodeURIComponent(origin)}-${encodeURIComponent(destination)}-${date.replace(/-/g,'')}&paxType=A-${numPeople}_C-0_I-0`, color:'#e91e63' },
+          { icon:'✈️', name:'Book on EaseMyTrip', desc:'Cheapest flight deals', url:`https://www.easemytrip.com/flights/domestic-flights.aspx`, color:'#2196F3' },
+          { icon:'✈️', name:'Book on Ixigo Flights', desc:'Best fare finder', url:`https://www.ixigo.com/flights/results/${encodeURIComponent(origin)}/${encodeURIComponent(destination)}/${date}/1/0/0/E/0/1/CHEAP`, color:'#e64c3c' },
+        ]);
+      }
+
+      else if (travelMode === 'own_vehicle') {
+        bookingGrid.innerHTML = externalLinks([
+          { icon:'🗺️', name:'Get Directions on Google Maps', desc:'Full route with turn-by-turn directions', url:`https://www.google.com/maps/dir/${encodeURIComponent(origin)}/${encodeURIComponent(destination)}`, color:'#1a73e8' },
+          { icon:'⛽', name:'Check Fuel Prices Today', desc:"Today's petrol & diesel prices", url:`https://www.google.com/search?q=petrol+price+today+${encodeURIComponent(origin)}`, color:'#FF9800' },
+          { icon:'🛣️', name:'Toll Calculator — NHAI', desc:'FASTag toll info & calculator', url:`https://tis.nhai.gov.in/`, color:'#4CAF50' },
+          { icon:'🚗', name:'Route on Maps.me', desc:'Offline maps for road trips', url:`https://maps.me/`, color:'#FF5722' },
+        ]);
+      }
+
+      else if (travelMode === 'cab_service') {
+        bookingGrid.innerHTML = externalLinks([
+          { icon:'🚕', name:'Book on Ola Outstation', desc:'Reliable outstation cabs', url:`https://book.olacabs.com/?serviceType=outstation&pickup_name=${encodeURIComponent(origin)}&drop_name=${encodeURIComponent(destination)}`, color:'#F5A623' },
+          { icon:'🚕', name:'Book on Uber Intercity', desc:'Comfortable intercity rides', url:`https://m.uber.com/ul/?action=setPickup&pickup=${encodeURIComponent(origin)}&dropoff=${encodeURIComponent(destination)}`, color:'#000000' },
+          { icon:'🚕', name:'Book on MakeMyTrip Cabs', desc:'Outstation cab with driver', url:`https://www.makemytrip.com/cab/?from=${encodeURIComponent(origin)}&to=${encodeURIComponent(destination)}&date=${date}`, color:'#e91e63' },
+          { icon:'🚕', name:'Book on Savaari', desc:'Top-rated outstation cabs', url:`https://www.savaari.com/cab-booking/${encodeURIComponent(origin.toLowerCase())}-to-${encodeURIComponent(destination.toLowerCase())}`, color:'#1D9E75' },
+          { icon:'🚕', name:'Book on InDriver', desc:'Negotiate your cab fare', url:`https://indriver.com/`, color:'#00C853' },
+        ]);
+      }
+
+      else {
+        bookingGrid.innerHTML = '';
+      }
+
+    } catch (e) {
+      bookingGrid.innerHTML = '<div style="font-size:13px;color:#e74c3c;">Could not load booking options.</div>';
     }
 
-    if (travelMode === 'flight') {
-      bookingLinks.push({
-        icon: '✈️',
-        name: 'Search Flights on Google',
-        desc: 'Compare all airlines and prices',
-        url: `https://www.google.com/travel/flights?q=flights+from+${encodeURIComponent(origin)}+to+${encodeURIComponent(destination)}+on+${date}`,
-        color: '#1a73e8'
+    // Hotels — always show for destination
+    const hotelGrid = document.getElementById('hotel-grid');
+    hotelGrid.innerHTML = '<div style="font-size:13px;color:#888;">Searching hotels...</div>';
+    try {
+      const res = await fetch('/api/booking/hotels/search', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ city: destination, num_rooms: 1 })
       });
-      bookingLinks.push({
-        icon: '✈️',
-        name: 'Book on MakeMyTrip',
-        desc: 'India\'s top flight booking platform',
-        url: `https://www.makemytrip.com/flights/domestic/results?tripType=O&itinerary=${encodeURIComponent(origin)}-${encodeURIComponent(destination)}-${date.replace(/-/g,'')}&paxType=A-${numPeople}_C-0_I-0`,
-        color: '#e91e63'
-      });
-      bookingLinks.push({
-        icon: '✈️',
-        name: 'Book on EaseMyTrip',
-        desc: 'Cheapest flight deals',
-        url: `https://www.easemytrip.com/flights/domestic-flights.aspx`,
-        color: '#2196F3'
-      });
+      const hotels = await res.json();
+      renderHotelResults(hotels, hotelGrid);
+      hotelGrid.innerHTML += externalLinks([
+        { icon:'🏨', name:'Booking.com', desc:'Best hotel deals worldwide', url:`https://www.booking.com/searchresults.html?ss=${encodeURIComponent(destination)}&checkin=${date}`, color:'#003580' },
+        { icon:'🏨', name:'MakeMyTrip Hotels', desc:'Hotels with Indian payment options', url:`https://www.makemytrip.com/hotels/${encodeURIComponent(destination.toLowerCase())}-hotels.html`, color:'#e91e63' },
+        { icon:'🏠', name:'OYO Rooms', desc:'Budget hotels & homestays', url:`https://www.oyorooms.com/s/?q=${encodeURIComponent(destination)}`, color:'#EE2E24' },
+        { icon:'🏕️', name:'Airbnb', desc:'Unique stays, villas & homes', url:`https://www.airbnb.co.in/s/${encodeURIComponent(destination)}`, color:'#FF5A5F' },
+        { icon:'🏨', name:'Agoda', desc:'Great deals on Asian hotels', url:`https://www.agoda.com/search?city=${encodeURIComponent(destination)}`, color:'#5C2D91' },
+      ]);
+    } catch (e) {
+      hotelGrid.innerHTML = '<div style="font-size:13px;color:#e74c3c;">Could not load hotels.</div>';
+    }
+  }
+
+  // ── Render Internal Results ───────────────────────────────────────────────
+  function renderBookingResults(items, type, container) {
+    if (!items.length) {
+      container.innerHTML = `<div style="font-size:13px;color:#888;">No ${type}s found on this route in RoadBuddy yet — check external options below.</div>`;
+      return;
     }
 
-    if (travelMode === 'own_vehicle') {
-      bookingLinks.push({
-        icon: '🗺️',
-        name: 'Get Directions on Google Maps',
-        desc: 'Full route with turn-by-turn directions',
-        url: `https://www.google.com/maps/dir/${encodeURIComponent(origin)}/${encodeURIComponent(destination)}`,
-        color: '#1a73e8'
-      });
-      bookingLinks.push({
-        icon: '⛽',
-        name: 'Check Fuel Prices',
-        desc: 'Today\'s petrol and diesel prices',
-        url: `https://www.google.com/search?q=petrol+price+today+${encodeURIComponent(origin)}`,
-        color: '#FF9800'
-      });
-      bookingLinks.push({
-        icon: '🛣️',
-        name: 'Check Toll on FASTag',
-        desc: 'NHAI toll calculator',
-        url: `https://tis.nhai.gov.in/`,
-        color: '#4CAF50'
-      });
-    }
+    const icons = { train: '🚂', bus: '🚌', flight: '✈️' };
 
-    // Render booking links
-    document.getElementById('booking-grid').innerHTML = bookingLinks.map(b => `
-      <a href="${b.url}" target="_blank" class="booking-card" style="border-top:3px solid ${b.color}">
-        <span class="booking-icon">${b.icon}</span>
-        <div class="booking-info">
-          <div class="booking-name">${b.name}</div>
-          <div class="booking-desc">${b.desc}</div>
+    container.innerHTML = items.map(item => {
+      const name = type === 'train' ? `${item.train_name} (${item.train_number})`
+                 : type === 'bus'   ? item.operator_name
+                 : `${item.airline} ${item.flight_number}`;
+      const subInfo = type === 'train' ? item.travel_class
+                    : type === 'bus'   ? item.bus_type
+                    : item.travel_class;
+
+      return `
+        <div class="partner-vehicle-card">
+          <div class="partner-vehicle-top">
+            <span class="booking-icon">${icons[type]}</span>
+            <div>
+              <div class="booking-name">${name}</div>
+              <div class="booking-desc">${subInfo} · ${item.duration_hrs.toFixed(1)} hrs</div>
+            </div>
+          </div>
+          <div class="partner-vehicle-details">
+            <span>🕐 ${item.departure_time} → ${item.arrival_time}</span>
+            <span>💺 ${item.seats_available} left</span>
+          </div>
+          <div class="partner-vehicle-footer">
+            <span class="partner-vehicle-fare">₹${Math.round(item.fare_inr).toLocaleString()}</span>
+            <button class="btn-plan" style="margin:0;padding:6px 14px;font-size:12px;"
+              onclick="bookTravelItem('${type}', ${item.id}, '${name}', ${item.fare_inr})">Book Now</button>
+          </div>
         </div>
-        <span class="booking-arrow">→</span>
-      </a>
-    `).join('');
+      `;
+    }).join('');
+  }
 
-    // Hotel links
-    const hotelLinks = [
-      {
-        icon: '🏨',
-        name: 'Search Hotels on Booking.com',
-        desc: 'Best hotel deals worldwide',
-        url: `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(destination)}&checkin=${date}`,
-        color: '#003580'
-      },
-      {
-        icon: '🏨',
-        name: 'Book on MakeMyTrip',
-        desc: 'Hotels with Indian payment options',
-        url: `https://www.makemytrip.com/hotels/${encodeURIComponent(destination.toLowerCase())}-hotels.html`,
-        color: '#e91e63'
-      },
-      {
-        icon: '🏠',
-        name: 'Find Homestays on OYO',
-        desc: 'Budget hotels and homestays',
-        url: `https://www.oyorooms.com/s/?q=${encodeURIComponent(destination)}`,
-        color: '#EE2E24'
-      },
-      {
-        icon: '🏕️',
-        name: 'Find Unique Stays on Airbnb',
-        desc: 'Homes, villas and unique stays',
-        url: `https://www.airbnb.co.in/s/${encodeURIComponent(destination)}`,
-        color: '#FF5A5F'
-      },
-    ];
+  function renderHotelResults(hotels, container) {
+    if (!hotels.length) {
+      container.innerHTML = '<div style="font-size:13px;color:#888;">No hotels found in RoadBuddy for this destination — check external options below.</div>';
+      return;
+    }
 
-    document.getElementById('hotel-grid').innerHTML = hotelLinks.map(b => `
-      <a href="${b.url}" target="_blank" class="booking-card" style="border-top:3px solid ${b.color}">
-        <span class="booking-icon">${b.icon}</span>
-        <div class="booking-info">
-          <div class="booking-name">${b.name}</div>
-          <div class="booking-desc">${b.desc}</div>
+    container.innerHTML = hotels.map(h => `
+      <div class="partner-vehicle-card">
+        <div class="partner-vehicle-top">
+          <span class="booking-icon">🏨</span>
+          <div>
+            <div class="booking-name">${h.name}</div>
+            <div class="booking-desc">⭐ ${h.star_rating} · ${h.address || h.city}</div>
+          </div>
         </div>
-        <span class="booking-arrow">→</span>
-      </a>
+        <div class="partner-vehicle-details">
+          <span>🛏️ ${h.rooms_available} rooms left</span>
+          <span>${h.amenities ? h.amenities.split(',').slice(0,2).join(', ') : ''}</span>
+        </div>
+        <div class="partner-vehicle-footer">
+          <span class="partner-vehicle-fare">₹${Math.round(h.price_per_night_inr).toLocaleString()}/night</span>
+          <button class="btn-plan" style="margin:0;padding:6px 14px;font-size:12px;"
+            onclick="bookHotel(${h.id}, '${h.name}', ${h.price_per_night_inr})">Book Now</button>
+        </div>
+      </div>
     `).join('');
+  }
+
+  async function bookTravelItem(type, id, name, fare) {
+    const passengerName = prompt(`Booking ${name}\n\nEnter passenger name:`);
+    if (!passengerName) return;
+
+    const endpoint = `/api/booking/${type}s/book`;
+    const body = {
+      [`${type}_id`]: id,
+      passenger_name: passengerName,
+      travel_date: document.getElementById('start-date').value,
+      num_seats: parseInt(document.getElementById('num-people').value),
+    };
+
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(`✅ Booked! Total fare: ₹${Math.round(data.total_fare_inr).toLocaleString()}`);
+        renderMapAndBookings();
+      } else {
+        alert(data.detail || 'Booking failed.');
+      }
+    } catch (e) {
+      alert('Something went wrong while booking.');
+    }
+  }
+
+  async function bookHotel(hotelId, name, pricePerNight) {
+    const checkIn  = document.getElementById('start-date').value;
+    const checkOut = document.getElementById('end-date').value;
+
+    try {
+      const res = await fetch('/api/booking/hotels/book', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          hotel_id: hotelId,
+          check_in_date: checkIn,
+          check_out_date: checkOut,
+          num_rooms: 1,
+          num_guests: parseInt(document.getElementById('num-people').value),
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(`✅ ${name} booked! Total: ₹${Math.round(data.total_price_inr).toLocaleString()}`);
+        renderMapAndBookings();
+      } else {
+        alert(data.detail || 'Booking failed.');
+      }
+    } catch (e) {
+      alert('Something went wrong while booking.');
+    }
   }
 
   async function saveTrip() {
@@ -641,9 +748,11 @@
   nextWeek.setDate(nextWeek.getDate() + 7);
   document.getElementById('start-date').value = tomorrow.toISOString().split('T')[0];
   document.getElementById('end-date').value   = nextWeek.toISOString().split('T')[0];
+
+  // Hide vehicle section on load
+  toggleVehicle();
 </script>
 
-<!-- Booking Card Styles -->
 <style>
 .booking-grid {
   display: grid;
@@ -662,7 +771,7 @@
   padding: 14px;
   text-decoration: none;
   color: inherit;
-  transition: box-shadow 0.2s;
+  transition: box-shadow 0.2s, transform 0.2s;
 }
 
 .booking-card:hover {
