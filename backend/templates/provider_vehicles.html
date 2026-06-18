@@ -2,94 +2,418 @@
 {% block title %}My Vehicles — RoadBuddy Partner{% endblock %}
 {% block content %}
 
-<div class="dashboard-header">
+<style>
+  .vehicles-container {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .both-grids {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  @media (max-width: 992px) {
+    .both-grids {
+      grid-template-columns: 1fr;
+    }
+  }
+  .form-card {
+    background: linear-gradient(145deg, #1a1a30, #20203a);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  }
+  .form-card h2 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .form-card .card-subtitle {
+    font-size: 12px;
+    color: #7878a0;
+    margin-bottom: 20px;
+  }
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .form-group.full-width {
+    grid-column: span 2;
+  }
+  .form-group label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #8888aa;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .form-group input, .form-group select {
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    font-size: 13.5px;
+    color: #e0e0f0;
+    font-family: 'Inter', system-ui, sans-serif;
+    transition: all 0.2s;
+  }
+  .form-group input:focus, .form-group select:focus {
+    outline: none;
+    border-color: #FF6B35;
+    background: rgba(255,107,53,0.05);
+  }
+  .btn-add-vehicle {
+    width: 100%;
+    margin-top: 20px;
+    padding: 12px;
+    background: linear-gradient(135deg, #FF6B35, #FF8F5E);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-add-vehicle:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(255,107,53,0.3);
+  }
+
+  /* Confirmation Popup Modal */
+  .confirm-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(5px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+  .confirm-overlay.show {
+    display: flex;
+    opacity: 1;
+  }
+  .confirm-modal {
+    background: linear-gradient(145deg, #1a1a30, #20203a);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 28px;
+    max-width: 440px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    transform: scale(0.9);
+    transition: transform 0.2s ease;
+  }
+  .confirm-overlay.show .confirm-modal {
+    transform: scale(1);
+  }
+  .modal-icon {
+    font-size: 36px;
+    margin-bottom: 12px;
+    display: block;
+  }
+  .confirm-modal h3 {
+    font-size: 18px;
+    color: #fff;
+    margin-bottom: 8px;
+  }
+  .confirm-modal p {
+    font-size: 13px;
+    color: #a0a0c0;
+    line-height: 1.5;
+    margin-bottom: 24px;
+  }
+  .modal-buttons {
+    display: flex;
+    gap: 12px;
+  }
+  .btn-modal-confirm {
+    flex: 1;
+    padding: 11px;
+    background: #1DB954;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-modal-edit {
+    flex: 1;
+    padding: 11px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #fff;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-modal-ok {
+    width: 100%;
+    padding: 11px;
+    background: #FF6B35;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .listed-vehicles-title {
+    margin-top: 32px;
+    margin-bottom: 16px;
+    font-size: 18px;
+    font-weight: 600;
+    color: #fff;
+  }
+</style>
+
+<div class="dashboard-header" style="margin-bottom: 24px;">
   <h1>🚗 My Vehicles</h1>
-  <a href="/provider/dashboard" class="btn-secondary">← Dashboard</a>
+  <a href="/provider/dashboard" class="btn-secondary" style="background: rgba(255,255,255,0.05); color: #fff; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-size: 13px; border: 1px solid rgba(255,255,255,0.1);">← Dashboard</a>
 </div>
 
-<div class="plan-card">
-  <h2>Add a New Vehicle</h2>
-  {% if error %}<div class="error">{{ error }}</div>{% endif %}
-  {% if success %}<div class="success">{{ success }}</div>{% endif %}
+<div class="vehicles-container">
+  {% set bmode = provider.booking_mode %}
 
-  <form method="POST" action="/provider/vehicles">
-    <div class="form-grid">
-      <div class="form-group">
-        <label>Vehicle Type *</label>
-        <select name="vehicle_type" required>
-          <option value="hatchback">Hatchback</option>
-          <option value="sedan">Sedan</option>
-          <option value="suv">SUV</option>
-          <option value="muv">MUV</option>
-          <option value="mini_bus">Mini Bus</option>
-          <option value="traveller_bus">Traveller Bus</option>
-          <option value="luxury_bus">Luxury Bus</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Vehicle Name *</label>
-        <input type="text" name="vehicle_name" placeholder="e.g. Toyota Innova" required />
-      </div>
-      <div class="form-group">
-        <label>From (Origin) *</label>
-        <input type="text" name="origin" placeholder="e.g. Jaipur" required />
-      </div>
-      <div class="form-group">
-        <label>To (Destination) *</label>
-        <input type="text" name="destination" placeholder="e.g. Udaipur" required />
-      </div>
-      <div class="form-group">
-        <label>Departure Time</label>
-        <input type="time" name="departure_time" />
-      </div>
-      <div class="form-group">
-        <label>Total Seats *</label>
-        <input type="number" name="total_seats" value="4" min="1" required />
-      </div>
-      <div class="form-group">
-        <label>Fixed Fare (₹)</label>
-        <input type="number" name="fixed_fare_inr" placeholder="e.g. 6000" />
-      </div>
-      <div class="form-group">
-        <label>Price per KM (₹)</label>
-        <input type="number" name="price_per_km_inr" placeholder="e.g. 15" step="0.5" />
-      </div>
-      <div class="form-group">
-        <label>Driver Included?</label>
-        <select name="driver_included">
-          <option value="true">Yes</option>
-          <option value="false">No (Self Drive)</option>
-        </select>
-      </div>
+  <!-- Setup Forms Grid -->
+  <div class="{% if bmode == 'both_services' %}both-grids{% endif %}">
+    
+    <!-- PRIVATE SERVICE FORM (Shown if solo_owner, both_services, or default) -->
+    {% if bmode == 'solo_owner' or bmode == 'both_services' or not bmode or bmode == 'self_drive' %}
+    <div class="form-card">
+      <h2>🚗 Private Booking Service</h2>
+      <p class="card-subtitle">List vehicle available for private distance-based bookings</p>
+      
+      <form id="form-private" onsubmit="handleFormSubmit(event, 'private')">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Vehicle Type *</label>
+            <select name="vehicle_type" required>
+              <option value="hatchback">Hatchback</option>
+              <option value="sedan">Sedan</option>
+              <option value="suv">SUV</option>
+              <option value="muv">MUV</option>
+              <option value="mini_bus">Mini Bus</option>
+              <option value="traveller_bus">Traveller Bus</option>
+              <option value="luxury_bus">Luxury Bus</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Vehicle Name *</label>
+            <input type="text" name="vehicle_name" placeholder="e.g. Toyota Innova" required />
+          </div>
+          <div class="form-group">
+            <label>Seats *</label>
+            <input type="number" name="total_seats" value="4" min="1" required />
+          </div>
+          <div class="form-group">
+            <label>Fare per KM (₹) *</label>
+            <input type="number" name="price_per_km_inr" placeholder="e.g. 15" step="0.5" required />
+          </div>
+          <div class="form-group full-width">
+            <label>Current City Available *</label>
+            <input type="text" name="origin" placeholder="e.g. Jaipur" required />
+          </div>
+        </div>
+        <button type="submit" class="btn-add-vehicle">+ Add Private Vehicle</button>
+      </form>
     </div>
-    <button type="submit" class="btn-plan">+ Add Vehicle</button>
-  </form>
+    {% endif %}
+
+    <!-- PUBLIC ROUTE-BASED FORM (Shown if route_based or both_services) -->
+    {% if bmode == 'route_based' or bmode == 'both_services' %}
+    <div class="form-card">
+      <h2>🚌 Route-Based Public Service</h2>
+      <p class="card-subtitle">List vehicles running on pre-decided routes and schedules</p>
+
+      <form id="form-public" onsubmit="handleFormSubmit(event, 'public')">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Vehicle Type *</label>
+            <select name="vehicle_type" required>
+              <option value="sedan">Sedan</option>
+              <option value="suv">SUV</option>
+              <option value="mini_bus">Mini Bus</option>
+              <option value="traveller_bus">Traveller Bus</option>
+              <option value="luxury_bus" selected>Luxury Bus</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Vehicle Name *</label>
+            <input type="text" name="vehicle_name" placeholder="e.g. Volvo Multi-Axle" required />
+          </div>
+          <div class="form-group">
+            <label>Origin *</label>
+            <input type="text" name="origin" placeholder="e.g. Jaipur" required />
+          </div>
+          <div class="form-group">
+            <label>Destination *</label>
+            <input type="text" name="destination" placeholder="e.g. Udaipur" required />
+          </div>
+          <div class="form-group">
+            <label>Departure Time *</label>
+            <input type="time" name="departure_time" required />
+          </div>
+          <div class="form-group">
+            <label>Arrival Time *</label>
+            <input type="time" name="arrival_time" required />
+          </div>
+          <div class="form-group">
+            <label>Total Seats *</label>
+            <input type="number" name="total_seats" value="40" min="1" required />
+          </div>
+          <div class="form-group">
+            <label>Fare per Seat (₹) *</label>
+            <input type="number" name="fixed_fare_inr" placeholder="e.g. 800" required />
+          </div>
+        </div>
+        <button type="submit" class="btn-add-vehicle">+ Add Route Vehicle</button>
+      </form>
+    </div>
+    {% endif %}
+
+  </div>
 </div>
 
+<!-- listed vehicles list -->
+<h2 class="listed-vehicles-title">Your Listed Vehicles ({{ vehicles|length }})</h2>
 {% if vehicles %}
-<h2>Your Listed Vehicles ({{ vehicles|length }})</h2>
 <div class="vehicle-list">
   {% for v in vehicles %}
-  <div class="vehicle-card">
-    <div class="vehicle-icon">
-      {% if 'bus' in v.vehicle_type %}🚌
-      {% elif v.vehicle_type == 'suv' %}🚙
-      {% else %}🚗
-      {% endif %}
-    </div>
-    <div class="vehicle-info">
-      <div class="vehicle-name">{{ v.vehicle_name }}</div>
-      <div class="vehicle-meta">📍 {{ v.origin }} → {{ v.destination }}</div>
-      <div class="vehicle-meta">💺 {{ v.seats_available }}/{{ v.total_seats }} available</div>
+  <div class="vehicle-card" style="background: linear-gradient(145deg, #1a1a30, #20203a); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+    <div style="display: flex; align-items: center; gap: 16px;">
+      <div style="font-size: 28px;">
+        {% if 'bus' in v.vehicle_type %}🚌
+        {% elif v.vehicle_type == 'suv' %}🚙
+        {% else %}🚗
+        {% endif %}
+      </div>
+      <div>
+        <div style="font-weight: 600; color: #fff; font-size: 15px;">{{ v.vehicle_name }}</div>
+        <div style="font-size: 12.5px; color: #7878a0; margin-top: 2px;">
+          {% if v.destination == 'Private' %}
+          📍 Available at: {{ v.origin }} (Private Rental) · ₹{{ v.price_per_km_inr }}/KM
+          {% else %}
+          📍 Route: {{ v.origin }} → {{ v.destination }} · 🕐 {{ v.departure_time }} - {{ v.arrival_time }} · ₹{{ v.fixed_fare_inr }} per seat
+          {% endif %}
+        </div>
+        <div style="font-size: 12px; color: #505075; margin-top: 2px;">
+          💺 Seats: {{ v.total_seats }}
+        </div>
+      </div>
     </div>
     <form method="POST" action="/provider/vehicles/{{ v.id }}/delete" onsubmit="return confirm('Delete this vehicle?')">
-      <button type="submit" class="btn-delete">🗑️</button>
+      <button type="submit" style="background: none; border: none; font-size: 16px; cursor: pointer; color: #ff6b6b; padding: 8px;">🗑️</button>
     </form>
   </div>
   {% endfor %}
 </div>
 {% else %}
-<p class="empty" style="margin-top:16px;">No vehicles added yet.</p>
+<p class="empty" style="color: #6a6a8a; font-size: 13.5px; margin-top: 8px;">No vehicles added yet.</p>
 {% endif %}
+
+
+<!-- ═══ MODAL POPUPS (Confirmation & Success) ═══ -->
+
+<!-- 1. Are you sure modal -->
+<div class="confirm-overlay" id="overlay-confirm">
+  <div class="confirm-modal">
+    <span class="modal-icon">🤔</span>
+    <h3>Verify Vehicle Info</h3>
+    <p>Are you sure about the vehicle info and do not want to edit it?</p>
+    <div class="modal-buttons">
+      <button type="button" class="btn-modal-confirm" id="btn-confirm-yes">Confirm</button>
+      <button type="button" class="btn-modal-edit" onclick="closeConfirmModal()">Edit Vehicle</button>
+    </div>
+  </div>
+</div>
+
+<!-- 2. Added Success modal -->
+<div class="confirm-overlay" id="overlay-success">
+  <div class="confirm-modal">
+    <span class="modal-icon">✅</span>
+    <h3>Vehicle Added!</h3>
+    <p id="success-message-text"></p>
+    <button type="button" class="btn-modal-ok" onclick="window.location.reload()">OK</button>
+  </div>
+</div>
+
+
+<script>
+  let activeSubmitEvent = null;
+  let activeFormType = null;
+
+  function handleFormSubmit(event, type) {
+    event.preventDefault();
+    activeSubmitEvent = event;
+    activeFormType = type;
+
+    // Open confirm popup
+    const overlay = document.getElementById("overlay-confirm");
+    overlay.classList.add("show");
+  }
+
+  function closeConfirmModal() {
+    document.getElementById("overlay-confirm").classList.remove("show");
+    activeSubmitEvent = null;
+    activeFormType = null;
+  }
+
+  document.getElementById("btn-confirm-yes").addEventListener("click", function() {
+    if (!activeSubmitEvent) return;
+    
+    // Close confirmation modal
+    document.getElementById("overlay-confirm").classList.remove("show");
+
+    const form = activeSubmitEvent.target;
+    const formData = new FormData(form);
+
+    // Call POST API asynchronously
+    fetch("/provider/vehicles", {
+      method: "POST",
+      body: formData
+    })
+    .then(response => {
+      if (response.ok) {
+        // Build customized success message
+        const vType = form.querySelector('[name="vehicle_type"]').value;
+        const vName = form.querySelector('[name="vehicle_name"]').value;
+        const vSeats = form.querySelector('[name="total_seats"]').value;
+        
+        const successMsg = `Vehicle added, your ${vType}, ${vName} ${vSeats} seater is available for bookings, thank you.`;
+        document.getElementById("success-message-text").textContent = successMsg;
+
+        // Open success modal
+        document.getElementById("overlay-success").classList.add("show");
+      } else {
+        alert("Failed to add vehicle. Please try again.");
+      }
+    })
+    .catch(error => {
+      console.error("Error:", error);
+      alert("An error occurred. Please try again.");
+    });
+  });
+</script>
 
 {% endblock %}

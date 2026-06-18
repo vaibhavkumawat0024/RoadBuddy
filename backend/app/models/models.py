@@ -359,18 +359,20 @@ class FlightBooking(Base):
  
 class Provider(Base):
     __tablename__ = "providers"
- 
+
     id              = Column(Integer, primary_key=True, index=True)
-    company_name    = Column(String, nullable=False)
-    contact_person  = Column(String, nullable=False)
+    company_name    = Column(String, nullable=True)
+    contact_person  = Column(String, nullable=True)
     email           = Column(String, unique=True, nullable=False, index=True)
     password_hash   = Column(String, nullable=False)
-    phone           = Column(String, nullable=False)
-    city            = Column(String, nullable=False)
-    service_type    = Column(String, nullable=False)   # car_rental, bus_operator, both
+    phone           = Column(String, nullable=True)
+    city            = Column(String, nullable=True)
+    service_type    = Column(String, nullable=True)
     is_verified     = Column(Boolean, default=False)
     created_at      = Column(DateTime, server_default=func.now())
- 
+    alternate_email = Column(String, nullable=True)
+    booking_mode    = Column(String, nullable=True)
+
     vehicles = relationship("ProviderVehicle", back_populates="provider")
  
  
@@ -385,6 +387,7 @@ class ProviderVehicle(Base):
     origin          = Column(String, nullable=False, index=True)
     destination     = Column(String, nullable=False, index=True)
     departure_time  = Column(String, nullable=True)
+    arrival_time    = Column(String, nullable=True)
     price_per_km_inr = Column(Float, nullable=True)
     fixed_fare_inr  = Column(Float, nullable=True)
     total_seats     = Column(Integer, default=4)

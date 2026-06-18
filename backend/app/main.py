@@ -7,6 +7,17 @@ from app.routers import booking
 
 from app.routers import trips, fuel, users, community, journal, transport
 from app.pages import auth_pages, dashboard_pages
+from app.core.database import engine
+from sqlalchemy import text
+
+# Run schema updates
+with engine.begin() as connection:
+    try:
+        connection.execute(text("ALTER TABLE providers ADD COLUMN IF NOT EXISTS alternate_email VARCHAR;"))
+        connection.execute(text("ALTER TABLE providers ADD COLUMN IF NOT EXISTS booking_mode VARCHAR;"))
+        connection.execute(text("ALTER TABLE provider_vehicles ADD COLUMN IF NOT EXISTS arrival_time VARCHAR;"))
+    except Exception as e:
+        print("Schema update error:", e)
 
 app = FastAPI(
     title="RoadBuddy AI",

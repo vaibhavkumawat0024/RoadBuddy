@@ -2,25 +2,47 @@
 {% block title %}Partner Login — RoadBuddy{% endblock %}
 {% block content %}
 
-<div class="auth-card">
-  <h1>🚐 Partner Login</h1>
-  <p class="subtitle">Manage your vehicles and bookings</p>
+<div class="auth-card provider-auth">
+  <div class="auth-logo">🚐</div>
+  <h1>Partner Login</h1>
+  <p class="subtitle">Access your dashboard and manage services</p>
 
   {% if error %}<div class="error">{{ error }}</div>{% endif %}
   {% if success %}<div class="success">{{ success }}</div>{% endif %}
 
   <form method="POST" action="/provider/login">
-    <label>Email</label>
-    <input type="email" name="email" placeholder="you@company.com" required />
+    <label for="login-email">Email Address</label>
+    <input type="email" id="login-email" name="email" placeholder="you@company.com" required />
 
-    <label>Password</label>
-    <input type="password" name="password" placeholder="Your password" required />
+    <label for="login-password">Password</label>
+    <div class="password-wrapper">
+      <input type="password" id="login-password" name="password" placeholder="Your password" required />
+      <button type="button" class="toggle-pw" onclick="togglePw('login-password', this)">👁</button>
+    </div>
 
     <button type="submit">Login</button>
   </form>
 
-  <p>New partner? <a href="/provider/register">Register here</a></p>
-  <p style="margin-top:8px;"><a href="/login">← Back to traveller login</a></p>
+  <div class="auth-footer">
+    <p>New partner? <a href="/provider/register">Register here</a></p>
+  </div>
 </div>
+
+<script>
+  function togglePw(id, btn) {
+    const inp = document.getElementById(id);
+    if (inp.type === "password") { inp.type = "text"; btn.textContent = "🙈"; }
+    else { inp.type = "password"; btn.textContent = "👁"; }
+  }
+
+  document.querySelectorAll('.provider-auth form input').forEach(inp => {
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        e.target.form.submit();
+      }
+    });
+  });
+</script>
 
 {% endblock %}

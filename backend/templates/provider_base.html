@@ -3,7 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="RoadBuddy Partner — Manage your vehicles, bookings, and grow your transport business">
   <title>{% block title %}RoadBuddy Partner{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/style.css">
   <link rel="stylesheet" href="/static/css/provider.css">
 </head>
@@ -13,8 +17,10 @@
     <div>
       {% if provider %}
       <a href="/provider/dashboard">Dashboard</a>
+      {% if provider.company_name %}
       <a href="/provider/vehicles">My Vehicles</a>
       <a href="/provider/bookings">Bookings</a>
+      {% endif %}
       <a href="/provider/logout">Logout</a>
       {% else %}
       <a href="/provider/login">Login</a>

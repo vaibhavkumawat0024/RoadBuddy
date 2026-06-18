@@ -2,43 +2,202 @@
 {% block title %}Partner Registration — RoadBuddy{% endblock %}
 {% block content %}
 
-<div class="auth-card">
-  <h1>🚐 Become a RoadBuddy Partner</h1>
-  <p class="subtitle">List your cars and buses, reach more travellers</p>
+<div class="auth-card provider-auth">
+  <div class="auth-logo">🚐</div>
+  <h1>Become a RoadBuddy Partner</h1>
+  <p class="subtitle">Create your partner account to get started</p>
 
   {% if error %}<div class="error">{{ error }}</div>{% endif %}
 
-  <form method="POST" action="/provider/register">
-    <label>Company Name</label>
-    <input type="text" name="company_name" placeholder="e.g. Jaipur Cabs Pvt Ltd" required />
+  <!-- Step 1: Email + Password -->
+  <div id="step-credentials" class="auth-step active">
+    <div class="step-indicator">
+      <div class="step-dot active"></div>
+      <div class="step-line"></div>
+      <div class="step-dot"></div>
+    </div>
+    <p class="step-label">Step 1 — Account Details</p>
 
-    <label>Contact Person</label>
-    <input type="text" name="contact_person" placeholder="e.g. Ramesh Kumar" required />
+    <label for="reg-email">Email Address</label>
+    <input type="email" id="reg-email" placeholder="you@company.com" required />
 
-    <label>Email</label>
-    <input type="email" name="email" placeholder="you@company.com" required />
+    <label for="reg-password">Password</label>
+    <div class="password-wrapper">
+      <input type="password" id="reg-password" placeholder="Min 6 characters" required />
+      <button type="button" class="toggle-pw" onclick="togglePw('reg-password', this)">👁</button>
+    </div>
 
-    <label>Password</label>
-    <input type="password" name="password" placeholder="Min 6 characters" required />
+    <label for="reg-confirm">Confirm Password</label>
+    <div class="password-wrapper">
+      <input type="password" id="reg-confirm" placeholder="Re-enter password" required />
+      <button type="button" class="toggle-pw" onclick="togglePw('reg-confirm', this)">👁</button>
+    </div>
 
-    <label>Phone Number</label>
-    <input type="tel" name="phone" placeholder="9876543210" required />
+    <button type="button" id="btn-generate-otp" onclick="generateOTP()">
+      <span class="btn-text">Generate OTP</span>
+      <span class="btn-loader" style="display:none;">
+        <span class="spinner"></span> Sending...
+      </span>
+    </button>
+    <p class="field-error" id="step1-error" style="display:none;"></p>
+  </div>
 
-    <label>City</label>
-    <input type="text" name="city" placeholder="e.g. Jaipur" required />
+  <!-- Step 2: OTP Verification -->
+  <div id="step-otp" class="auth-step">
+    <div class="step-indicator">
+      <div class="step-dot completed">✓</div>
+      <div class="step-line active"></div>
+      <div class="step-dot active"></div>
+    </div>
+    <p class="step-label">Step 2 — Verify OTP</p>
 
-    <label>Service Type</label>
-    <select name="service_type" required>
-      <option value="car_rental">Car Rental</option>
-      <option value="bus_operator">Bus Operator</option>
-      <option value="both">Both Cars & Buses</option>
-    </select>
+    <div class="otp-sent-badge">
+      <span>📧</span> OTP sent to <strong id="otp-email-display"></strong>
+    </div>
 
-    <button type="submit">Register as Partner</button>
-  </form>
+    <label for="otp-input">Enter 4-digit OTP</label>
+    <div class="otp-inputs">
+      <input type="text" class="otp-box" maxlength="1" data-index="0" oninput="otpNext(this)" onkeydown="otpBack(event, this)" />
+      <input type="text" class="otp-box" maxlength="1" data-index="1" oninput="otpNext(this)" onkeydown="otpBack(event, this)" />
+      <input type="text" class="otp-box" maxlength="1" data-index="2" oninput="otpNext(this)" onkeydown="otpBack(event, this)" />
+      <input type="text" class="otp-box" maxlength="1" data-index="3" oninput="otpNext(this)" onkeydown="otpBack(event, this)" />
+    </div>
 
-  <p>Already a partner? <a href="/provider/login">Login here</a></p>
-  <p style="margin-top:8px;"><a href="/login">← Back to traveller login</a></p>
+    <form method="POST" action="/provider/register" id="register-form">
+      <input type="hidden" name="email" id="form-email" />
+      <input type="hidden" name="password" id="form-password" />
+      <button type="submit" id="btn-register" disabled>
+        <span class="btn-text">Create Account</span>
+      </button>
+    </form>
+
+    <p class="field-error" id="otp-error" style="display:none;"></p>
+
+    <button type="button" class="btn-link" onclick="goBack()">← Change email / password</button>
+  </div>
+
+  <div class="auth-footer">
+    <p>Already a partner? <a href="/provider/login">Login here</a></p>
+  </div>
 </div>
+
+<script>
+  const CORRECT_OTP = "1234";
+
+  function togglePw(id, btn) {
+    const inp = document.getElementById(id);
+    if (inp.type === "password") { inp.type = "text"; btn.textContent = "🙈"; }
+    else { inp.type = "password"; btn.textContent = "👁"; }
+  }
+
+  function showError(elId, msg) {
+    const el = document.getElementById(elId);
+    el.textContent = msg;
+    el.style.display = "block";
+    setTimeout(() => el.style.display = "none", 4000);
+  }
+
+  function generateOTP() {
+    const email = document.getElementById("reg-email").value.trim();
+    const pw = document.getElementById("reg-password").value;
+    const confirm = document.getElementById("reg-confirm").value;
+
+    if (!email || !email.includes("@")) return showError("step1-error", "Enter a valid email address.");
+    if (pw.length < 6) return showError("step1-error", "Password must be at least 6 characters.");
+    if (pw !== confirm) return showError("step1-error", "Passwords do not match.");
+
+    // Simulate OTP send
+    const btn = document.getElementById("btn-generate-otp");
+    btn.querySelector(".btn-text").style.display = "none";
+    btn.querySelector(".btn-loader").style.display = "inline-flex";
+    btn.disabled = true;
+
+    setTimeout(() => {
+      document.getElementById("otp-email-display").textContent = email;
+      document.getElementById("form-email").value = email;
+      document.getElementById("form-password").value = pw;
+
+      document.getElementById("step-credentials").classList.remove("active");
+      document.getElementById("step-otp").classList.add("active");
+
+      // Focus first OTP box
+      document.querySelector(".otp-box").focus();
+
+      btn.querySelector(".btn-text").style.display = "inline";
+      btn.querySelector(".btn-loader").style.display = "none";
+      btn.disabled = false;
+    }, 1200);
+  }
+
+  function otpNext(el) {
+    el.value = el.value.replace(/[^0-9]/g, "");
+    if (el.value && el.nextElementSibling && el.nextElementSibling.classList.contains("otp-box")) {
+      el.nextElementSibling.focus();
+    }
+    checkOTP();
+  }
+
+  function otpBack(e, el) {
+    if (e.key === "Backspace" && !el.value) {
+      const prev = el.previousElementSibling;
+      if (prev && prev.classList.contains("otp-box")) {
+        prev.focus();
+        prev.value = "";
+      }
+    }
+  }
+
+  function checkOTP() {
+    const boxes = document.querySelectorAll(".otp-box");
+    let code = "";
+    boxes.forEach(b => code += b.value);
+    const btn = document.getElementById("btn-register");
+
+    if (code.length === 4) {
+      if (code === CORRECT_OTP) {
+        btn.disabled = false;
+        btn.classList.add("ready");
+        document.getElementById("otp-error").style.display = "none";
+      } else {
+        btn.disabled = true;
+        btn.classList.remove("ready");
+        showError("otp-error", "Invalid OTP. Try again.");
+        boxes.forEach(b => { b.value = ""; b.classList.add("shake"); });
+        boxes[0].focus();
+        setTimeout(() => boxes.forEach(b => b.classList.remove("shake")), 500);
+      }
+    } else {
+      btn.disabled = true;
+      btn.classList.remove("ready");
+    }
+  }
+
+  function goBack() {
+    document.getElementById("step-otp").classList.remove("active");
+    document.getElementById("step-credentials").classList.add("active");
+    document.querySelectorAll(".otp-box").forEach(b => b.value = "");
+    document.getElementById("btn-register").disabled = true;
+  }
+
+  // Allow Enter key on step 1
+  document.querySelectorAll("#step-credentials input").forEach(inp => {
+    inp.addEventListener("keydown", e => {
+      if (e.key === "Enter") { e.preventDefault(); generateOTP(); }
+    });
+  });
+
+  // Allow Enter key on step 2 (OTP verification)
+  document.querySelectorAll(".otp-box").forEach(b => {
+    b.addEventListener("keydown", e => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const btn = document.getElementById("btn-register");
+        if (!btn.disabled) {
+          document.getElementById("register-form").submit();
+        }
+      }
+    });
+  });
+</script>
 
 {% endblock %}

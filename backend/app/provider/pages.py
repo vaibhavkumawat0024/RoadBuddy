@@ -36,13 +36,8 @@ def register_page(request: Request):
 @router.post("/register", response_class=HTMLResponse)
 def register_submit(
     request: Request,
-    company_name: str = Form(...),
-    contact_person: str = Form(...),
     email: str = Form(...),
     password: str = Form(...),
-    phone: str = Form(...),
-    city: str = Form(...),
-    service_type: str = Form(...),
     db: Session = Depends(get_db),
 ):
     existing = db.query(Provider).filter(Provider.email == email).first()
@@ -52,13 +47,13 @@ def register_submit(
         })
 
     provider = Provider(
-        company_name=company_name,
-        contact_person=contact_person,
+        company_name="",
+        contact_person="",
         email=email,
         password_hash=hash_password(password),
-        phone=phone,
-        city=city,
-        service_type=service_type,
+        phone="",
+        city="",
+        service_type="",
     )
     db.add(provider)
     db.commit()
@@ -100,6 +95,36 @@ def logout():
     return response
 
 
+# ── Quick Setup (first-time profile completion) ───────────────────────────
+
+@router.post("/setup", response_class=HTMLResponse)
+def setup_submit(
+    request: Request,
+    company_name: str = Form(...),
+    contact_person: str = Form(...),
+    phone: str = Form(...),
+    alternate_email: Optional[str] = Form(None),
+    city: Optional[str] = Form(None),
+    service_type: str = Form(...),
+    booking_mode: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+):
+    provider = get_provider_from_cookie(request, db)
+    if not provider:
+        return RedirectResponse("/provider/login", status_code=303)
+
+    provider.company_name = company_name
+    provider.contact_person = contact_person
+    provider.phone = phone
+    provider.alternate_email = alternate_email
+    provider.city = city or ""
+    provider.service_type = service_type
+    provider.booking_mode = booking_mode
+    db.commit()
+
+    return RedirectResponse("/provider/dashboard", status_code=303)
+
+
 # ── Dashboard ──────────────────────────────────────────────────────────────
 
 @router.get("/dashboard", response_class=HTMLResponse)
@@ -107,6 +132,9 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
     provider = get_provider_from_cookie(request, db)
     if not provider:
         return RedirectResponse("/provider/login", status_code=303)
+
+    # Show setup popup if provider hasn't completed their profile
+    show_setup = not provider.company_name
 
     vehicles = db.query(ProviderVehicle).filter(
         ProviderVehicle.provider_id == provider.id
@@ -127,6 +155,7 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
         "total_bookings": len(bookings),
         "total_seats_booked": total_seats_booked,
         "total_revenue": total_revenue,
+        "show_setup": show_setup,
     })
 
 
@@ -137,6 +166,8 @@ def vehicles_page(request: Request, db: Session = Depends(get_db)):
     provider = get_provider_from_cookie(request, db)
     if not provider:
         return RedirectResponse("/provider/login", status_code=303)
+    if not provider.company_name:
+        return RedirectResponse("/provider/dashboard?setup_required=1", status_code=303)
 
     vehicles = db.query(ProviderVehicle).filter(
         ProviderVehicle.provider_id == provider.id
@@ -155,9 +186,10 @@ def add_vehicle_submit(
     request: Request,
     vehicle_type: str = Form(...),
     vehicle_name: str = Form(...),
-    origin: str = Form(...),
-    destination: str = Form(...),
+    origin: Optional[str] = Form(None),
+    destination: Optional[str] = Form(None),
     departure_time: Optional[str] = Form(None),
+    arrival_time: Optional[str] = Form(None),
     total_seats: int = Form(...),
     fixed_fare_inr: Optional[float] = Form(None),
     price_per_km_inr: Optional[float] = Form(None),
@@ -167,15 +199,18 @@ def add_vehicle_submit(
     provider = get_provider_from_cookie(request, db)
     if not provider:
         return RedirectResponse("/provider/login", status_code=303)
+    if not provider.company_name:
+        return RedirectResponse("/provider/dashboard?setup_required=1", status_code=303)
 
     vehicle = ProviderVehicle(
         provider_id=provider.id,
         vehicle_type=vehicle_type,
         vehicle_name=vehicle_name,
         driver_included=(driver_included == "true"),
-        origin=origin,
-        destination=destination,
+        origin=origin or "Unknown",
+        destination=destination or "Private",
         departure_time=departure_time,
+        arrival_time=arrival_time,
         fixed_fare_inr=fixed_fare_inr,
         price_per_km_inr=price_per_km_inr,
         total_seats=total_seats,
@@ -191,6 +226,8 @@ def delete_vehicle(vehicle_id: int, request: Request, db: Session = Depends(get_
     provider = get_provider_from_cookie(request, db)
     if not provider:
         return RedirectResponse("/provider/login", status_code=303)
+    if not provider.company_name:
+        return RedirectResponse("/provider/dashboard?setup_required=1", status_code=303)
 
     vehicle = db.query(ProviderVehicle).filter(
         ProviderVehicle.id == vehicle_id,
@@ -210,6 +247,8 @@ def bookings_page(request: Request, db: Session = Depends(get_db)):
     provider = get_provider_from_cookie(request, db)
     if not provider:
         return RedirectResponse("/provider/login", status_code=303)
+    if not provider.company_name:
+        return RedirectResponse("/provider/dashboard?setup_required=1", status_code=303)
 
     vehicle_ids = [v.id for v in db.query(ProviderVehicle).filter(
         ProviderVehicle.provider_id == provider.id

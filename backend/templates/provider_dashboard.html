@@ -2,31 +2,58 @@
 {% block title %}Partner Dashboard — RoadBuddy{% endblock %}
 {% block content %}
 
-<div class="dashboard-header">
-  <h1>Welcome, {{ provider.company_name }} 👋</h1>
+<!-- Dashboard Header -->
+<div class="provider-dashboard-header">
+  <div>
+    <h1>Welcome to Road Buddy Partner 👋</h1>
+    <p class="dash-subtitle">Manage your vehicles, bookings, and grow your business</p>
+  </div>
+  {% if show_setup %}
+  <button onclick="openSetupPopup()" class="btn-primary">+ Add Vehicle</button>
+  {% else %}
   <a href="/provider/vehicles" class="btn-primary">+ Add Vehicle</a>
+  {% endif %}
 </div>
 
+{% if show_setup %}
+<div class="setup-warning-banner">
+  <div class="banner-content">
+    <span class="warning-icon">⚠️</span>
+    <div class="banner-text">
+      <h3>Quick Setup Incomplete</h3>
+      <p>You cannot add vehicles or receive bookings yet. Complete the quick setup to activate your partner services.</p>
+    </div>
+  </div>
+  <button onclick="openSetupPopup()" class="btn-setup-action">Complete Setup Now</button>
+</div>
+{% endif %}
+
+<!-- Stats Row -->
 <div class="stats-row">
   <div class="stat-card">
+    <span class="stat-icon">🚗</span>
     <span class="stat-num">{{ vehicle_count }}</span>
     <span class="stat-label">Vehicles listed</span>
   </div>
   <div class="stat-card">
+    <span class="stat-icon">📋</span>
     <span class="stat-num">{{ total_bookings }}</span>
     <span class="stat-label">Total bookings</span>
   </div>
   <div class="stat-card">
+    <span class="stat-icon">💺</span>
     <span class="stat-num">{{ total_seats_booked }}</span>
     <span class="stat-label">Seats booked</span>
   </div>
   <div class="stat-card">
+    <span class="stat-icon">💰</span>
     <span class="stat-num">₹{{ "{:,.0f}".format(total_revenue) }}</span>
     <span class="stat-label">Total revenue</span>
   </div>
 </div>
 
-<h2>Your Vehicles</h2>
+<!-- Vehicles Section -->
+<h2 class="section-title">Your Vehicles</h2>
 {% if vehicles %}
 <div class="vehicle-list">
   {% for v in vehicles %}
@@ -56,7 +83,174 @@
   {% endfor %}
 </div>
 {% else %}
-<p class="empty">No vehicles listed yet. <a href="/provider/vehicles">Add your first vehicle!</a></p>
+<div class="empty-state">
+  <span class="empty-icon">🚗</span>
+  <p>No vehicles listed yet.</p>
+  <a href="/provider/vehicles" class="btn-primary">Add your first vehicle</a>
+</div>
 {% endif %}
+
+
+<!-- ═══ Quick Setup Popup ═══ -->
+{% if show_setup %}
+<div class="popup-overlay" id="setup-overlay">
+  <div class="popup-card" id="setup-popup">
+    <div class="popup-header">
+      <span class="popup-icon">⚡</span>
+      <h2>Quick Setup</h2>
+      <p>Activate your services in a few steps</p>
+    </div>
+
+    <form method="POST" action="/provider/setup" class="setup-form">
+      <div class="setup-group">
+        <label for="setup-company">Business / Company Name *</label>
+        <input type="text" id="setup-company" name="company_name" placeholder="e.g. Jaipur Cabs Pvt Ltd" required />
+      </div>
+
+      <div class="setup-group">
+        <label for="setup-contact">Owner Name *</label>
+        <input type="text" id="setup-contact" name="contact_person" placeholder="e.g. Ramesh Kumar" required />
+      </div>
+
+      <div class="setup-group">
+        <label for="setup-phone">Phone Number *</label>
+        <input type="tel" id="setup-phone" name="phone" placeholder="9876543210" required />
+      </div>
+
+      <div class="setup-group">
+        <label for="setup-alt-email">Alternate Email (Optional)</label>
+        <input type="email" id="setup-alt-email" name="alternate_email" placeholder="owner@company.com" />
+      </div>
+
+      <div class="setup-group">
+        <label for="setup-city">Company City (Optional)</label>
+        <input type="text" id="setup-city" name="city" placeholder="e.g. Jaipur" />
+      </div>
+
+      <div class="setup-group">
+        <label>Service Type *</label>
+        <div class="service-type-options custom-grid">
+          <label class="radio-card">
+            <input type="radio" name="service_type" value="car_rental" checked />
+            <div class="radio-card-content">
+              <span class="rc-icon">🚗</span>
+              <span class="rc-label">Car Rental</span>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="service_type" value="bus_traveller_rental" />
+            <div class="radio-card-content">
+              <span class="rc-icon">🚌</span>
+              <span class="rc-label">Bus/Traveller</span>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="service_type" value="both_car_big" />
+            <div class="radio-card-content">
+              <span class="rc-icon">🚐</span>
+              <span class="rc-label">Both car/big vehicle</span>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="service_type" value="self_drive" onchange="toggleBookingModeSection(this)" />
+            <div class="radio-card-content">
+              <span class="rc-icon">🔑</span>
+              <span class="rc-label">Self Drive</span>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div class="setup-group" id="booking-mode-section">
+        <label>Booking / Business Mode (Select One) *</label>
+        <div class="booking-mode-options">
+          <label class="mode-card">
+            <input type="radio" name="booking_mode" value="solo_owner" checked />
+            <div class="mode-card-content">
+              <div class="mode-radio-circle"></div>
+              <div class="mode-details">
+                <span class="mode-title">Solo vehicle owner</span>
+                <span class="mode-desc">For private bookings</span>
+              </div>
+            </div>
+          </label>
+          <label class="mode-card">
+            <input type="radio" name="booking_mode" value="route_based" />
+            <div class="mode-card-content">
+              <div class="mode-radio-circle"></div>
+              <div class="mode-details">
+                <span class="mode-title">Route based public bookings</span>
+                <span class="mode-desc">Pre-decided routes (e.g. Jaipur to Udaipur)</span>
+              </div>
+            </div>
+          </label>
+          <label class="mode-card">
+            <input type="radio" name="booking_mode" value="both_services" />
+            <div class="mode-card-content">
+              <div class="mode-radio-circle"></div>
+              <div class="mode-details">
+                <span class="mode-title">Both private & public service</span>
+                <span class="mode-desc">Flexible business model</span>
+              </div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-setup">Complete Setup & Activate</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<script>
+  const overlay = document.getElementById("setup-overlay");
+  if (overlay) {
+    overlay.addEventListener("click", function(e) {
+      if (e.target === overlay) {
+        overlay.classList.add("closing");
+        setTimeout(() => overlay.style.display = "none", 300);
+      }
+    });
+    setTimeout(() => overlay.classList.add("visible"), 100);
+  }
+
+  function openSetupPopup() {
+    if (overlay) {
+      overlay.style.display = "flex";
+      overlay.classList.remove("closing");
+      setTimeout(() => overlay.classList.add("visible"), 10);
+    }
+  }
+
+  function toggleBookingModeSection(el) {
+    const section = document.getElementById("booking-mode-section");
+    if (section) {
+      if (el.value === "self_drive" && el.checked) {
+        section.style.display = "none";
+        section.querySelectorAll("input").forEach(i => i.disabled = true);
+      } else {
+        section.style.display = "block";
+        section.querySelectorAll("input").forEach(i => i.disabled = false);
+      }
+    }
+  }
+
+  // Set listeners for other service types to show the section back
+  document.querySelectorAll('input[name="service_type"]').forEach(r => {
+    r.addEventListener('change', function() {
+      const section = document.getElementById("booking-mode-section");
+      if (section) {
+        if (this.value === "self_drive") {
+          section.style.display = "none";
+          section.querySelectorAll("input").forEach(i => i.disabled = true);
+        } else {
+          section.style.display = "block";
+          section.querySelectorAll("input").forEach(i => i.disabled = false);
+        }
+      }
+    });
+  });
+</script>
 
 {% endblock %}
