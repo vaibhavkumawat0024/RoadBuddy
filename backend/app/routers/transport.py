@@ -4,7 +4,7 @@ from app.schemas.schemas import (
     TransportSearch, TransportOption,
     TransportBooking, BookingOut
 )
-from app.services.transport_service import search_transport, calculate_total_fare
+from app.services.transport_service import search_transport, calculate_total_fare, get_transport_option_by_id
 from app.core.auth import get_current_user
 from app.core.database import get_db
 from app.models.models import Booking
@@ -45,15 +45,7 @@ def book_ticket(
     Book a transport ticket.
     include_return is optional — False by default.
     """
-    all_options = (
-        search_transport("any", "any", "bus") +
-        search_transport("any", "any", "train") +
-        search_transport("any", "any", "flight")
-    )
-    option = next(
-        (o for o in all_options if o.id == data.transport_option_id),
-        None
-    )
+    option = get_transport_option_by_id(data.transport_option_id)
     if not option:
         raise HTTPException(status_code=404, detail="Transport option not found")
 

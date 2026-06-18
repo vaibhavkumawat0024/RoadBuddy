@@ -1,6 +1,8 @@
 {% extends "base.html" %}
+{% block title %}Community — RoadBuddy{% endblock %}
 
 {% block content %}
+
 
 <div class="community-container">
 
@@ -144,7 +146,7 @@ function searchRoutes(){
 
 
         if(text.includes(input)){
-            card.style.display="block";
+            card.style.display="";
         }
         else{
             card.style.display="none";

@@ -1,24 +1,18 @@
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-import os
-from dotenv import load_dotenv
+from sqlalchemy.orm import sessionmaker, declarative_base
+from app.core.config import settings
 
-# Load .env file
-load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
-
-DATABASE_URL = os.getenv("DATABASE_URL")
-
-if not DATABASE_URL:
-    raise ValueError("DATABASE_URL not found in .env file!")
+connect_args = {}
+if settings.database_url.startswith("postgresql"):
+    connect_args = {"sslmode": "require"}
 
 engine = create_engine(
-    DATABASE_URL,
+    settings.database_url,
     pool_pre_ping=True,        # tests connection before using it
     pool_recycle=300,           # recycle connections every 5 minutes
     pool_size=5,
     max_overflow=10,
-    connect_args={"sslmode": "require"}
+    connect_args=connect_args
 )
 SessionLocal = sessionmaker(
     autocommit=False,

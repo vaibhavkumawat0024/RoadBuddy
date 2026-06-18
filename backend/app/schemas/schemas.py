@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List
 from enum import Enum
 
@@ -144,7 +144,7 @@ class RoutePost(BaseModel):
 
 class RouteReview(BaseModel):
     route_id: str
-    rating: int                        # 1–5
+    rating: int  # 1–5
     review_text: str
     tags: List[str] = []
 

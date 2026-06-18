@@ -174,18 +174,8 @@ async def call_groq(prompt: str) -> dict:
                     text = text[4:]
             return json.loads(text.strip())
 
-    # All retries failed — return mock data
-    from app.schemas.schemas import TripCreate
-    return mock_own_vehicle(TripCreate(
-        origin="Origin",
-        destination="Destination", 
-        start_date="2025-12-01",
-        end_date="2025-12-03",
-        budget_inr=10000,
-        num_people=2,
-        group_type="friends",
-        travel_mode="own_vehicle",
-))
+    # All retries failed
+    raise RuntimeError("All Groq retry attempts failed.")
 
 
 def mock_own_vehicle(trip: TripCreate) -> dict:
@@ -236,21 +226,35 @@ async def generate_itinerary(trip: TripCreate, vehicle_info: dict) -> TripOut:
     try:
         if trip.travel_mode == TravelMode.own_vehicle:
             if settings.groq_api_key:
-                data = await call_groq(build_own_vehicle_prompt(trip, vehicle_info))
+                try:
+                    data = await call_groq(build_own_vehicle_prompt(trip, vehicle_info))
+                except Exception as e:
+                    print(f"Groq itinerary failed: {e}. Falling back to mock.")
+                    data = mock_own_vehicle(trip)
             else:
                 data = mock_own_vehicle(trip)
         else:
             if settings.groq_api_key:
-                data = await call_groq(build_transport_prompt(trip))
+                try:
+                    data = await call_groq(build_transport_prompt(trip))
+                except Exception as e:
+                    print(f"Groq itinerary failed: {e}. Falling back to mock.")
+                    data = mock_transport_itinerary(trip)
             else:
                 data = mock_transport_itinerary(trip)
 
         stops = [ItineraryStop(**s) for s in data["stops"]]
+        import uuid
+        trip_uuid = uuid.uuid4().hex[:6]
+        trip_id = f"trip_{trip.origin[:3].lower()}{trip.destination[:3].lower()}_{trip_uuid}"
+        
+        fuel_cost = data.get("fuel_cost_inr", 0) + data.get("return_fuel_cost_inr", 0)
+        
         return TripOut(
-            id=f"trip_{trip.origin[:3].lower()}{trip.destination[:3].lower()}",
+            id=trip_id,
             origin=trip.origin, destination=trip.destination, travel_mode=trip.travel_mode,
             total_distance_km=data.get("total_distance_km", 0), stops=stops,
-            fuel_cost_inr=data.get("fuel_cost_inr", 0),
+            fuel_cost_inr=fuel_cost,
             toll_cost_inr=data.get("toll_cost_inr", 0) + data.get("return_toll_cost_inr", 0),
             transport_fare_inr=0, return_fare_inr=0,
             hotel_cost_inr=data.get("hotel_cost_inr", 0),
@@ -259,4 +263,4 @@ async def generate_itinerary(trip: TripCreate, vehicle_info: dict) -> TripOut:
             ai_summary=data.get("ai_summary", ""),
         )
     except Exception as e:
-        raise RuntimeError(f"Itinerary generation failed: {e}")
+        raise RuntimeError(f"Itinerary generation failed: {e}") from e

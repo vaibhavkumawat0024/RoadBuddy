@@ -102,12 +102,22 @@ def mock_safety_report(origin, destination, travel_date, departure_time):
     }
 
 
+EMERGENCY_CONTACTS = [
+    {"name": "Highway Police", "number": "1033", "type": "police"},
+    {"name": "Ambulance", "number": "108", "type": "medical"},
+    {"name": "Road Accident Emergency", "number": "1073", "type": "accident"},
+    {"name": "Tourist Helpline", "number": "1800-11-1363", "type": "tourist"}
+]
+
+
 async def analyze_route_safety(origin, destination, travel_date, departure_time="08:00", vehicle_type="car", num_people=2):
     try:
         if settings.groq_api_key:
             data = await call_groq_safety(build_safety_prompt(origin, destination, travel_date, departure_time, vehicle_type, num_people))
         else:
             data = mock_safety_report(origin, destination, travel_date, departure_time)
+        
+        data["emergency_contacts"] = EMERGENCY_CONTACTS
         return {"origin": origin, "destination": destination, "safety_report": data}
     except Exception as e:
-        raise RuntimeError(f"Safety analysis failed: {e}")
+        raise RuntimeError(f"Safety analysis failed: {e}") from e

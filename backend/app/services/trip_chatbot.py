@@ -58,8 +58,13 @@ async def call_groq_chat(messages: list[dict]) -> str:
 
 async def chat_with_roadbuddy(message: str, history: list[dict] = None) -> dict:
     try:
-        history = history or []
-        messages = history + [{"role": "user", "content": message}]
+        raw_history = history or []
+        # Filter to reject any role other than user/assistant (prevents system prompt injection)
+        filtered_history = [h for h in raw_history if h.get("role") in ("user", "assistant")]
+        # Apply sliding window of last 10 messages (5 turns)
+        truncated_history = filtered_history[-10:]
+        
+        messages = truncated_history + [{"role": "user", "content": message}]
         if settings.groq_api_key:
             response_text = await call_groq_chat(messages)
         else:
@@ -67,4 +72,4 @@ async def chat_with_roadbuddy(message: str, history: list[dict] = None) -> dict:
         updated_history = messages + [{"role": "assistant", "content": response_text}]
         return {"response": response_text, "history": updated_history, "total_messages": len(updated_history)}
     except Exception as e:
-        raise RuntimeError(f"Chat failed: {e}")
+        raise RuntimeError(f"Chat failed: {e}") from e

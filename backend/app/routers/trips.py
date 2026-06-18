@@ -219,8 +219,7 @@ def delete_trip(
     db.query(TripStop).filter(TripStop.trip_id == trip.id).delete()
     db.delete(trip)
     db.commit()
-    from pydantic import BaseModel
-from typing import Optional
+
 
 
 class WaypointRequest(BaseModel):
@@ -250,7 +249,8 @@ async def get_waypoint_suggestions(request: WaypointRequest):
         return result
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e))
-    from app.services.trip_chatbot import chat_with_roadbuddy
+
+
 
 
 class ChatMessage(BaseModel):

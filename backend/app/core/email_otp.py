@@ -5,7 +5,7 @@ Sends real OTP emails using Gmail SMTP.
 Replaces the hardcoded 1234 OTP.
 """
 
-import random
+import secrets
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -21,10 +21,24 @@ _otp_store = {}
 
 def generate_otp(email: str) -> str:
     """Generate a 6-digit OTP and store it with 10 minute expiry."""
-    otp = str(random.randint(100000, 999999))
+    if email in _otp_store:
+        record = _otp_store[email]
+        if "last_requested_at" in record:
+            time_since_last = datetime.now() - record["last_requested_at"]
+            if time_since_last.total_seconds() < 60:
+                raise ValueError("Please wait 60 seconds before requesting a new OTP.")
+
+    otp = str(secrets.randbelow(900000) + 100000)
+    existing_record = _otp_store.get(email, {})
+    name = existing_record.get("name")
+    password = existing_record.get("password")
+
     _otp_store[email] = {
         "otp": otp,
         "expires_at": datetime.now() + timedelta(minutes=10),
+        "last_requested_at": datetime.now(),
+        "name": name,
+        "password": password
     }
     return otp
 
@@ -155,5 +169,8 @@ def generate_and_send_otp(email: str, name: str) -> bool:
     sent = send_otp_email(email, name, otp)
     if not sent:
         # Fallback — store OTP but warn
-        print(f"WARNING: Email failed for {email}. OTP is {otp} (dev fallback)")
+        if settings.debug:
+            print(f"WARNING: Email failed for {email}. OTP is {otp} (dev fallback)")
+        else:
+            print(f"WARNING: Email failed for {email} (dev fallback)")
     return sent

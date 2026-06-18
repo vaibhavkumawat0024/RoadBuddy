@@ -17,10 +17,6 @@
     <span class="stat-num">{{ vehicle_count }}</span>
     <span class="stat-label">Vehicles added</span>
   </div>
-  <div class="stat-card">
-    <span class="stat-num">7</span>
-    <span class="stat-label">AI features active</span>
-  </div>
 </div>
 
 <!-- AI Features Grid -->
@@ -41,7 +37,7 @@
     </div>
     <div class="chat-input-row">
       <input type="text" id="chat-input" placeholder="Plan a 3 day trip from Jaipur to Udaipur..." />
-      <button onclick="sendChat()">Send</button>
+      <button id="chat-send-btn" onclick="sendChat()">Send</button>
     </div>
   </div>
 
@@ -56,7 +52,7 @@
     </div>
     <div class="ai-form">
       <input type="text" id="search-input" placeholder="beach trip under 5000 for couple..." />
-      <button onclick="smartSearch()">Search</button>
+      <button id="search-btn" onclick="smartSearch()">Search</button>
     </div>
     <div id="search-result" class="ai-result hidden"></div>
   </div>
@@ -73,7 +69,7 @@
     <div class="ai-form">
       <input type="text" id="wp-origin" placeholder="From (e.g. Jaipur)" />
       <input type="text" id="wp-dest" placeholder="To (e.g. Udaipur)" />
-      <button onclick="getWaypoints()">Suggest Stops</button>
+      <button id="wp-btn" onclick="getWaypoints()">Suggest Stops</button>
     </div>
     <div id="waypoint-result" class="ai-result hidden"></div>
   </div>
@@ -91,7 +87,7 @@
       <input type="text" id="safety-origin" placeholder="From (e.g. Jaipur)" />
       <input type="text" id="safety-dest" placeholder="To (e.g. Manali)" />
       <input type="date" id="safety-date" />
-      <button onclick="safetyCheck()">Check Safety</button>
+      <button id="safety-btn" onclick="safetyCheck()">Check Safety</button>
     </div>
     <div id="safety-result" class="ai-result hidden"></div>
   </div>
@@ -114,7 +110,7 @@
         <option value="family">Family</option>
         <option value="solo">Solo</option>
       </select>
-      <button onclick="getRecommendations()">Get Recommendations</button>
+      <button id="rec-btn" onclick="getRecommendations()">Get Recommendations</button>
     </div>
     <div id="rec-result" class="ai-result hidden"></div>
   </div>
@@ -132,7 +128,7 @@
       <input type="text" id="journal-origin" placeholder="From (e.g. Jaipur)" />
       <input type="text" id="journal-dest" placeholder="To (e.g. Udaipur)" />
       <textarea id="journal-entry" placeholder="Write your trip journal here... What did you see? How did you feel?" rows="3"></textarea>
-      <button onclick="summarizeJournal()">Generate Summary</button>
+      <button id="journal-btn" onclick="summarizeJournal()">Generate Summary</button>
     </div>
     <div id="journal-result" class="ai-result hidden"></div>
   </div>
@@ -159,6 +155,31 @@
   const API = '';
   let chatHistory = [];
 
+  function escapeHTML(str) {
+    if (str === null || str === undefined) return '';
+    return String(str).replace(/[&<>'"]/g, 
+      tag => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        "'": '&#39;',
+        '"': '&quot;'
+      }[tag] || tag)
+    );
+  }
+
+  function setButtonState(btnId, disabled, loadingText) {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    btn.disabled = disabled;
+    if (disabled) {
+      btn.dataset.originalText = btn.textContent;
+      btn.textContent = loadingText || 'Loading...';
+    } else if (btn.dataset.originalText) {
+      btn.textContent = btn.dataset.originalText;
+    }
+  }
+
   // ── Chat ──────────────────────────────────────────────────────────────────
   async function sendChat() {
     const input = document.getElementById('chat-input');
@@ -168,6 +189,7 @@
     appendMsg(msg, 'user');
     input.value = '';
     appendMsg('Thinking...', 'ai', 'thinking');
+    setButtonState('chat-send-btn', true, 'Sending...');
 
     try {
       const res = await fetch(`${API}/api/trips/chat`, {
@@ -176,12 +198,14 @@
         body: JSON.stringify({ message: msg, history: chatHistory })
       });
       const data = await res.json();
-      removThinking();
+      removeThinking();
       appendMsg(data.response, 'ai');
       chatHistory = data.history;
     } catch (e) {
-      removThinking();
+      removeThinking();
       appendMsg('Sorry, something went wrong. Please try again.', 'ai');
+    } finally {
+      setButtonState('chat-send-btn', false);
     }
   }
 
@@ -195,7 +219,7 @@
     box.scrollTop = box.scrollHeight;
   }
 
-  function removThinking() {
+  function removeThinking() {
     const t = document.getElementById('thinking');
     if (t) t.remove();
   }
@@ -211,6 +235,7 @@
     const result = document.getElementById('search-result');
     result.innerHTML = 'Searching...';
     result.classList.remove('hidden');
+    setButtonState('search-btn', true, 'Searching...');
 
     try {
       const res = await fetch(`${API}/api/community/smart-search`, {
@@ -221,19 +246,21 @@
       const data = await res.json();
       const f = data.filters;
       result.innerHTML = `
-        <div class="result-title">🔍 ${f.understood_query}</div>
+        <div class="result-title">🔍 ${escapeHTML(f.understood_query)}</div>
         <div class="result-tags">
-          ${f.destination_type ? `<span class="tag">${f.destination_type}</span>` : ''}
-          ${f.max_budget_inr ? `<span class="tag">₹${f.max_budget_inr}</span>` : ''}
-          ${f.group_type ? `<span class="tag">${f.group_type}</span>` : ''}
-          ${f.duration_days ? `<span class="tag">${f.duration_days} days</span>` : ''}
+          ${f.destination_type ? `<span class="tag">${escapeHTML(f.destination_type)}</span>` : ''}
+          ${f.max_budget_inr ? `<span class="tag">₹${escapeHTML(f.max_budget_inr)}</span>` : ''}
+          ${f.group_type ? `<span class="tag">${escapeHTML(f.group_type)}</span>` : ''}
+          ${f.duration_days ? `<span class="tag">${escapeHTML(f.duration_days)} days</span>` : ''}
         </div>
         <div class="result-label">Suggested destinations:</div>
-        ${f.suggested_destinations.map(d => `<div class="result-item">📍 ${d}</div>`).join('')}
-        <div class="result-tip">💡 ${f.search_tips}</div>
+        ${(f.suggested_destinations || []).map(d => `<div class="result-item">📍 ${escapeHTML(d)}</div>`).join('')}
+        <div class="result-tip">💡 ${escapeHTML(f.search_tips)}</div>
       `;
     } catch (e) {
       result.innerHTML = 'Search failed. Please try again.';
+    } finally {
+      setButtonState('search-btn', false);
     }
   }
 
@@ -245,6 +272,7 @@
     const result = document.getElementById('waypoint-result');
     result.innerHTML = 'Finding hidden gems...';
     result.classList.remove('hidden');
+    setButtonState('wp-btn', true, 'Finding...');
 
     try {
       const res = await fetch(`${API}/api/trips/suggest-waypoints`, {
@@ -254,18 +282,20 @@
       });
       const data = await res.json();
       result.innerHTML = `
-        <div class="result-title">🗺️ ${data.route_summary}</div>
-        <div class="result-label">${data.total_waypoints} stops found:</div>
-        ${data.waypoints.slice(0, 4).map(w => `
+        <div class="result-title">🗺️ ${escapeHTML(data.route_summary)}</div>
+        <div class="result-label">${escapeHTML(data.total_waypoints)} stops found:</div>
+        ${(data.waypoints || []).slice(0, 4).map(w => `
           <div class="result-item">
-            <strong>${w.name}</strong>
-            <span class="tag">${w.type}</span>
-            <div style="font-size:12px;color:#888;margin-top:2px">${w.why_visit}</div>
+            <strong>${escapeHTML(w.name)}</strong>
+            <span class="tag">${escapeHTML(w.type)}</span>
+            <div style="font-size:12px;color:#888;margin-top:2px">${escapeHTML(w.why_visit)}</div>
           </div>
         `).join('')}
       `;
     } catch (e) {
       result.innerHTML = 'Failed to get waypoints. Please try again.';
+    } finally {
+      setButtonState('wp-btn', false);
     }
   }
 
@@ -278,6 +308,7 @@
     const result = document.getElementById('safety-result');
     result.innerHTML = 'Analyzing route safety...';
     result.classList.remove('hidden');
+    setButtonState('safety-btn', true, 'Checking...');
 
     try {
       const res = await fetch(`${API}/api/trips/safety-check`, {
@@ -287,25 +318,28 @@
       });
       const data = await res.json();
       const r = data.safety_report;
-      const scoreColor = r.overall_safety_score >= 8 ? '#1D9E75' : r.overall_safety_score >= 6 ? '#f39c12' : '#e74c3c';
+      const score = parseFloat(r.overall_safety_score) || 0;
+      const scoreColor = score >= 8 ? '#1D9E75' : score >= 6 ? '#f39c12' : '#e74c3c';
       result.innerHTML = `
         <div class="result-title">
-          <span style="color:${scoreColor};font-size:20px;font-weight:700">${r.overall_safety_score}/10</span>
-          <span class="tag" style="background:${scoreColor}20;color:${scoreColor}">${r.overall_safety_level}</span>
+          <span style="color:${scoreColor};font-size:20px;font-weight:700">${escapeHTML(r.overall_safety_score)}/10</span>
+          <span class="tag" style="background:${scoreColor}20;color:${scoreColor}">${escapeHTML(r.overall_safety_level)}</span>
         </div>
-        <div style="font-size:13px;color:#555;margin:8px 0">${r.summary}</div>
+        <div style="font-size:13px;color:#555;margin:8px 0">${escapeHTML(r.summary)}</div>
         <div class="result-label">⚠️ Hazards:</div>
-        ${r.hazards.slice(0, 2).map(h => `
+        ${(r.hazards || []).slice(0, 2).map(h => `
           <div class="result-item">
-            <strong>${h.name}</strong>
-            <span class="tag severity-${h.severity}">${h.severity}</span>
-            <div style="font-size:12px;color:#888;margin-top:2px">${h.advice}</div>
+            <strong>${escapeHTML(h.name)}</strong>
+            <span class="tag severity-${escapeHTML(h.severity)}">${escapeHTML(h.severity)}</span>
+            <div style="font-size:12px;color:#888;margin-top:2px">${escapeHTML(h.advice)}</div>
           </div>
         `).join('')}
-        <div class="result-tip">🕐 Best departure: ${r.best_departure_time}</div>
+        <div class="result-tip">🕐 Best departure: ${escapeHTML(r.best_departure_time)}</div>
       `;
     } catch (e) {
       result.innerHTML = 'Safety check failed. Please try again.';
+    } finally {
+      setButtonState('safety-btn', false);
     }
   }
 
@@ -318,6 +352,7 @@
     const result = document.getElementById('rec-result');
     result.innerHTML = 'Finding best trips for you...';
     result.classList.remove('hidden');
+    setButtonState('rec-btn', true, 'Getting...');
 
     try {
       const res = await fetch(`${API}/api/trips/recommendations`, {
@@ -327,20 +362,22 @@
       });
       const data = await res.json();
       result.innerHTML = `
-        <div class="result-label">Top ${data.total_recommendations} trips for you:</div>
-        ${data.recommendations.slice(0, 3).map(r => `
+        <div class="result-label">Top ${escapeHTML(data.total_recommendations)} trips for you:</div>
+        ${(data.recommendations || []).slice(0, 3).map(r => `
           <div class="result-item">
-            <strong>${r.rank}. ${r.title}</strong>
-            <span class="tag">₹${r.estimated_cost_inr}</span>
-            <span class="tag">${r.distance_km} km</span>
-            <div style="font-size:12px;color:#888;margin-top:2px">${r.why_recommended}</div>
-            <div style="font-size:12px;color:#1D9E75;margin-top:2px">🍽️ Try: ${r.must_try_food}</div>
+            <strong>${escapeHTML(r.rank)}. ${escapeHTML(r.title)}</strong>
+            <span class="tag">₹${escapeHTML(r.estimated_cost_inr)}</span>
+            <span class="tag">${escapeHTML(r.distance_km)} km</span>
+            <div style="font-size:12px;color:#888;margin-top:2px">${escapeHTML(r.why_recommended)}</div>
+            <div style="font-size:12px;color:#1D9E75;margin-top:2px">🍽️ Try: ${escapeHTML(r.must_try_food)}</div>
           </div>
         `).join('')}
-        <div class="result-tip">💡 ${data.recommendation_tip}</div>
+        <div class="result-tip">💡 ${escapeHTML(data.recommendation_tip)}</div>
       `;
     } catch (e) {
       result.innerHTML = 'Failed to get recommendations. Please try again.';
+    } finally {
+      setButtonState('rec-btn', false);
     }
   }
 
@@ -353,6 +390,7 @@
     const result = document.getElementById('journal-result');
     result.innerHTML = 'Generating your trip story...';
     result.classList.remove('hidden');
+    setButtonState('journal-btn', true, 'Generating...');
 
     try {
       const res = await fetch(`${API}/api/journal/summarize`, {
@@ -367,14 +405,16 @@
       const data = await res.json();
       const s = data.summary;
       result.innerHTML = `
-        <div class="result-title">📖 ${s.title}</div>
-        <div style="font-size:13px;color:#555;margin:8px 0;line-height:1.6">${s.narrative.split('\n')[0]}</div>
+        <div class="result-title">📖 ${escapeHTML(s.title)}</div>
+        <div style="font-size:13px;color:#555;margin:8px 0;line-height:1.6">${escapeHTML(s.narrative.split('\n')[0])}</div>
         <div class="result-label">✨ Highlights:</div>
-        ${s.highlights.slice(0, 3).map(h => `<div class="result-item">⭐ ${h}</div>`).join('')}
-        <div class="result-tip">📱 ${s.social_caption}</div>
+        ${(s.highlights || []).slice(0, 3).map(h => `<div class="result-item">⭐ ${escapeHTML(h)}</div>`).join('')}
+        <div class="result-tip">📱 ${escapeHTML(s.social_caption)}</div>
       `;
     } catch (e) {
       result.innerHTML = 'Failed to generate summary. Please try again.';
+    } finally {
+      setButtonState('journal-btn', false);
     }
   }
 </script>

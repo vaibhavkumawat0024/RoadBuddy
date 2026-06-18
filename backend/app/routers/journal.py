@@ -22,10 +22,23 @@ def add_entry(
     trip_id = data.trip_id
     user_id = int(current_user["user_id"])
 
+    # Try checking if trip is an integer to verify ownership in Trip table
+    try:
+        trip_int_id = int(trip_id)
+        from app.models.models import Trip
+        trip = db.query(Trip).filter(Trip.id == trip_int_id).first()
+        if trip and trip.user_id != user_id:
+            raise HTTPException(status_code=403, detail="Unauthorized access to this trip")
+    except ValueError:
+        pass
+
     # Get or create journal for this trip
     journal = db.query(Journal).filter(
         Journal.trip_id == trip_id
     ).first()
+
+    if journal and journal.user_id != user_id:
+        raise HTTPException(status_code=403, detail="Unauthorized access to this journal")
 
     if not journal:
         journal = Journal(
@@ -138,6 +151,8 @@ def expense_summary(
     ).first()
     if not journal:
         raise HTTPException(status_code=404, detail="Journal not found")
+    if journal.user_id != int(current_user["user_id"]) and not journal.is_public:
+        raise HTTPException(status_code=403, detail="This journal is private")
 
     entries = db.query(JournalEntryModel).filter(
         JournalEntryModel.journal_id == journal.id
@@ -182,7 +197,7 @@ async def summarize_journal(request: SummarizeRequest):
     """AI-powered trip journal summarizer."""
     try:
         from app.services.journal_summarizer import summarize_trip_journal
-        entries_dict = [e.dict() for e in request.entries]
+        entries_dict = [e.model_dump() for e in request.entries]
         result = await summarize_trip_journal(
             origin=request.origin,
             destination=request.destination,

@@ -9,7 +9,7 @@ Save as: backend/seed_data.py
 from app.core.database import SessionLocal
 from app.models.models import Hotel, Train, Bus, Flight
 
-db = SessionLocal()
+
 
 # ── Hotels ─────────────────────────────────────────────────────────────────
 
@@ -115,19 +115,30 @@ flights = [
 
 
 def seed():
-    # Avoid duplicate seeding
-    if db.query(Hotel).first():
-        print("Data already seeded. Skipping.")
-        return
+    db = SessionLocal()
+    try:
+        has_hotels = db.query(Hotel).first() is not None
+        has_trains = db.query(Train).first() is not None
+        has_buses = db.query(Bus).first() is not None
+        has_flights = db.query(Flight).first() is not None
 
-    db.add_all(hotels)
-    db.add_all(trains)
-    db.add_all(buses)
-    db.add_all(flights)
-    db.commit()
-    print(f"✅ Seeded {len(hotels)} hotels, {len(trains)} trains, {len(buses)} buses, {len(flights)} flights!")
+        if has_hotels or has_trains or has_buses or has_flights:
+            print("Database already contains seeded data. Skipping.")
+            return
+
+        db.add_all(hotels)
+        db.add_all(trains)
+        db.add_all(buses)
+        db.add_all(flights)
+        db.commit()
+        print(f"✅ Seeded {len(hotels)} hotels, {len(trains)} trains, {len(buses)} buses, {len(flights)} flights!")
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Error seeding database: {e}")
+        raise
+    finally:
+        db.close()
 
 
 if __name__ == "__main__":
     seed()
-    db.close()

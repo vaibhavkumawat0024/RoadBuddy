@@ -5,19 +5,9 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.models import User, Trip, Vehicle
-
-from passlib.context import CryptContext
-
-
+from app.core.auth import hash_password
 router = APIRouter()
-
 templates = Jinja2Templates(directory="templates")
-
-pwd_context = CryptContext(
-    schemes=["bcrypt"],
-    deprecated="auto"
-)
-
 
 # ---------------- USER FROM COOKIE ----------------
 
@@ -47,12 +37,13 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
         Trip.user_id == user.id
     ).order_by(Trip.created_at.desc()).limit(5).all()
 
+    trip_count = db.query(Trip).filter(Trip.user_id == user.id).count()
     vehicles = db.query(Vehicle).filter(Vehicle.user_id == user.id).all()
 
     return templates.TemplateResponse(request, "dashboard.html", {
         "user": user,
         "trips": trips,
-        "trip_count": len(trips),
+        "trip_count": trip_count,
         "vehicle_count": len(vehicles)
     })
 
@@ -240,11 +231,16 @@ async def update_profile(
     if not user:
         return RedirectResponse("/login", status_code=303)
 
+    if email != user.email:
+        existing = db.query(User).filter(User.email == email).first()
+        if existing:
+            return RedirectResponse("/profile?error=Email already in use.", status_code=303)
+        user.email = email
+
     user.name = name
-    user.email = email
 
     if password:
-        user.password_hash = pwd_context.hash(password)
+        user.password_hash = hash_password(password)
 
     db.commit()
 

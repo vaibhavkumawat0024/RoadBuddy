@@ -65,16 +65,20 @@ def browse_routes(
     db: Session = Depends(get_db)
 ):
     """Browse all public community routes."""
-    routes = db.query(CommunityRoute).filter(
-        CommunityRoute.is_public == True,
+    query = db.query(CommunityRoute).filter(
+        CommunityRoute.is_public.is_(True),
         CommunityRoute.avg_rating >= min_rating,
-    ).limit(limit).all()
+    )
+    
+    if tag:
+        escaped_tag = tag.replace('/', '//').replace('%', '/%').replace('_', '/_')
+        query = query.filter(CommunityRoute.tags.ilike(f"%{escaped_tag}%", escape='/'))
+
+    routes = query.limit(limit).all()
 
     results = []
     for r in routes:
         tags_list = r.tags.split(",") if r.tags else []
-        if tag and tag.lower() not in [t.lower() for t in tags_list]:
-            continue
         results.append(RouteOut(
             id            = str(r.id),
             title         = r.title,
@@ -168,12 +172,13 @@ def add_review(
         tags        = ",".join(data.tags),
     )
     db.add(review)
+    db.flush()
 
     # Recalculate average rating
     all_reviews = db.query(RouteReviewModel).filter(
         RouteReviewModel.route_id == int(route_id)
     ).all()
-    all_ratings = [r.rating for r in all_reviews] + [data.rating]
+    all_ratings = [r.rating for r in all_reviews]
     route.avg_rating    = round(sum(all_ratings) / len(all_ratings), 1)
     route.total_reviews = len(all_ratings)
 

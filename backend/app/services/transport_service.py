@@ -158,6 +158,15 @@ def search_transport(origin: str, destination: str, mode: str) -> list:
         return []
 
 
+def get_transport_option_by_id(option_id: str) -> TransportOption | None:
+    if not option_id or "_" not in option_id:
+        return None
+    mode = option_id.split("_")[0]
+    # Fetch from standard mock route Delhi -> Jaipur
+    options = search_transport("Delhi", "Jaipur", mode)
+    return next((o for o in options if o.id == option_id), None)
+
+
 # ── Fare calculator ───────────────────────────────────────────────────────────
 
 def calculate_total_fare(

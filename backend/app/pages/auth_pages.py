@@ -6,6 +6,7 @@ from app.core.database import get_db
 from app.core.email_otp import generate_and_send_otp, verify_otp, clear_otp, _otp_store
 from app.core.auth import hash_password, verify_password, create_access_token
 from app.models.models import User
+from app.core.config import settings
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
@@ -29,7 +30,12 @@ def register_submit(
         return templates.TemplateResponse(request, "register.html", {
             "error": "Email already registered."
         })
-    generate_and_send_otp(email, name)
+    try:
+        generate_and_send_otp(email, name)
+    except ValueError as e:
+        return templates.TemplateResponse(request, "register.html", {
+            "error": str(e)
+        })
     _otp_store[email]["name"] = name
     _otp_store[email]["password"] = hash_password(password)
     return templates.TemplateResponse(request, "verify_otp.html", {
@@ -45,10 +51,10 @@ def verify_otp_submit(
     db: Session = Depends(get_db)
 ):
     record = _otp_store.get(email)
-    if not verify_otp(email, otp):
+    if not record or not verify_otp(email, otp):
         return templates.TemplateResponse(request, "verify_otp.html", {
             "email": email,
-            "error": "Invalid OTP. Please enter 1234."
+            "error": "Invalid or expired OTP. Please try again."
         })
     user = User(
         name=record["name"],
@@ -83,7 +89,14 @@ def login_submit(
         })
     token = create_access_token({"sub": str(user.id)})
     response = RedirectResponse("/dashboard", status_code=303)
-    response.set_cookie("access_token", token, httponly=True, max_age=86400)
+    response.set_cookie(
+        "access_token",
+        token,
+        httponly=True,
+        max_age=86400,
+        secure=not settings.debug,
+        samesite="lax"
+    )
     return response
 
 

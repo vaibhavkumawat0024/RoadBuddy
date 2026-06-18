@@ -11,11 +11,17 @@
   <nav>
     <a href="/" class="brand">🚗 RoadBuddy</a>
     <div>
-      <a href="/add-vehicle">My Vehicles</a>
-      <a href="/logout">Logout</a>
+      {% if user %}
+      <a href="/dashboard">Dashboard</a>
       <a href="/my-trips">My Trips</a>
+      <a href="/add-vehicle">My Vehicles</a>
       <a href="/community">🌍 Community</a>
       <a href="/profile">👤 Profile</a>
+      <a href="/logout">Logout</a>
+      {% else %}
+      <a href="/login">Login</a>
+      <a href="/register">Register</a>
+      {% endif %}
     </div>
   </nav>
 

@@ -34,7 +34,9 @@ def calculate_fuel_cost(
     city: str = "Jaipur",
 ) -> dict:
     price = FUEL_PRICES.get(fuel_type, 104.0)
-    units_required = distance_km / mileage_kmpl
+    # Ensure mileage is positive to avoid ZeroDivisionError
+    safe_mileage = max(mileage_kmpl, 0.1)
+    units_required = distance_km / safe_mileage
     cost = units_required * price
     return {
         "units_required": round(units_required, 2),
@@ -78,12 +80,19 @@ def build_fuel_calc_response(
     include_return: bool = False,
 ) -> dict:
     distance = estimate_distance(origin, destination)
+    
+    mileage = vehicle.get("mileage_kmpl")
+    if mileage is None:
+        mileage = 15.0  # sensible default mileage
+    fuel_type = vehicle.get("fuel_type", "petrol")
+    category = vehicle.get("category", "car")
+
     fuel = calculate_fuel_cost(
         distance,
-        vehicle["mileage_kmpl"],
-        vehicle["fuel_type"],
+        mileage,
+        fuel_type,
     )
-    toll = calculate_toll_cost(distance, vehicle["category"])
+    toll = calculate_toll_cost(distance, category)
 
     total_one_way = round(fuel["cost_inr"] + toll, 2)
     total_return  = round(total_one_way * 2, 2) if include_return else None
