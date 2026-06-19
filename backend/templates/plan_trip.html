@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <title>RoadBuddy — Smart Map</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -59,7 +59,9 @@
     z-index: 10;
     flex-shrink: 0;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
+  .transport-bar::-webkit-scrollbar { display: none; }
   .transport-tab {
     display: flex;
     align-items: center;
@@ -194,6 +196,7 @@
     flex: 1;
     overflow-y: auto;
     background: #fdfdfd;
+    -webkit-overflow-scrolling: touch;
   }
   .dir-header {
     padding: 14px 20px;
@@ -379,6 +382,45 @@
     margin: 0 auto 10px;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ─── MOBILE MEDIA RESPONSIVENESS OVERRIDES ─── */
+  @media (max-width: 768px) {
+    .topbar { height: 50px; padding: 0 16px; }
+    .topbar-subtitle { display: none; }
+    .transport-bar { height: 48px; padding: 0 12px; gap: 6px; }
+    .transport-tab { padding: 6px 12px; font-size: 12px; border-radius: 6px; }
+    
+    .main-layout {
+      flex-direction: column;
+      height: calc(100vh - 98px);
+    }
+    
+    .left-panel {
+      width: 100%;
+      height: auto;
+      max-height: 45%;
+      border-right: none;
+      border-bottom: 1px solid var(--border-color);
+      overflow-y: auto;
+    }
+    
+    .panel-section { padding: 12px 16px; }
+    .loc-input { padding: 10px 10px 10px 32px; font-size: 13px; }
+    .get-routes-btn { padding: 12px; font-size: 13px; margin-top: 2px; }
+    
+    .right-map-area {
+      flex: 1;
+      height: 55%;
+    }
+    
+    .map-controls { bottom: 16px; right: 16px; }
+    .map-ctrl-btn { padding: 8px 12px; font-size: 12px; }
+
+    /* Auto-collapses input sections when route sets render on mobile screen bounds */
+    .left-panel.collapsed-view {
+      max-height: 150px;
+    }
+  }
 </style>
 </head>
 <body>
@@ -408,7 +450,7 @@
 
 <div class="main-layout">
 
-  <div class="left-panel">
+  <div class="left-panel" id="sidebar-panel">
 
     <div id="gps-status-row" class="gps-status-bar">
       <div class="gps-dot" id="gps-dot"></div>
@@ -501,8 +543,7 @@
       attribution: '© OpenStreetMap'
     }).addTo(leafletMap);
 
-    // Force size computation to ensure container matches wrapper calculations
-    setTimeout(() => { leafletMap.invalidateSize(); }, 200);
+    setTimeout(() => { leafletMap.invalidateSize(); }, 300);
   }
 
   // ─── MODE SELECTION ──────────────────────────────────────
@@ -510,6 +551,7 @@
     currentMode = mode;
     document.querySelectorAll('.transport-tab').forEach(t => t.classList.remove('active'));
     document.getElementById('tab-' + mode).classList.add('active');
+    document.getElementById('sidebar-panel').classList.remove('collapsed-view');
 
     const isCarMode = mode === 'car';
     const modeBadge = document.getElementById('mode-badge');
@@ -536,8 +578,9 @@
       stopNavigation();
     }
 
-    resetDirections();
+    resetDirections(true);
     checkEnableRouteBtn();
+    setTimeout(() => { leafletMap.invalidateSize(); }, 200);
   }
 
   // ─── GPS DETECT ──────────────────────────────────────────
@@ -796,6 +839,10 @@
     showLoading('Finding best routes...');
     resetDirections(false);
 
+    if(window.innerWidth <= 768) {
+      document.getElementById('sidebar-panel').classList.add('collapsed-view');
+    }
+
     if (currentMode === 'car') {
       let destCoords = (destInput.dataset.lat && destInput.dataset.lon) ? 
         { lat: parseFloat(destInput.dataset.lat), lon: parseFloat(destInput.dataset.lon) } : await geocode(destVal);
@@ -857,6 +904,7 @@
       const durMins = Math.floor((route.summary.totalTime % 3600) / 60);
       renderCarDirections(route.instructions, distKm, durHrs, durMins);
       document.getElementById('nav-toggle-btn').style.display = 'block';
+      setTimeout(() => leafletMap.invalidateSize(), 100);
     });
 
     setTimeout(() => leafletMap.invalidateSize(), 300);
@@ -901,160 +949,87 @@
     L.marker([origin.lat, origin.lon], { icon: oIcon }).addTo(leafletMap);
     L.marker([dest.lat, dest.lon], { icon: dIcon }).addTo(leafletMap);
 
-    leafletMap.fitBounds(L.latLngBounds([originLatLng, destLatLng]), { padding:[60,60] });
-    const dist = leafletMap.distance(originLatLng, destLatLng) / 1000;
-    renderTransitCards(mode, originName, destName, dist);
-  }
+    leafletMap.fitBounds(L.latLngBounds([originLatLng, destLatLng]), { padding: [50, 50] });
 
-  function renderTransitCards(mode, originName, destName, distKm) {
+    const dist = (leafletMap.distance(originLatLng, destLatLng) / 1000);
+    const baseRates = { bus: 2.2, train: 1.6, flight: 7.5, cab: 15.0 };
+    const estimatedCost = Math.round(dist * (baseRates[mode] || 3.0));
+
     const wrap = document.getElementById('directions-wrap');
-    const routes = getTransitRoutes(mode, originName, destName, distKm);
-
     wrap.innerHTML = `
-      <div class="dir-header">
-        <span class="dir-header-title">Available Routes</span>
-        <span class="route-meta">${Math.round(distKm)} km</span>
-      </div>
-      ${routes.map((r, i) => `
-        <div class="transit-route-card ${i===0?'selected':''}" onclick="selectTransitCard(this)">
-          <div class="trc-header">
-            <div class="trc-mode">${r.icon} ${r.name}</div>
-            <div class="trc-price">${r.price}</div>
-          </div>
-          <div class="trc-meta">
-            <span class="trc-chip chip-time">⏱ ${r.duration}</span>
-            <span class="trc-chip chip-book">${r.frequency}</span>
-          </div>
-          <div class="trc-stops">
-            <div class="stop-line"><div class="stop-dot" style="background:#1D9E75;"></div><span>${originName}</span></div>
-            ${r.via ? `<div style="padding-left:3px;"><div class="stop-line-v"></div></div><div class="stop-line"><div class="stop-dot" style="background:#f59e0b;"></div><span style="color:#92400e;">${r.via}</span></div>` : ''}
-            <div style="padding-left:3px;"><div class="stop-line-v"></div></div>
-            <div class="stop-line"><div class="stop-dot" style="background:#ef4444;"></div><span>${destName}</span></div>
-          </div>
-          <div style="padding:10px 14px; border-top:1px solid #f1f5f9; display:flex; gap:8px;">
-            <a href="${r.bookUrl}" target="_blank" style="font-size:11px;font-weight:700;color:#2563eb;text-decoration:none;padding:5px 10px;background:#eff6ff;border-radius:6px;">Book on ${r.platform} →</a>
-            ${r.altUrl ? `<a href="${r.altUrl}" target="_blank" style="font-size:11px;font-weight:700;color:#64748b;text-decoration:none;padding:5px 10px;background:#f8fafc;border-radius:6px;">Alt: ${r.altPlatform}</a>` : ''}
-          </div>
+      <div class="transit-route-card selected">
+        <div class="trc-header">
+          <div class="trc-mode">${mode.toUpperCase()} Connection Route</div>
+          <div class="trc-price">~₹${estimatedCost}</div>
         </div>
-      `).join('')}
+        <div class="trc-meta">
+          <span class="trc-chip chip-time">Distance: ${Math.round(dist)} km</span>
+          <span class="trc-chip chip-book">Direct Route Option</span>
+        </div>
+        <div class="trc-stops">
+          <div class="stop-line"><div class="stop-dot" style="background:${lineColor};"></div><span>${originName}</span></div>
+          <div class="stop-line-v"></div>
+          <div class="stop-line"><div class="stop-dot" style="background:#ef4444;"></div><span>${destName}</span></div>
+        </div>
+      </div>
     `;
+    setTimeout(() => leafletMap.invalidateSize(), 100);
   }
 
-  function getTransitRoutes(mode, from, to, distKm) {
-    const fromEnc = encodeURIComponent(from);
-    const toEnc   = encodeURIComponent(to);
-    if (mode === 'bus') {
-      const hrs = Math.max(1, Math.round(distKm / 60));
-      return [
-        { icon:'🚌', name:'Express AC Sleeper Bus', price: `₹${Math.round(distKm * 1.8)}–₹${Math.round(distKm * 2.5)}`, duration: `${hrs}h–${hrs+2}h`, frequency:'Departs every 1–2h', via: distKm > 300 ? 'Overnight Route' : null, bookUrl:`https://www.redbus.in/bus-tickets/${fromEnc.toLowerCase()}-to-${toEnc.toLowerCase()}`, platform:'RedBus', altUrl:`https://www.ixigo.com/search/result/bus`, altPlatform:'Ixigo' },
-        { icon:'🚌', name:'State Transport Service', price: `₹${Math.round(distKm * 0.8)}–₹${Math.round(distKm * 1.2)}`, duration: `${hrs+1}h–${hrs+4}h`, frequency:'Departs every 2–4h', via: null, bookUrl:`https://www.redbus.in/bus-tickets/${fromEnc.toLowerCase()}-to-${toEnc.toLowerCase()}`, platform:'RedBus', altUrl: null, altPlatform: null }
-      ];
-    }
-    if (mode === 'train') {
-      const hrs = Math.max(1, Math.round(distKm / 80));
-      return [
-        { icon:'🚂', name:'Rajdhani / Shatabdi Express', price: `₹${Math.round(distKm * 1.5)}–₹${Math.round(distKm * 4)}`, duration: `${hrs}h–${hrs+2}h`, frequency:'1–3 trains/day', via: null, bookUrl:`https://www.irctc.co.in/nget/train-search`, platform:'IRCTC', altUrl:`https://www.ixigo.com/trains/results/search`, altPlatform:'Ixigo' },
-        { icon:'🚂', name:'Superfast Express', price: `₹${Math.round(distKm * 0.7)}–₹${Math.round(distKm * 2)}`, duration: `${hrs+2}h–${hrs+6}h`, frequency:'Multiple trains/day', via: distKm > 500 ? 'Junction Transit' : null, bookUrl:`https://www.irctc.co.in/nget/train-search`, platform:'IRCTC', altUrl:`https://www.confirmtkt.com/`, altPlatform:'ConfirmTkt' }
-      ];
-    }
-    if (mode === 'flight') {
-      return [
-        { icon:'✈️', name:'Direct Flight', price: `₹${Math.round(distKm * 6)}–₹${Math.round(distKm * 14)}`, duration: `1h–3h`, frequency:'5–12 flights/day', via: null, bookUrl:`https://www.makemytrip.com/flights/domestic-cheapest-airtickets-${fromEnc.toLowerCase()}-${toEnc.toLowerCase()}.html`, platform:'MakeMyTrip', altUrl:`https://www.easemytrip.com/flights/domestic-flights-from-${fromEnc.toLowerCase()}-to-${toEnc.toLowerCase()}.aspx`, altPlatform:'EaseMyTrip' }
-      ];
-    }
-    if (mode === 'cab') {
-      const hrs = Math.max(1, Math.round(distKm / 70));
-      return [
-        { icon:'🚕', name:'Outstation Cab (AC Sedan)', price: `₹${Math.round(distKm * 12)}–₹${Math.round(distKm * 16)}`, duration: `${hrs}h–${hrs+2}h`, frequency:'Door-to-door', via: null, bookUrl:`https://www.olacabs.com/cab-booking/outstation`, platform:'Ola', altUrl:`https://www.uber.com/in/en/`, altPlatform:'Uber' }
-      ];
-    }
-    return [];
-  }
-
-  function selectTransitCard(el) {
-    document.querySelectorAll('.transit-route-card').forEach(c => c.classList.remove('selected'));
-    el.classList.add('selected');
-  }
-
-  // ─── CAR NAVIGATION ──────────────────────────────────────
-  function toggleNavigation() {
-    isNavigating ? stopNavigation() : startNavigation();
-  }
+  // ─── UTILITIES & HELPERS ─────────────────────────────────
+  function toggleNavigation() { isNavigating ? stopNavigation() : startNavigation(); }
 
   function startNavigation() {
-    if (!navigator.geolocation) { alert('GPS not available in your browser.'); return; }
+    if (!gpsLocked) return;
     isNavigating = true;
     document.getElementById('nav-toggle-btn').textContent = '🛑 Stop Navigation';
-    document.getElementById('nav-toggle-btn').style.background = '#ef4444';
-    document.getElementById('nav-toggle-btn').style.borderColor = '#ef4444';
     document.getElementById('nav-hud').classList.add('visible');
 
-    const blueDot = L.divIcon({
-      html:`<div style="position:relative;width:24px;height:24px;"><div style="position:absolute;width:100%;height:100%;background:rgba(37,99,235,0.3);border-radius:50%;animation:pulse 1.5s infinite;"></div><div style="position:absolute;top:4px;left:4px;background:#2563eb;width:16px;height:16px;border-radius:50%;border:2px solid white;box-shadow:0 0 6px rgba(0,0,0,0.3);"></div></div><style>@keyframes pulse{0%{transform:scale(0.5);opacity:1}100%{transform:scale(2);opacity:0}}</style>`,
-      className:'', iconSize:[24,24], iconAnchor:[12,12]
-    });
-
     trackWatchId = navigator.geolocation.watchPosition((pos) => {
-      const lat = pos.coords.latitude, lon = pos.coords.longitude;
-      const speed = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0;
-      gpsCoords = { lat, lon };
-
-      if (!userMarker) userMarker = L.marker([lat,lon],{icon:blueDot}).addTo(leafletMap);
-      else userMarker.setLatLng([lat,lon]);
-
-      leafletMap.setView([lat,lon], 16);
-      document.getElementById('hud-instruction').textContent = `🚙 Driving — follow the blue route`;
-      document.getElementById('hud-speed').textContent = `${speed} km/h`;
-    }, (err) => {
-      console.error(err);
-      stopNavigation();
-    }, { enableHighAccuracy:true, maximumAge:0, timeout:10000 });
+      gpsCoords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+      if (userMarker) userMarker.setLatLng([gpsCoords.lat, gpsCoords.lon]);
+      leafletMap.setView([gpsCoords.lat, gpsCoords.lon], 16);
+      
+      if(pos.coords.speed) {
+        const speedKmh = Math.round(pos.coords.speed * 3.6);
+        document.getElementById('hud-speed').textContent = `${speedKmh} km/h`;
+      }
+    }, (err) => console.warn(err), { enableHighAccuracy: true });
   }
 
   function stopNavigation() {
     isNavigating = false;
-    if (trackWatchId !== null) { navigator.geolocation.clearWatch(trackWatchId); trackWatchId = null; }
-    if (userMarker) { leafletMap.removeLayer(userMarker); userMarker = null; }
+    document.getElementById('nav-toggle-btn').textContent = '🚀 Start Navigation';
     document.getElementById('nav-hud').classList.remove('visible');
-    const navBtn = document.getElementById('nav-toggle-btn');
-    navBtn.textContent = '🚀 Start Navigation';
-    navBtn.style.background = 'var(--primary)';
-    navBtn.style.borderColor = 'var(--primary)';
+    if (trackWatchId !== null) {
+      navigator.geolocation.clearWatch(trackWatchId);
+      trackWatchId = null;
+    }
   }
 
-  // ─── NIGHT MODE ──────────────────────────────────────────
   function toggleNightMode() {
     isNightMode = !isNightMode;
-    const pane = document.querySelector('.leaflet-tile-pane');
-    const btn = document.getElementById('night-btn');
-    if (isNightMode) {
-      pane.classList.add('night-mode');
-      btn.textContent = '☀️ Light Mode';
-    } else {
-      pane.classList.remove('night-mode');
-      btn.textContent = '🌙 Night Mode';
-    }
+    document.querySelector('.leaflet-tile-pane').classList.toggle('night-mode', isNightMode);
+    document.getElementById('night-btn').textContent = isNightMode ? '☀️ Light Mode' : '🌙 Night Mode';
   }
 
-  // ─── HELPERS ─────────────────────────────────────────────
   function clearRouting() {
     if (routingControl) { leafletMap.removeControl(routingControl); routingControl = null; }
-    if (currentPolyline) { 
-      if (currentPolyline instanceof L.Layer) { leafletMap.removeLayer(currentPolyline); }
-      currentPolyline = null; 
-    }
-    
-    // Clean up markers and polylines safely without touching default systems
-    leafletMap.eachLayer(layer => {
+    if (currentPolyline) { leafletMap.removeLayer(currentPolyline); currentPolyline = null; }
+    leafletMap.eachLayer((layer) => {
       if ((layer instanceof L.Marker || layer instanceof L.Polyline) && layer !== userMarker) {
         leafletMap.removeLayer(layer);
       }
     });
   }
 
-  function resetDirections(showEmpty=true) {
-    if (showEmpty) {
-      document.getElementById('directions-wrap').innerHTML = `<div class="dir-empty" id="dir-empty">Select transport mode, enter your locations, and tap "Get Routes".</div>`;
+  function resetDirections(showEmptyText = true) {
+    document.getElementById('nav-toggle-btn').style.display = 'none';
+    stopNavigation();
+    if (showEmptyText) {
+      showDirEmpty('Select transport mode, enter your locations, and tap "Get Routes".');
+    } else {
+      document.getElementById('directions-wrap').innerHTML = '';
     }
   }
 
@@ -1063,19 +1038,21 @@
   }
 
   function showLoading(msg) {
-    const el = document.getElementById('route-loading');
     document.getElementById('loading-msg').textContent = msg;
-    el.style.display = 'block';
+    document.getElementById('route-loading').style.display = 'block';
   }
 
   function hideLoading() {
     document.getElementById('route-loading').style.display = 'none';
   }
 
-  // ─── INITIAL BOOT RUN ───
   window.addEventListener('DOMContentLoaded', () => {
     initMap();
     selectMode('car');
+  });
+
+  window.addEventListener('resize', () => {
+    if (leafletMap) leafletMap.invalidateSize();
   });
 </script>
 </body>
