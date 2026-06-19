@@ -1,964 +1,1082 @@
-{% extends "base.html" %}
-{% block title %}Plan a Trip — RoadBuddy{% endblock %}
-{% block content %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>RoadBuddy — Smart Map</title>
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
 <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-compass@1.5.6/dist/leaflet-compass.min.css" />
-<script src="https://cdn.jsdelivr.net/npm/leaflet-compass@1.5.6/dist/leaflet-compass.min.js"></script>
 
 <style>
-  /* Premium UI Timeline & Layout Enhancements */
-  .timeline-container {
-    position: relative;
-    margin: 20px 0;
-    padding-left: 20px;
-    border-left: 2px dashed #cbd5e1;
+  :root {
+    --primary: #1d9e75;
+    --primary-hover: #158061;
+    --bg-main: #f8fafc;
+    --surface: #ffffff;
+    --text-dark: #0f172a;
+    --text-muted: #64748b;
+    --border-color: #e2e8f0;
   }
-  .stop-card-v2 {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 16px;
-    margin-bottom: 16px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-    position: relative;
-    transition: transform 0.2s, box-shadow 0.2s;
-  }
-  .stop-card-v2:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-  }
-  .stop-dot {
-    position: absolute;
-    left: -27px;
-    top: 22px;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: #1D9E75;
-    border: 2px solid #fff;
-    box-shadow: 0 0 0 2px #1D9E75;
-  }
-  .custom-tag {
-    display: inline-flex;
-    align-items: center;
-    padding: 4px 8px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    margin-right: 6px;
-    margin-top: 4px;
-  }
-  .tag-budget { background: #e0f2fe; color: #0369a1; }
-  .tag-premium { background: #f3e8ff; color: #6b21a8; }
-  .tag-time { background: #f1f5f9; color: #475569; }
-  
-  /* Weather Panel Styles */
-  .weather-alert-box {
-    background: linear-gradient(135deg, #1e293b, #0f172a);
-    color: #fff;
-    border-radius: 12px;
-    padding: 16px;
-    margin-bottom: 20px;
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { 
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
+    background: var(--bg-main); 
+    color: var(--text-dark); 
+    height: 100vh;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
+    overflow: hidden;
   }
-  .weather-stat {
+
+  /* ─── TOP BAR ─── */
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border-color);
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    height: 60px;
+    z-index: 10;
+    flex-shrink: 0;
+  }
+  .logo { font-size: 20px; font-weight: 800; color: var(--primary); letter-spacing: -0.5px; }
+  .logo span { color: var(--text-dark); }
+  .topbar-subtitle { font-size: 13px; color: var(--text-muted); margin-left: 10px; font-weight: 500; }
+
+  /* ─── TRANSPORT SELECTOR TABS ─── */
+  .transport-bar {
+    background: var(--surface);
+    padding: 0 24px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 56px;
+    z-index: 10;
+    flex-shrink: 0;
+    overflow-x: auto;
+  }
+  .transport-tab {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 14px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 1.5px solid var(--border-color);
+    background: var(--surface);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    transition: all 0.2s ease;
+    white-space: nowrap;
+  }
+  .transport-tab:hover { border-color: var(--primary); color: var(--primary); background: #f0fdf9; }
+  .transport-tab.active { background: var(--primary); color: #fff; border-color: var(--primary); box-shadow: 0 2px 4px rgba(29, 158, 117, 0.15); }
+  .transport-tab .tab-icon { font-size: 16px; }
+
+  /* ─── MAIN LAYOUT ─── */
+  .main-layout {
+    display: flex;
+    flex: 1;
+    height: calc(100vh - 116px);
+    position: relative;
   }
 
-  /* Custom Map Styling & Controls */
-  .map-theme-toggle {
+  /* ─── LEFT PANEL ─── */
+  .left-panel {
+    width: 360px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    z-index: 5;
+    box-shadow: 4px 0 10px rgba(0,0,0,0.01);
+  }
+  .panel-section {
+    padding: 20px;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .panel-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+  .autocomplete-wrap { position: relative; margin-bottom: 12px; }
+  .autocomplete-wrap .input-icon {
     position: absolute;
-    bottom: 20px;
-    left: 20px;
-    z-index: 1000;
-    background: white;
-    border: 1px solid #cbd5e1;
-    padding: 8px 12px;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 14px;
+    pointer-events: none;
+    z-index: 2;
+  }
+  .loc-input {
+    width: 100%;
+    padding: 12px 12px 12px 36px;
+    border: 1px solid var(--border-color);
     border-radius: 8px;
+    font-size: 13px;
+    color: var(--text-dark);
+    background: #f8fafc;
+    outline: none;
+    transition: all 0.2s;
+  }
+  .loc-input:focus { border-color: var(--primary); background: var(--surface); box-shadow: 0 0 0 3px rgba(29, 158, 117, 0.1); }
+  .loc-input::placeholder { color: #94a3b8; }
+  .loc-input:disabled { color: var(--text-muted); cursor: not-allowed; }
+
+  .gps-detect-btn {
+    width: 100%;
+    padding: 12px;
+    background: #f0fdf9;
+    border: 1.5px dashed var(--primary);
+    border-radius: 8px;
+    color: var(--primary);
+    font-size: 13px;
     font-weight: 600;
-    font-size: 12px;
     cursor: pointer;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
     display: flex;
     align-items: center;
-    gap: 6px;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.2s;
+    margin-bottom: 12px;
   }
+  .gps-detect-btn:hover { background: #dcfce7; }
+  .gps-detect-btn.locked { background: #e6fbf3; border-style: solid; cursor: default; }
 
-  /* Active Driving Guidance HUD Panel */
-  .navigation-hud {
-    background: #10b981;
-    color: white;
+  .get-routes-btn {
+    width: 100%;
+    padding: 14px;
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .get-routes-btn:hover { background: var(--primary-hover); }
+  .get-routes-btn:disabled { background: #cbd5e1; cursor: not-allowed; }
+
+  /* ─── MODE BADGE ─── */
+  .mode-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 16px;
+  }
+  .mode-gps { background: #dcfce7; color: #166534; }
+  .mode-transit { background: #eff6ff; color: #1e40af; }
+
+  /* ─── DIRECTIONS LIST ─── */
+  .directions-wrap {
+    flex: 1;
+    overflow-y: auto;
+    background: #fdfdfd;
+  }
+  .dir-header {
     padding: 14px 20px;
-    border-radius: 10px;
-    margin-bottom: 15px;
+    background: #f8fafc;
+    border-bottom: 1px solid #f1f5f9;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-weight: 600;
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
   }
-  .nav-btn-active {
-    background: #ef4444 !important;
+  .dir-header-title { font-size: 13px; font-weight: 700; color: var(--text-dark); }
+  .route-meta { font-size: 13px; color: var(--primary); font-weight: 700; }
+  .dir-step {
+    display: flex;
+    gap: 12px;
+    padding: 12px 20px;
+    border-bottom: 1px solid #f8fafc;
+    align-items: flex-start;
   }
+  .dir-step-num {
+    min-width: 24px;
+    height: 24px;
+    background: #e0f2fe;
+    color: #0369a1;
+    border-radius: 50%;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .dir-step-text { font-size: 13px; color: #334155; line-height: 1.5; }
+  .dir-step-dist { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+  .dir-empty { padding: 40px 20px; text-align: center; color: #94a3b8; font-size: 13px; line-height: 1.6; }
 
-  /* Booking Grid UI Blocks */
-  .booking-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 16px;
-    margin-bottom: 24px;
+  /* ─── TRANSIT ROUTES (for non-car) ─── */
+  .transit-route-card {
+    margin: 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--surface);
+    cursor: pointer;
+    transition: all 0.2s;
   }
-  .partner-vehicle-card {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
+  .transit-route-card:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,0.06); }
+  .transit-route-card.selected { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(29, 158, 117, 0.15); }
+  .trc-header {
     padding: 14px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f8fafc;
+    border-bottom: 1px solid #f1f5f9;
   }
+  .trc-mode { font-size: 13px; font-weight: 700; color: var(--text-dark); display: flex; align-items: center; gap: 6px; }
+  .trc-price { font-size: 13px; font-weight: 700; color: var(--primary); }
+  .trc-meta { padding: 12px 14px 10px; display: flex; gap: 10px; }
+  .trc-chip { font-size: 11px; padding: 4px 8px; border-radius: 6px; font-weight: 600; }
+  .chip-time { background: #fef3c7; color: #92400e; }
+  .chip-book { background: #eff6ff; color: #1e40af; }
+  .trc-stops { padding: 10px 14px; border-top: 1px solid #f1f5f9; }
+  .stop-line { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #64748b; padding: 4px 0; }
+  .stop-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); flex-shrink: 0; }
+  .stop-line-v { width: 1px; height: 12px; background: #cbd5e1; margin-left: 3px; }
 
-  /* Hide default LRM layout wrapper to keep our sidebar clear */
-  .leaflet-routing-container {
-    display: none !important;
+  /* ─── STATUS BAR ─── */
+  .gps-status-bar {
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    border-bottom: 1px solid #f1f5f9;
+    background: #fafafa;
   }
+  .gps-dot { width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; flex-shrink: 0; }
+  .gps-dot.locked { background: var(--primary); animation: blink 2s infinite; }
+  .gps-dot.searching { background: #f59e0b; animation: blink 0.8s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* ─── NAV HUD ─── */
+  .nav-hud {
+    background: var(--primary);
+    color: #fff;
+    padding: 14px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    font-weight: 700;
+    display: none;
+  }
+  .nav-hud.visible { display: flex; }
+  .hud-speed { background: rgba(0,0,0,0.15); padding: 4px 10px; border-radius: 6px; font-size: 12px; }
+
+  /* ─── MAP AREA ─── */
+  .right-map-area {
+    flex: 1;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    background: #e5e7eb;
+  }
+  #map { flex: 1; width: 100%; height: 100%; z-index: 1; }
+
+  /* ─── CONTROLS ─── */
+  .map-controls {
+    position: absolute;
+    bottom: 24px;
+    right: 24px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .map-ctrl-btn {
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #475569;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    white-space: nowrap;
+    transition: background 0.2s;
+  }
+  .map-ctrl-btn:hover { background: #f8fafc; }
+
+  /* ─── NIGHT MAP FILTER ─── */
+  .leaflet-tile-pane.night-mode { filter: invert(1) hue-rotate(180deg) brightness(0.8); }
+  .leaflet-routing-container { display: none !important; }
+
+  /* ─── AUTOCOMPLETE ─── */
+  .autocomplete-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0; right: 0;
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+    z-index: 9999;
+    max-height: 220px;
+    overflow-y: auto;
+    display: none;
+  }
+  .autocomplete-dropdown.open { display: block; }
+  .ac-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid #f1f5f9;
+    transition: background 0.15s;
+  }
+  .ac-item:last-child { border-bottom: none; }
+  .ac-item:hover, .ac-item.highlighted { background: #f0fdf9; }
+  .ac-pin { font-size: 15px; flex-shrink: 0; }
+  .ac-main { font-size: 13px; font-weight: 600; color: var(--text-dark); line-height: 1.3; }
+  .ac-sub  { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+  .ac-loading { padding: 14px; font-size: 13px; color: #94a3b8; display: flex; align-items: center; gap: 8px; }
+  .ac-spinner { width: 14px; height: 14px; border: 2px solid var(--border-color); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.7s linear infinite; }
+
+  /* ─── LOADING OVERLAY ─── */
+  .route-loading {
+    padding: 30px 20px;
+    text-align: center;
+    color: #64748b;
+    font-size: 13px;
+    display: none;
+  }
+  .spinner-sm {
+    width: 22px; height: 22px;
+    border: 2px solid var(--border-color);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin: 0 auto 10px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>
+</head>
+<body>
 
-<div class="dashboard-header">
-  <h1>🗺️ Plan a Trip</h1>
-  <a href="/dashboard" class="btn-secondary">← Back to Dashboard</a>
+<div class="topbar">
+  <div class="logo">Road<span>Buddy</span></div>
+  <span class="topbar-subtitle">Smart Route Map</span>
 </div>
 
-<div class="steps-row">
-  <div class="step active" id="step-indicator-1">1. Trip Details</div>
-  <div class="step-divider">→</div>
-  <div class="step" id="step-indicator-2">2. AI Itinerary</div>
-  <div class="step-divider">→</div>
-  <div class="step" id="step-indicator-3">3. Safety Check</div>
-  <div class="step-divider">→</div>
-  <div class="step" id="step-indicator-4">4. Book & Map</div>
-</div>
-
-<div id="step-1" class="plan-card">
-  <h2>Tell us about your trip</h2>
-
-  <div class="form-grid">
-    <div class="form-group">
-      <label>From (Origin) *</label>
-      <input type="text" id="origin" placeholder="Detecting your location..." readonly style="background-color: #f9f9f9; cursor: not-allowed;" />
-    </div>
-    <div class="form-group">
-      <label>To (Destination) *</label>
-      <input type="text" id="destination" placeholder="e.g. Udaipur" />
-    </div>
-    <div class="form-group">
-      <label>Start Date *</label>
-      <input type="date" id="start-date" />
-    </div>
-    <div class="form-group">
-      <label>End Date *</label>
-      <input type="date" id="end-date" />
-    </div>
-    <div class="form-group">
-      <label>Budget (₹) *</label>
-      <input type="number" id="budget" placeholder="e.g. 15000" />
-    </div>
-    <div class="form-group">
-      <label>Number of People *</label>
-      <input type="number" id="num-people" value="2" min="1" />
-    </div>
-    <div class="form-group">
-      <label>Group Type *</label>
-      <select id="group-type">
-        <option value="friends">Friends</option>
-        <option value="couple">Couple</option>
-        <option value="family">Family</option>
-        <option value="solo">Solo</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Travel Mode *</label>
-      <select id="travel-mode" onchange="toggleVehicle()">
-        <option value="own_vehicle">🚗 Own Vehicle</option>
-        <option value="cab_service">🚕 Cab Service (RoadBuddy Partner)</option>
-        <option value="bus">🚌 Bus</option>
-        <option value="train">🚂 Train</option>
-        <option value="flight">✈️ Flight</option>
-      </select>
-    </div>
-  </div>
-
-  <div id="vehicle-section">
-    <h3 style="margin: 20px 0 12px; font-size: 15px;">Vehicle Details</h3>
-    {% if vehicles %}
-    <div class="form-group">
-      <label>Select your vehicle</label>
-      <select id="vehicle-id">
-        {% for v in vehicles %}
-        <option value="{{ v.id }}">{{ v.name }} — {{ v.fuel_type }} ({{ v.mileage_kmpl }} kmpl)</option>
-        {% endfor %}
-      </select>
-    </div>
-    {% else %}
-    <div class="info-box">
-      No vehicles added yet.
-      <a href="/add-vehicle">Add a vehicle</a> to get accurate fuel estimates.
-    </div>
-    <input type="hidden" id="vehicle-id" value="" />
-    {% endif %}
-  </div>
-
-  <button class="btn-plan" id="generate-btn" onclick="generateTrip()" disabled style="background-color: #cccccc; cursor: not-allowed;">
-    ⏳ Waiting for GPS Lock...
+<div class="transport-bar">
+  <button class="transport-tab active" onclick="selectMode('car')" id="tab-car">
+    <span class="tab-icon">🚗</span> Own Vehicle
+  </button>
+  <button class="transport-tab" onclick="selectMode('bus')" id="tab-bus">
+    <span class="tab-icon">🚌</span> Bus
+  </button>
+  <button class="transport-tab" onclick="selectMode('train')" id="tab-train">
+    <span class="tab-icon">🚂</span> Train
+  </button>
+  <button class="transport-tab" onclick="selectMode('flight')" id="tab-flight">
+    <span class="tab-icon">✈️</span> Flight
+  </button>
+  <button class="transport-tab" onclick="selectMode('cab')" id="tab-cab">
+    <span class="tab-icon">🚕</span> Cab
   </button>
 </div>
 
-<div id="step-2" class="plan-card hidden">
-  <div class="itinerary-header">
-    <div>
-      <h2 id="itinerary-title">Your Trip Itinerary</h2>
-      <p id="itinerary-summary" class="itinerary-summary"></p>
+<div class="main-layout">
+
+  <div class="left-panel">
+
+    <div id="gps-status-row" class="gps-status-bar">
+      <div class="gps-dot" id="gps-dot"></div>
+      <span id="gps-status-text" style="color:#64748b;">GPS not started</span>
     </div>
-    <button class="btn-secondary" onclick="goBack()">← Edit Trip</button>
-  </div>
 
-  <div class="cost-grid" id="cost-grid"></div>
+    <div class="panel-section">
+      <div id="mode-badge" class="mode-badge mode-gps">🛰️ GPS Mode — Own Vehicle</div>
 
-  <h3 style="margin: 24px 0 12px; font-size: 15px;">📅 Tailored Timeline & Route Breakdown</h3>
-  <div id="stops-list"></div>
+      <div class="panel-label">From</div>
 
-  <div class="action-row">
-    <button class="btn-plan" onclick="proceedToSafety()">🛡️ Check Route Safety & Weather</button>
-    <button class="btn-secondary" onclick="saveTrip()">💾 Save Trip</button>
-  </div>
-</div>
+      <div id="gps-btn-wrap">
+        <button class="gps-detect-btn" id="gps-detect-btn" onclick="detectGPS()">
+          📍 Detect My Location
+        </button>
+      </div>
 
-<div id="step-3" class="plan-card hidden">
-  <div class="itinerary-header">
-    <h2>🛡️ Live Diagnostics & Route Safety Report</h2>
-    <button class="btn-secondary" onclick="goToStep(2)">← Back to Itinerary</button>
-  </div>
+      <div id="origin-manual-wrap" style="display:none;">
+        <div class="autocomplete-wrap">
+          <span class="input-icon">📍</span>
+          <input class="loc-input" id="origin-manual" placeholder="e.g. Delhi, Mumbai..." autocomplete="off" />
+          <div class="autocomplete-dropdown" id="ac-origin"></div>
+        </div>
+      </div>
 
-  <div class="weather-alert-box">
-    <div>
-      <h4 style="margin:0 0 4px 0; color:#38bdf8;">🌤️ Real-Time Route Weather</h4>
-      <p style="margin:0; font-size:13px; color:#94a3b8;" id="weather-summary-text">Fetching radar tracking arrays along your destination corridor...</p>
-    </div>
-    <div style="display:flex; gap:16px;">
-      <div class="weather-stat">🌡️ <span id="weather-temp">--°C</span></div>
-      <div class="weather-stat">💨 <span id="weather-wind">-- km/h</span></div>
-    </div>
-  </div>
+      <div id="gps-coords-display" style="font-size:11px; color:var(--primary); margin-bottom:8px; display:none; padding:8px 10px; background:#f0fdf9; border-radius:6px; font-weight: 600;">
+        📡 Location locked
+      </div>
 
-  <div id="safety-report"></div>
+      <div class="panel-label" style="margin-top:10px;">To</div>
+      <div class="autocomplete-wrap">
+        <span class="input-icon">🎯</span>
+        <input class="loc-input" id="destination-input" placeholder="Enter destination..." autocomplete="off" />
+        <div class="autocomplete-dropdown" id="ac-destination"></div>
+      </div>
 
-  <div class="action-row" style="margin-top: 20px;">
-    <button class="btn-plan" onclick="goToStep(4)">🗺️ View Map & Book</button>
-    <button class="btn-secondary" onclick="saveTrip()">💾 Save Trip</button>
-  </div>
-</div>
-
-<div id="step-4" class="plan-card hidden">
-  
-  <div id="navigation-hud" class="navigation-hud hidden">
-    <div>
-      <span style="font-size: 20px; margin-right: 8px;">🚙</span>
-      <span id="hud-instruction">Drive safe! Turning onto main corridor path...</span>
-    </div>
-    <div id="hud-next-stop" style="font-size: 12px; background: rgba(0,0,0,0.15); padding: 4px 10px; border-radius: 6px;">
-      Next AI Stop: Calculating...
-    </div>
-  </div>
-
-  <div class="itinerary-header" style="margin-bottom: 12px;">
-    <h2>🗺️ Route Map & Bookings</h2>
-    <button class="btn-plan" id="btn-start-navigation" onclick="toggleActiveNavigation()" style="background:#2563eb; margin:0;">
-      🚀 Start Navigation
-    </button>
-  </div>
-
-  <h3 style="font-size:15px;margin-bottom:12px;">📍 Live Google-Style Interactive Mapping Environment</h3>
-  
-  <div style="display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap;">
-    <div id="map-container" style="flex: 2; min-width: 320px; border-radius:10px; overflow:hidden; border:1px solid #e5e5e5; position: relative;">
-      <div id="map" style="width: 100%; height: 450px; background-color: #f0f0f0;"></div>
-      
-      <button class="map-theme-toggle" onclick="toggleMapTheme()">
-        🌙 <span id="theme-btn-text">Switch to Night Map</span>
+      <button class="get-routes-btn" id="get-routes-btn" onclick="getRoutes()" disabled>
+        🗺️ Get Routes
       </button>
     </div>
 
-    <div id="directions-panel" style="flex: 1; min-width: 280px; height: 450px; border: 1px solid #e5e5e5; border-radius: 10px; background: #fff; padding: 14px; display: flex; flex-direction: column;">
-      <h4 style="margin: 0 0 10px 0; font-size: 14px; color: #333; display: flex; justify-content: space-between;">
-        <span>📋 Turn-by-Turn Guide</span>
-        <span id="route-meta-info" style="color: #1D9E75; font-weight:700;"></span>
-      </h4>
-      <p style="font-size: 11px; color: #666; margin-bottom: 8px;">💡 <i>Alternative routes are displayed on the map. Select your path dynamically.</i></p>
-      <div id="directions-steps" style="overflow-y: auto; flex: 1; font-size: 13px; color: #555;">
-        <div style="color: #999; padding: 20px 0; text-align: center;">Calculating optimal multi-route path structures...</div>
-      </div>
+    <div class="route-loading" id="route-loading">
+      <div class="spinner-sm"></div>
+      <div id="loading-msg">Finding routes...</div>
+    </div>
+
+    <div class="directions-wrap" id="directions-wrap">
+      <div class="dir-empty" id="dir-empty">Select transport mode, enter your locations, and tap "Get Routes".</div>
+    </div>
+
+    <div class="nav-hud" id="nav-hud">
+      <div id="hud-instruction">🚙 Navigation active</div>
+      <div class="hud-speed" id="hud-speed">0 km/h</div>
     </div>
   </div>
 
-  <h3 style="font-size:15px;margin-bottom:12px;">🎫 Book Your Trip Alternatives — RoadBuddy</h3>
-  <div class="booking-grid" id="booking-grid"></div>
-
-  <h3 id="partner-heading" style="font-size:15px;margin:20px 0 12px;">🚐 Book a Car or Bus on RoadBuddy</h3>
-  <div id="partner-search-status" style="font-size:13px;color:#888;margin-bottom:10px;">Searching available vehicles on this route...</div>
-  <div class="booking-grid" id="partner-grid"></div>
-
-  <h3 style="font-size:15px;margin:20px 0 12px;">🏨 Book Hotels — RoadBuddy</h3>
-  <div class="booking-grid" id="hotel-grid"></div>
-
-  <div class="action-row" style="margin-top:24px;">
-    <a href="/my-trips" class="btn-plan">✅ View My Trips</a>
-    <button class="btn-secondary" onclick="saveTrip()">💾 Save Trip</button>
+  <div class="right-map-area">
+    <div id="map"></div>
+    <div class="map-controls">
+      <button class="map-ctrl-btn" onclick="toggleNightMode()" id="night-btn">🌙 Night Mode</button>
+      <button class="map-ctrl-btn" id="nav-toggle-btn" onclick="toggleNavigation()" style="display:none; background:var(--primary); color:#fff; border-color:var(--primary);">
+        🚀 Start Navigation
+      </button>
+    </div>
   </div>
-</div>
 
-<div id="loading" class="loading-overlay hidden">
-  <div class="loading-box">
-    <div class="spinner"></div>
-    <div id="loading-text">Generating your AI itinerary...</div>
-  </div>
 </div>
 
 <script>
-  let tripData = null;
-  const TOKEN = "{{ token }}";
-  
+  // ─── STATE ───────────────────────────────────────────────
+  let currentMode = 'car';
   let leafletMap = null;
   let routingControl = null;
-  let currentTileLayer = null;
-  let trafficTileLayer = null;
+  let tileLayer = null;
   let isNightMode = false;
+  let isNavigating = false;
+  let trackWatchId = null;
+  let userMarker = null;
+  let gpsCoords = null;
+  let gpsLocked = false;
+  let currentPolyline = null;
+  const acCache = {};
+  let acTimers = {};
 
-  // Realtime positioning tracking structures
-  let trackingWatchId = null;
-  let userLocationMarker = null;
-  let liveUserCoords = null; 
-  let internalRawGPSString = ""; 
-  let isNavigatingActive = false; 
-  let aiWaypointsData = []; 
-  let currentActiveRoutePolyline = null;
+  // ─── INIT MAP ────────────────────────────────────────────
+  function initMap() {
+    leafletMap = L.map('map', { zoomControl: false }).setView([20.5937, 78.9629], 5);
+    L.control.zoom({ position: 'topright' }).addTo(leafletMap);
+    tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap'
+    }).addTo(leafletMap);
 
-  // Automatic Background Location Fetching on Initial Load
-  window.addEventListener('DOMContentLoaded', () => {
+    // Force size computation to ensure container matches wrapper calculations
+    setTimeout(() => { leafletMap.invalidateSize(); }, 200);
+  }
+
+  // ─── MODE SELECTION ──────────────────────────────────────
+  function selectMode(mode) {
+    currentMode = mode;
+    document.querySelectorAll('.transport-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-' + mode).classList.add('active');
+
+    const isCarMode = mode === 'car';
+    const modeBadge = document.getElementById('mode-badge');
+    const gpsRow = document.getElementById('gps-status-row');
+    const gpsBtnWrap = document.getElementById('gps-btn-wrap');
+    const originManual = document.getElementById('origin-manual-wrap');
+    const navBtn = document.getElementById('nav-toggle-btn');
+
+    if (isCarMode) {
+      modeBadge.className = 'mode-badge mode-gps';
+      modeBadge.textContent = '🛰️ GPS Mode — Own Vehicle';
+      gpsRow.style.display = 'flex';
+      gpsBtnWrap.style.display = 'block';
+      originManual.style.display = 'none';
+      if(gpsLocked) navBtn.style.display = 'block';
+    } else {
+      modeBadge.className = 'mode-badge mode-transit';
+      const modeNames = { bus:'Bus', train:'Train', flight:'Flight', cab:'Cab' };
+      modeBadge.textContent = `🔀 Transit Mode — ${modeNames[mode]}`;
+      gpsRow.style.display = 'none';
+      gpsBtnWrap.style.display = 'none';
+      originManual.style.display = 'block';
+      navBtn.style.display = 'none';
+      stopNavigation();
+    }
+
+    resetDirections();
+    checkEnableRouteBtn();
+  }
+
+  // ─── GPS DETECT ──────────────────────────────────────────
+  function detectGPS() {
+    const btn = document.getElementById('gps-detect-btn');
+    const dot = document.getElementById('gps-dot');
+    const statusTxt = document.getElementById('gps-status-text');
+
+    dot.className = 'gps-dot searching';
+    statusTxt.textContent = 'Searching for GPS signal...';
+    statusTxt.style.color = '#d97706';
+    btn.textContent = '⏳ Detecting...';
+    btn.disabled = true;
+
     if (!navigator.geolocation) {
-      document.getElementById('origin').placeholder = "GPS tracking not supported";
-      fallbackNoGPS();
+      dot.className = 'gps-dot';
+      statusTxt.textContent = 'GPS not supported in browser';
+      statusTxt.style.color = '#ef4444';
+      btn.textContent = '📍 Detect My Location';
+      btn.disabled = false;
       return;
     }
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const lat = pos.coords.latitude.toFixed(6);
-        const lon = pos.coords.longitude.toFixed(6);
-        
-        internalRawGPSString = `${lat}, ${lon}`;
-        liveUserCoords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-        
-        const originInput = document.getElementById('origin');
-        originInput.value = "📍 Current Location (Detected)";
-        
-        enableItineraryButton();
+        gpsCoords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+        gpsLocked = true;
+
+        dot.className = 'gps-dot locked';
+        statusTxt.textContent = `GPS locked — ${gpsCoords.lat.toFixed(4)}, ${gpsCoords.lon.toFixed(4)}`;
+        statusTxt.style.color = '#1D9E75';
+
+        btn.className = 'gps-detect-btn locked';
+        btn.innerHTML = '✅ Location Locked';
+        btn.disabled = false;
+
+        const coordsDisplay = document.getElementById('gps-coords-display');
+        coordsDisplay.style.display = 'block';
+        coordsDisplay.textContent = `📡 Lat ${gpsCoords.lat.toFixed(5)}, Lon ${gpsCoords.lon.toFixed(5)}`;
+
+        if (userMarker) leafletMap.removeLayer(userMarker);
+        userMarker = L.marker([gpsCoords.lat, gpsCoords.lon], {
+          icon: L.divIcon({
+            html: `<div style="background:#1D9E75;width:14px;height:14px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 2px #1D9E75;"></div>`,
+            className: '', iconSize: [14,14], iconAnchor: [7,7]
+          })
+        }).addTo(leafletMap).bindPopup('📍 Your Location');
+        leafletMap.setView([gpsCoords.lat, gpsCoords.lon], 12);
+
+        checkEnableRouteBtn();
       },
       (err) => {
-        console.error("Auto background tracking failed", err);
-        fallbackNoGPS();
+        dot.className = 'gps-dot';
+        statusTxt.style.color = '#ef4444';
+        if (err.code === 1) {
+          statusTxt.textContent = 'Permission denied — enable location';
+        } else if (err.code === 2) {
+          statusTxt.textContent = 'Position unavailable';
+        } else {
+          statusTxt.textContent = 'GPS timeout — retry';
+        }
+        btn.textContent = '📍 Retry GPS Detection';
+        btn.disabled = false;
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
     );
-  });
-
-  function fallbackNoGPS() {
-    document.getElementById('origin').placeholder = "Enter origin manually.";
-    document.getElementById('origin').readOnly = false;
-    document.getElementById('origin').style.backgroundColor = "";
-    enableItineraryButton();
   }
 
-  function enableItineraryButton() {
-    const genBtn = document.getElementById('generate-btn');
-    genBtn.disabled = false;
-    genBtn.textContent = "✨ Generate AI Itinerary";
-    genBtn.style.backgroundColor = "";
-    genBtn.style.cursor = "pointer";
-  }
-
-  function toggleVehicle() {
-    const mode = document.getElementById('travel-mode').value;
-    document.getElementById('vehicle-section').style.display =
-      mode === 'own_vehicle' ? 'block' : 'none';
-  }
-
-  function showLoading(text) {
-    document.getElementById('loading-text').textContent = text;
-    document.getElementById('loading').classList.remove('hidden');
-  }
-
-  function hideLoading() {
-    document.getElementById('loading').classList.add('hidden');
-  }
-
-  function goToStep(n) {
-    [1, 2, 3, 4].forEach(i => {
-      document.getElementById(`step-${i}`).classList.add('hidden');
-      document.getElementById(`step-indicator-${i}`).classList.remove('active');
-    });
-    document.getElementById(`step-${n}`).classList.remove('hidden');
-    document.getElementById(`step-indicator-${n}`).classList.add('active');
-    
-    if (n === 4) {
-      renderMapAndBookings();
+  // ─── ENABLE GET ROUTES BTN ───────────────────────────────
+  function checkEnableRouteBtn() {
+    const dest = document.getElementById('destination-input').value.trim();
+    const btn = document.getElementById('get-routes-btn');
+    if (currentMode === 'car') {
+      btn.disabled = !gpsLocked || !dest;
     } else {
-      stopLiveTracking(); 
+      const origin = document.getElementById('origin-manual').value.trim();
+      btn.disabled = !origin || !dest;
     }
-    window.scrollTo(0, 0);
   }
 
-  function goBack() { goToStep(1); }
+  // ─── AUTOCOMPLETE ENGINE ─────────────────────────────────
+  function setupAutocomplete(inputId, dropdownId, onSelect) {
+    const input = document.getElementById(inputId);
+    const dropdown = document.getElementById(dropdownId);
+    let highlightIdx = -1;
+    let lastResults = [];
 
-  async function generateTrip() {
-    let origin = internalRawGPSString ? internalRawGPSString : document.getElementById('origin').value.trim();
-    const destination = document.getElementById('destination').value.trim();
-    const startDate   = document.getElementById('start-date').value;
-    const endDate     = document.getElementById('end-date').value;
-    const budget      = document.getElementById('budget').value;
-    const numPeople   = document.getElementById('num-people').value;
-    const groupType   = document.getElementById('group-type').value;
-    const travelMode  = document.getElementById('travel-mode').value;
-    const vehicleId   = document.getElementById('vehicle-id')?.value;
-
-    if (!origin || !destination || !startDate || !endDate || !budget) {
-      alert('Please complete all form selections before proceeding!');
-      return;
+    function closeDropdown() {
+      dropdown.classList.remove('open');
+      highlightIdx = -1;
     }
 
-    if (origin === "📍 Current Location (Detected)" && internalRawGPSString) {
-      origin = internalRawGPSString;
+    function openDropdown() {
+      dropdown.classList.add('open');
     }
 
-    showLoading('✨ Generating your AI itinerary...Points');
-
-    try {
-      const res = await fetch('/api/trips/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${TOKEN}`
-        },
-        body: JSON.stringify({
-          origin, destination,
-          start_date: startDate,
-          end_date: endDate,
-          budget_inr: parseFloat(budget),
-          num_people: parseInt(numPeople),
-          group_type: groupType,
-          travel_mode: travelMode,
-          vehicle_id: vehicleId || null,
-        })
-      });
-
-      const data = await res.json();
-      hideLoading();
-
-      if (!res.ok) {
-        alert(data.detail || 'Failed to generate itinerary. Please try again.');
+    function renderResults(results) {
+      lastResults = results;
+      highlightIdx = -1;
+      if (!results.length) {
+        dropdown.innerHTML = `<div class="ac-loading"><span>No results found</span></div>`;
+        openDropdown();
         return;
       }
+      dropdown.innerHTML = results.map((r, i) => `
+        <div class="ac-item" data-idx="${i}" onmousedown="event.preventDefault()">
+          <span class="ac-pin">${r.icon}</span>
+          <div>
+            <div class="ac-main">${r.display_name_short}</div>
+            <div class="ac-sub">${r.display_name_full}</div>
+          </div>
+        </div>
+      `).join('');
 
-      tripData = data;
-      renderItinerary(data);
-      goToStep(2);
-
-    } catch (e) {
-      hideLoading();
-      alert('Something went wrong. Please try again.');
+      dropdown.querySelectorAll('.ac-item').forEach(item => {
+        item.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          const idx = parseInt(item.dataset.idx);
+          pickResult(results[idx]);
+        });
+      });
+      openDropdown();
     }
-  }
 
-  function renderItinerary(data) {
-    document.getElementById('itinerary-title').textContent =
-      `${data.origin.includes(',') ? 'Your Location' : data.origin} → ${data.destination}`;
-    document.getElementById('itinerary-summary').textContent = data.ai_summary;
+    function pickResult(result) {
+      input.value = result.display_name_short;
+      input.dataset.lat = result.lat;
+      input.dataset.lon = result.lon;
+      input.dataset.fullName = result.display_name_short;
+      closeDropdown();
+      onSelect(result);
+    }
 
-    const safetyBuffer = 0.08; 
-    const tailoredTollCost = data.toll_cost_inr || 450;
-    const dynamicallyCalculatedTotal = data.fuel_cost_inr + tailoredTollCost + data.hotel_cost_inr + data.food_cost_inr;
-    const finalBufferTotal = Math.round(dynamicallyCalculatedTotal * (1 + safetyBuffer));
+    function highlightItem(idx) {
+      const items = dropdown.querySelectorAll('.ac-item');
+      items.forEach(i => i.classList.remove('highlighted'));
+      if (idx >= 0 && idx < items.length) {
+        items[idx].classList.add('highlighted');
+        items[idx].scrollIntoView({ block: 'nearest' });
+      }
+    }
 
-    const costGrid = document.getElementById('cost-grid');
-    const costs = [
-      { label: 'Fuel Cost',      value: data.fuel_cost_inr,            icon: '⛽' },
-      { label: 'Tolls & Permits',value: tailoredTollCost,              icon: '🛣️' },
-      { label: 'Hotel Cost',     value: data.hotel_cost_inr,           icon: '🏨' },
-      { label: 'Food & Meals',   value: data.food_cost_inr,            icon: '🍽️' },
-      { label: 'Total (With Buffer)', value: finalBufferTotal,         icon: '💰', highlight: true },
-    ];
-    costGrid.innerHTML = costs.map(c => `
-      <div class="cost-card ${c.highlight ? 'cost-highlight' : ''}">
-        <span class="cost-icon">${c.icon}</span>
-        <span class="cost-value">₹${Math.round(c.value).toLocaleString()}</span>
-        <span class="cost-label">${c.label}</span>
-      </div>
-    `).join('');
+    input.addEventListener('input', () => {
+      const q = input.value.trim();
+      delete input.dataset.lat;
+      delete input.dataset.lon;
+      checkEnableRouteBtn();
 
-    const byDay = {};
-    (data.stops || []).forEach(stop => {
-      if (!byDay[stop.day]) byDay[stop.day] = [];
-      byDay[stop.day].push(stop);
+      if (q.length < 2) { closeDropdown(); return; }
+
+      dropdown.innerHTML = `<div class="ac-loading"><div class="ac-spinner"></div><span>Searching...</span></div>`;
+      openDropdown();
+
+      clearTimeout(acTimers[inputId]);
+      acTimers[inputId] = setTimeout(async () => {
+        if (acCache[q]) { renderResults(acCache[q]); return; }
+        try {
+          const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q + ', India')}&limit=6&addressdetails=1`;
+          const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+          const data = await res.json();
+          const results = data.map(item => {
+            const addr = item.address || {};
+            const shortName = addr.city || addr.town || addr.village || addr.county || addr.state || item.display_name.split(',')[0];
+            const state = addr.state || '';
+            const country = addr.country || 'India';
+            return {
+              display_name_short: shortName,
+              display_name_full: [addr.district || '', state, country].filter(Boolean).join(', '),
+              lat: parseFloat(item.lat),
+              lon: parseFloat(item.lon),
+              icon: getPlaceIcon(item.type || item.class, item.class),
+            };
+          });
+          const seen = new Set();
+          const unique = results.filter(r => {
+            if (seen.has(r.display_name_short)) return false;
+            seen.add(r.display_name_short);
+            return true;
+          });
+          acCache[q] = unique;
+          renderResults(unique);
+        } catch(e) {
+          dropdown.innerHTML = `<div class="ac-loading"><span>Search unavailable. Type full city name.</span></div>`;
+        }
+      }, 320);
     });
 
-    const stopIcons = {
-      fuel: '⛽', food: '🍽️', hotel: '🏨', sightseeing: '🏛️',
-      destination_food: '🍴', going_route: '🚗', return_route: '🏠', toll: '🛣️',
-    };
+    input.addEventListener('keydown', (e) => {
+      const items = dropdown.querySelectorAll('.ac-item');
+      if (!dropdown.classList.contains('open') || !items.length) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        highlightIdx = Math.min(highlightIdx + 1, items.length - 1);
+        highlightItem(highlightIdx);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        highlightIdx = Math.max(highlightIdx - 1, 0);
+        highlightItem(highlightIdx);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (highlightIdx >= 0 && lastResults[highlightIdx]) {
+          pickResult(lastResults[highlightIdx]);
+        } else if (lastResults.length > 0) {
+          pickResult(lastResults[0]);
+        }
+      } else if (e.key === 'Escape') {
+        closeDropdown();
+      }
+    });
 
-    const stopsList = document.getElementById('stops-list');
-    stopsList.innerHTML = Object.entries(byDay).map(([day, stops]) => `
-      <div class="day-section" style="background: transparent; padding: 0; box-shadow: none; margin-bottom: 30px;">
-        <div class="day-header" style="background: #1D9E75; color: white; display: inline-block; padding: 6px 16px; border-radius: 20px; font-size: 13px; margin-bottom: 15px;">Day ${day} Timeline</div>
-        <div class="timeline-container">
-          ${stops.map(stop => {
-            let pricingTag = '<span class="custom-tag tag-budget">Value Stop</span>';
-            if (stop.estimated_cost_inr > 2000) {
-              pricingTag = '<span class="custom-tag tag-premium">Premium Space</span>';
-            }
-            const timeTag = `<span class="custom-tag tag-time">🕒 ${stop.time_slot || 'Flexible'}</span>`;
-
-            return `
-              <div class="stop-card-v2">
-                <div class="stop-dot"></div>
-                <div class="stop-top" style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
-                  <div style="display:flex; gap:10px; align-items:center;">
-                    <span style="font-size:20px;">${stopIcons[stop.place_type] || '📍'}</span>
-                    <div>
-                      <div style="font-weight:600; color:#1e293b; font-size:14px;">${stop.place_name}</div>
-                    </div>
-                  </div>
-                  ${stop.estimated_cost_inr ? `<span style="font-weight:700; color:#1D9E75; font-size:14px;">₹${Math.round(stop.estimated_cost_inr)}</span>` : ''}
-                </div>
-                ${stop.description ? `<div style="font-size:13px; color:#64748b; margin-bottom:8px; line-height:1.5;">${stop.description}</div>` : ''}
-                <div style="margin-top: 4px;">
-                  ${timeTag}
-                  ${pricingTag}
-                  ${stop.highway ? `<span class="custom-tag" style="background:#fef3c7; color:#d97706;">🛣️ ${stop.highway}</span>` : ''}
-                </div>
-              </div>
-            `;
-          }).join('')}
-        </div>
-      </div>
-    `).join('');
+    input.addEventListener('blur', () => {
+      setTimeout(closeDropdown, 150);
+    });
   }
 
-  async function proceedToSafety() {
-    if (!tripData) return;
-    showLoading('🛡️ Analyzing Route Safety Metrics...');
+  function getPlaceIcon(type, cls) {
+    if (cls === 'aeroway' || type === 'aerodrome') return '✈️';
+    if (type === 'station' || type === 'halt') return '🚉';
+    if (cls === 'railway') return '🚂';
+    if (type === 'bus_stop') return '🚌';
+    if (type === 'city' || type === 'town') return '🏙️';
+    if (type === 'village') return '🏘️';
+    return '📍';
+  }
+
+  setupAutocomplete('origin-manual', 'ac-origin', () => { checkEnableRouteBtn(); });
+  setupAutocomplete('destination-input', 'ac-destination', (result) => {
+    checkEnableRouteBtn();
+    if (currentMode === 'car' && gpsLocked) {
+      leafletMap.setView(L.latLng(result.lat, result.lon), 10);
+    }
+  });
+
+  // ─── GEOCODE ─────────────────────────────────────────────
+  async function geocode(query) {
+    if (!query) return null;
+    const q = query.trim();
+    if (/^[-\d.]+\s*,\s*[-\d.]+$/.test(q)) {
+      const [lat, lon] = q.split(',').map(Number);
+      return { lat, lon };
+    }
+    const cleanQ = q.toLowerCase().includes('india') ? q : q + ', India';
     try {
-      const res = await fetch('/api/trips/safety-check', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          origin: tripData.origin,
-          destination: tripData.destination,
-          travel_date: document.getElementById('start-date').value,
-          departure_time: '08:00',
-          vehicle_type: 'car',
-          num_people: parseInt(document.getElementById('num-people').value),
-        })
-      });
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanQ)}&limit=1`);
       const data = await res.json();
-      hideLoading();
-
-      const r = data.safety_report;
-      
-      if (r.weather) {
-        document.getElementById('weather-summary-text').textContent = r.weather.condition_desc || "Clear skies tracked along corridor.";
-        document.getElementById('weather-temp').textContent = `${r.weather.temp_c || 30}°C`;
-        document.getElementById('weather-wind').textContent = `${r.weather.wind_kph || 12} km/h`;
-      }
-
-      const scoreColor = r.overall_safety_score >= 8 ? '#1D9E75' : r.overall_safety_score >= 6 ? '#f39c12' : '#e74c3c';
-
-      document.getElementById('safety-report').innerHTML = `
-        <div class="safety-score-row" style="background:#f8fafc; padding:20px; border-radius:12px; margin-bottom:20px; border-left:5px solid ${scoreColor}">
-          <div class="safety-score" style="color:${scoreColor}; font-size:36px; font-weight:800; margin-bottom:0;">${r.overall_safety_score}<span style="font-size:16px; font-weight:normal; color:#64748b;">/10</span></div>
-          <div>
-            <div class="safety-level" style="color:${scoreColor}; font-weight:700; font-size:16px; text-transform:uppercase;">${r.overall_safety_level.toUpperCase()} ROUTE RATING</div>
-            <div class="safety-summary" style="font-size:13px; color:#475569; margin-top:4px;">${r.summary}</div>
-          </div>
-        </div>
-        
-        <h3 style="font-size:14px; margin-bottom:10px;">⚠️ Key Safety Advisories</h3>
-        <ul style="padding-left:20px; font-size:13px; color:#475569; line-height:1.6;">
-          ${(r.advisories || ['No high-risk parameters flagged along primary national highway link layers.']).map(adv => `<li>${adv}</li>`).join('')}
-        </ul>
-
-        <h3 style="font-size:14px; margin:20px 0 10px;">🚨 Verified Emergency Contacts on Route</h3>
-        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
-          <div style="background:#fef2f2; border:1px solid #fee2e2; padding:12px; border-radius:8px; font-size:12px;">
-            <b>📞 Highway Patrol Police</b><br><span style="color:#ef4444; font-weight:700; font-size:14px;">1033 / 112</span>
-          </div>
-          <div style="background:#f0fdf4; border:1px solid #dcfce7; padding:12px; border-radius:8px; font-size:12px;">
-            <b>🚑 Trauma Care Ambulance</b><br><span style="color:#16a34a; font-weight:700; font-size:14px;">102</span>
-          </div>
-        </div>
-      `;
-      goToStep(3);
-    } catch (e) { 
-      hideLoading(); 
-      goToStep(3); 
-    }
-  }
-
-  function getExternalLinks(dest) {
-    const cleanDest = encodeURIComponent(dest || 'India');
-    return [
-      { name: '✈️ Search Flights', url: `https://www.makemytrip.com/flights/`, desc: 'Compare low cost indigo/air india lines', color: '#008cff' },
-      { name: '🚂 IRCTC Train Booking', url: `https://www.irctc.co.in/`, desc: 'Check seat maps & express schedules live', color: '#213d77' },
-      { name: '🚌 RedBus & Public Transit', url: `https://www.redbus.in/`, desc: 'Book luxury sleeper coaches immediately', color: '#d84e55' }
-    ];
-  }
-
-  async function getCoordinates(queryCity) {
-    if (!queryCity) return null;
-    let cleanQuery = queryCity.trim();
-
-    if (/^[-\d.]+\s*,\s*[-\d.]+$/.test(cleanQuery)) {
-      const parts = cleanQuery.split(',');
-      return { lat: parseFloat(parts[0]), lon: parseFloat(parts[1]) };
-    }
-
-    if (!cleanQuery.toLowerCase().includes('india')) {
-      cleanQuery += ', India';
-    }
-
-    try {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanQuery)}&limit=1`;
-      const response = await fetch(url);
-      const data = await response.json();
-      if (data && data.length > 0) {
-        return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
-      }
-    } catch (e) { console.error("Geocoding mismatch: ", e); }
+      if (data && data.length > 0) return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+    } catch(e) { console.error(e); }
     return null;
   }
 
-  async function drawGoogleStyleMap(originName, destName) {
-    if (!leafletMap) {
-      leafletMap = L.map('map', { zoomControl: false }).setView([20.5937, 78.9629], 5);
-      L.control.zoom({ position: 'topleft' }).addTo(leafletMap);
+  // ─── GET ROUTES MAIN ENTRY ───────────────────────────────
+  async function getRoutes() {
+    const destInput = document.getElementById('destination-input');
+    const destVal = destInput.value.trim();
+
+    showLoading('Finding best routes...');
+    resetDirections(false);
+
+    if (currentMode === 'car') {
+      let destCoords = (destInput.dataset.lat && destInput.dataset.lon) ? 
+        { lat: parseFloat(destInput.dataset.lat), lon: parseFloat(destInput.dataset.lon) } : await geocode(destVal);
       
-      currentTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(leafletMap);
+      if (!destCoords) {
+        hideLoading();
+        showDirEmpty('Could not find destination. Try a clearer city name.');
+        return;
+      }
+      hideLoading();
+      drawCarRoute(gpsCoords, destCoords, destVal);
+    } else {
+      const originInput = document.getElementById('origin-manual');
+      const originVal = originInput.value.trim();
+
+      let originCoords = (originInput.dataset.lat && originInput.dataset.lon) ? 
+        { lat: parseFloat(originInput.dataset.lat), lon: parseFloat(originInput.dataset.lon) } : await geocode(originVal);
       
-      trafficTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        opacity: 0.40,
-        className: 'traffic-visualization-matrix'
-      }).addTo(leafletMap);
+      let destCoords = (destInput.dataset.lat && destInput.dataset.lon) ? 
+        { lat: parseFloat(destInput.dataset.lat), lon: parseFloat(destInput.dataset.lon) } : await geocode(destVal);
 
-      const compassControl = new L.Control.Compass({ autoRotation: true, position: 'topright' });
-      leafletMap.addControl(compassControl);
+      if (!originCoords || !destCoords) {
+        hideLoading();
+        showDirEmpty('Could not find one or both locations. Please check spelling.');
+        return;
+      }
+      hideLoading();
+      drawTransitOptions(currentMode, originCoords, destCoords, originVal, destVal);
     }
+  }
 
-    if (liveUserCoords && isNavigatingActive) {
-      originName = `${liveUserCoords.lat}, ${liveUserCoords.lon}`;
+  // ─── CAR ROUTING ─────────────────────────────────────────
+  function drawCarRoute(origin, dest, destName) {
+    clearRouting();
+
+    const startIcon = L.divIcon({ html:`<div style="background:#1D9E75;color:#fff;padding:4px 8px;border-radius:4px;font-size:11px;font-weight:700;box-shadow:0 2px 4px rgba(0,0,0,0.2);white-space:nowrap;">🏁 START</div>`, className:'', iconSize:[60,22], iconAnchor:[8,11] });
+    const endIcon   = L.divIcon({ html:`<div style="background:#ef4444;color:#fff;padding:4px 8px;border-radius:4px;font-size:11px;font-weight:700;box-shadow:0 2px 4px rgba(0,0,0,0.2);white-space:nowrap;">🎯 ${destName}</div>`, className:'', iconSize:[null,22], iconAnchor:[8,11] });
+
+    L.marker([origin.lat, origin.lon], { icon: startIcon }).addTo(leafletMap);
+    L.marker([dest.lat, dest.lon], { icon: endIcon }).addTo(leafletMap);
+
+    routingControl = L.Routing.control({
+      waypoints: [L.latLng(origin.lat, origin.lon), L.latLng(dest.lat, dest.lon)],
+      routeWhileDragging: false,
+      showAlternatives: true,
+      addWaypoints: false,
+      fitSelectedRoutes: true,
+      router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1', profile: 'driving' }),
+      altLineOptions: { styles: [{ color:'#94a3b8', opacity:0.6, weight:5 }] },
+      lineOptions: { styles: [{ color:'#2563eb', opacity:0.9, weight:6 }] },
+      createMarker: () => null
+    }).addTo(leafletMap);
+
+    routingControl.on('routeselected', (e) => {
+      const route = e.route;
+      currentPolyline = route.coordinates;
+      const distKm = (route.summary.totalDistance / 1000).toFixed(1);
+      const durHrs  = Math.floor(route.summary.totalTime / 3600);
+      const durMins = Math.floor((route.summary.totalTime % 3600) / 60);
+      renderCarDirections(route.instructions, distKm, durHrs, durMins);
+      document.getElementById('nav-toggle-btn').style.display = 'block';
+    });
+
+    setTimeout(() => leafletMap.invalidateSize(), 300);
+  }
+
+  function renderCarDirections(instructions, distKm, durHrs, durMins) {
+    const wrap = document.getElementById('directions-wrap');
+    const durStr = durHrs > 0 ? `${durHrs}h ${durMins}m` : `${durMins}m`;
+    wrap.innerHTML = `
+      <div class="dir-header">
+        <span class="dir-header-title">Turn-by-Turn Directions</span>
+        <span class="route-meta">${distKm} km · ${durStr}</span>
+      </div>
+      ${instructions.map((step, i) => `
+        <div class="dir-step">
+          <div class="dir-step-num">${i+1}</div>
+          <div>
+            <div class="dir-step-text">${step.text}</div>
+            <div class="dir-step-dist">${step.distance > 1000 ? (step.distance/1000).toFixed(1)+' km' : Math.round(step.distance)+' m'}</div>
+          </div>
+        </div>
+      `).join('')}
+    `;
+  }
+
+  // ─── TRANSIT ROUTING ─────────────────────────────────────
+  function drawTransitOptions(mode, origin, dest, originName, destName) {
+    clearRouting();
+
+    const originLatLng = L.latLng(origin.lat, origin.lon);
+    const destLatLng   = L.latLng(dest.lat, dest.lon);
+    const colors = { bus:'#f59e0b', train:'#6366f1', flight:'#0ea5e9', cab:'#ec4899' };
+    const lineColor = colors[mode] || '#1D9E75';
+
+    currentPolyline = L.polyline([originLatLng, destLatLng], {
+      color: lineColor, weight: 4, opacity: 0.8, dashArray: mode === 'flight' ? '8,8' : null
+    }).addTo(leafletMap);
+
+    const oIcon = L.divIcon({ html:`<div style="background:#fff;border:2px solid ${lineColor};color:${lineColor};padding:4px 8px;border-radius:4px;font-size:11px;font-weight:700;box-shadow:0 2px 4px rgba(0,0,0,0.15);white-space:nowrap;">📍 ${originName}</div>`, className:'', iconSize:[null,22] });
+    const dIcon = L.divIcon({ html:`<div style="background:${lineColor};color:#fff;padding:4px 8px;border-radius:4px;font-size:11px;font-weight:700;box-shadow:0 2px 4px rgba(0,0,0,0.2);white-space:nowrap;">🎯 ${destName}</div>`, className:'', iconSize:[null,22] });
+
+    L.marker([origin.lat, origin.lon], { icon: oIcon }).addTo(leafletMap);
+    L.marker([dest.lat, dest.lon], { icon: dIcon }).addTo(leafletMap);
+
+    leafletMap.fitBounds(L.latLngBounds([originLatLng, destLatLng]), { padding:[60,60] });
+    const dist = leafletMap.distance(originLatLng, destLatLng) / 1000;
+    renderTransitCards(mode, originName, destName, dist);
+  }
+
+  function renderTransitCards(mode, originName, destName, distKm) {
+    const wrap = document.getElementById('directions-wrap');
+    const routes = getTransitRoutes(mode, originName, destName, distKm);
+
+    wrap.innerHTML = `
+      <div class="dir-header">
+        <span class="dir-header-title">Available Routes</span>
+        <span class="route-meta">${Math.round(distKm)} km</span>
+      </div>
+      ${routes.map((r, i) => `
+        <div class="transit-route-card ${i===0?'selected':''}" onclick="selectTransitCard(this)">
+          <div class="trc-header">
+            <div class="trc-mode">${r.icon} ${r.name}</div>
+            <div class="trc-price">${r.price}</div>
+          </div>
+          <div class="trc-meta">
+            <span class="trc-chip chip-time">⏱ ${r.duration}</span>
+            <span class="trc-chip chip-book">${r.frequency}</span>
+          </div>
+          <div class="trc-stops">
+            <div class="stop-line"><div class="stop-dot" style="background:#1D9E75;"></div><span>${originName}</span></div>
+            ${r.via ? `<div style="padding-left:3px;"><div class="stop-line-v"></div></div><div class="stop-line"><div class="stop-dot" style="background:#f59e0b;"></div><span style="color:#92400e;">${r.via}</span></div>` : ''}
+            <div style="padding-left:3px;"><div class="stop-line-v"></div></div>
+            <div class="stop-line"><div class="stop-dot" style="background:#ef4444;"></div><span>${destName}</span></div>
+          </div>
+          <div style="padding:10px 14px; border-top:1px solid #f1f5f9; display:flex; gap:8px;">
+            <a href="${r.bookUrl}" target="_blank" style="font-size:11px;font-weight:700;color:#2563eb;text-decoration:none;padding:5px 10px;background:#eff6ff;border-radius:6px;">Book on ${r.platform} →</a>
+            ${r.altUrl ? `<a href="${r.altUrl}" target="_blank" style="font-size:11px;font-weight:700;color:#64748b;text-decoration:none;padding:5px 10px;background:#f8fafc;border-radius:6px;">Alt: ${r.altPlatform}</a>` : ''}
+          </div>
+        </div>
+      `).join('')}
+    `;
+  }
+
+  function getTransitRoutes(mode, from, to, distKm) {
+    const fromEnc = encodeURIComponent(from);
+    const toEnc   = encodeURIComponent(to);
+    if (mode === 'bus') {
+      const hrs = Math.max(1, Math.round(distKm / 60));
+      return [
+        { icon:'🚌', name:'Express AC Sleeper Bus', price: `₹${Math.round(distKm * 1.8)}–₹${Math.round(distKm * 2.5)}`, duration: `${hrs}h–${hrs+2}h`, frequency:'Departs every 1–2h', via: distKm > 300 ? 'Overnight Route' : null, bookUrl:`https://www.redbus.in/bus-tickets/${fromEnc.toLowerCase()}-to-${toEnc.toLowerCase()}`, platform:'RedBus', altUrl:`https://www.ixigo.com/search/result/bus`, altPlatform:'Ixigo' },
+        { icon:'🚌', name:'State Transport Service', price: `₹${Math.round(distKm * 0.8)}–₹${Math.round(distKm * 1.2)}`, duration: `${hrs+1}h–${hrs+4}h`, frequency:'Departs every 2–4h', via: null, bookUrl:`https://www.redbus.in/bus-tickets/${fromEnc.toLowerCase()}-to-${toEnc.toLowerCase()}`, platform:'RedBus', altUrl: null, altPlatform: null }
+      ];
     }
-
-    const startCoords = await getCoordinates(originName);
-    const endCoords = await getCoordinates(destName);
-
-    if (!startCoords || !endCoords) {
-      document.getElementById('directions-steps').innerHTML = '<div style="color:#e74c3c;padding:10px;">Resolving location coordinates...</div>';
-      return;
+    if (mode === 'train') {
+      const hrs = Math.max(1, Math.round(distKm / 80));
+      return [
+        { icon:'🚂', name:'Rajdhani / Shatabdi Express', price: `₹${Math.round(distKm * 1.5)}–₹${Math.round(distKm * 4)}`, duration: `${hrs}h–${hrs+2}h`, frequency:'1–3 trains/day', via: null, bookUrl:`https://www.irctc.co.in/nget/train-search`, platform:'IRCTC', altUrl:`https://www.ixigo.com/trains/results/search`, altPlatform:'Ixigo' },
+        { icon:'🚂', name:'Superfast Express', price: `₹${Math.round(distKm * 0.7)}–₹${Math.round(distKm * 2)}`, duration: `${hrs+2}h–${hrs+6}h`, frequency:'Multiple trains/day', via: distKm > 500 ? 'Junction Transit' : null, bookUrl:`https://www.irctc.co.in/nget/train-search`, platform:'IRCTC', altUrl:`https://www.confirmtkt.com/`, altPlatform:'ConfirmTkt' }
+      ];
     }
-
-    if (routingControl) {
-      leafletMap.removeControl(routingControl);
+    if (mode === 'flight') {
+      return [
+        { icon:'✈️', name:'Direct Flight', price: `₹${Math.round(distKm * 6)}–₹${Math.round(distKm * 14)}`, duration: `1h–3h`, frequency:'5–12 flights/day', via: null, bookUrl:`https://www.makemytrip.com/flights/domestic-cheapest-airtickets-${fromEnc.toLowerCase()}-${toEnc.toLowerCase()}.html`, platform:'MakeMyTrip', altUrl:`https://www.easemytrip.com/flights/domestic-flights-from-${fromEnc.toLowerCase()}-to-${toEnc.toLowerCase()}.aspx`, altPlatform:'EaseMyTrip' }
+      ];
     }
+    if (mode === 'cab') {
+      const hrs = Math.max(1, Math.round(distKm / 70));
+      return [
+        { icon:'🚕', name:'Outstation Cab (AC Sedan)', price: `₹${Math.round(distKm * 12)}–₹${Math.round(distKm * 16)}`, duration: `${hrs}h–${hrs+2}h`, frequency:'Door-to-door', via: null, bookUrl:`https://www.olacabs.com/cab-booking/outstation`, platform:'Ola', altUrl:`https://www.uber.com/in/en/`, altPlatform:'Uber' }
+      ];
+    }
+    return [];
+  }
 
-    leafletMap.eachLayer((layer) => {
-      if (layer instanceof L.Marker && !layer.options.icon?.options?.className?.includes('gps-active-pointer')) {
+  function selectTransitCard(el) {
+    document.querySelectorAll('.transit-route-card').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+  }
+
+  // ─── CAR NAVIGATION ──────────────────────────────────────
+  function toggleNavigation() {
+    isNavigating ? stopNavigation() : startNavigation();
+  }
+
+  function startNavigation() {
+    if (!navigator.geolocation) { alert('GPS not available in your browser.'); return; }
+    isNavigating = true;
+    document.getElementById('nav-toggle-btn').textContent = '🛑 Stop Navigation';
+    document.getElementById('nav-toggle-btn').style.background = '#ef4444';
+    document.getElementById('nav-toggle-btn').style.borderColor = '#ef4444';
+    document.getElementById('nav-hud').classList.add('visible');
+
+    const blueDot = L.divIcon({
+      html:`<div style="position:relative;width:24px;height:24px;"><div style="position:absolute;width:100%;height:100%;background:rgba(37,99,235,0.3);border-radius:50%;animation:pulse 1.5s infinite;"></div><div style="position:absolute;top:4px;left:4px;background:#2563eb;width:16px;height:16px;border-radius:50%;border:2px solid white;box-shadow:0 0 6px rgba(0,0,0,0.3);"></div></div><style>@keyframes pulse{0%{transform:scale(0.5);opacity:1}100%{transform:scale(2);opacity:0}}</style>`,
+      className:'', iconSize:[24,24], iconAnchor:[12,12]
+    });
+
+    trackWatchId = navigator.geolocation.watchPosition((pos) => {
+      const lat = pos.coords.latitude, lon = pos.coords.longitude;
+      const speed = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0;
+      gpsCoords = { lat, lon };
+
+      if (!userMarker) userMarker = L.marker([lat,lon],{icon:blueDot}).addTo(leafletMap);
+      else userMarker.setLatLng([lat,lon]);
+
+      leafletMap.setView([lat,lon], 16);
+      document.getElementById('hud-instruction').textContent = `🚙 Driving — follow the blue route`;
+      document.getElementById('hud-speed').textContent = `${speed} km/h`;
+    }, (err) => {
+      console.error(err);
+      stopNavigation();
+    }, { enableHighAccuracy:true, maximumAge:0, timeout:10000 });
+  }
+
+  function stopNavigation() {
+    isNavigating = false;
+    if (trackWatchId !== null) { navigator.geolocation.clearWatch(trackWatchId); trackWatchId = null; }
+    if (userMarker) { leafletMap.removeLayer(userMarker); userMarker = null; }
+    document.getElementById('nav-hud').classList.remove('visible');
+    const navBtn = document.getElementById('nav-toggle-btn');
+    navBtn.textContent = '🚀 Start Navigation';
+    navBtn.style.background = 'var(--primary)';
+    navBtn.style.borderColor = 'var(--primary)';
+  }
+
+  // ─── NIGHT MODE ──────────────────────────────────────────
+  function toggleNightMode() {
+    isNightMode = !isNightMode;
+    const pane = document.querySelector('.leaflet-tile-pane');
+    const btn = document.getElementById('night-btn');
+    if (isNightMode) {
+      pane.classList.add('night-mode');
+      btn.textContent = '☀️ Light Mode';
+    } else {
+      pane.classList.remove('night-mode');
+      btn.textContent = '🌙 Night Mode';
+    }
+  }
+
+  // ─── HELPERS ─────────────────────────────────────────────
+  function clearRouting() {
+    if (routingControl) { leafletMap.removeControl(routingControl); routingControl = null; }
+    if (currentPolyline) { 
+      if (currentPolyline instanceof L.Layer) { leafletMap.removeLayer(currentPolyline); }
+      currentPolyline = null; 
+    }
+    
+    // Clean up markers and polylines safely without touching default systems
+    leafletMap.eachLayer(layer => {
+      if ((layer instanceof L.Marker || layer instanceof L.Polyline) && layer !== userMarker) {
         leafletMap.removeLayer(layer);
       }
     });
-
-    let routeWaypoints = [ L.latLng(startCoords.lat, startCoords.lon) ];
-    aiWaypointsData = []; 
-
-    if (tripData && tripData.stops && tripData.stops.length > 0) {
-      const sequentiallySortedStops = [...tripData.stops].sort((a, b) => (a.day - b.day));
-      for (let stop of sequentiallySortedStops) {
-        let stopCoords = await getCoordinates(stop.place_name);
-        if (stopCoords) {
-          let stopLatLng = L.latLng(stopCoords.lat, stopCoords.lon);
-          routeWaypoints.push(stopLatLng);
-          aiWaypointsData.push({ name: stop.place_name, lat: stopCoords.lat, lon: stopCoords.lon });
-          
-          L.marker(stopLatLng, {
-            icon: L.divIcon({
-              html: `<div style="background:#ff9800; color:white; border:2px solid white; padding:2px 6px; border-radius:6px; font-weight:bold; font-size:10px; box-shadow:0 2px 4px rgba(0,0,0,0.3); white-space:nowrap;">🛑 ${stop.place_name}</div>`,
-              className: 'ai-stop-marker', iconSize: [null, null], iconAnchor: [15, 10]
-            })
-          }).addTo(leafletMap).bindPopup(`<b>AI Stop:</b> ${stop.place_name}`);
-        }
-      }
-    }
-    
-    routeWaypoints.push(L.latLng(endCoords.lat, endCoords.lon));
-
-    routingControl = L.Routing.control({
-      waypoints: routeWaypoints,
-      routeWhileDragging: false, 
-      showAlternatives: true,    
-      addWaypoints: false,       
-      fitSelectedRoutes: !isNavigatingActive, // Only fit bounds if we aren't tracking actively
-      router: L.Routing.osrmv1({
-        serviceUrl: 'https://router.project-osrm.org/route/v1',
-        profile: 'driving'
-      }),
-      altLineOptions: {
-        styles: [{ color: '#94a3b8', opacity: 0.65, weight: 5 }] 
-      },
-      lineOptions: {
-        styles: [{ color: '#2563eb', opacity: 0.9, weight: 6 }]  
-      },
-      createMarker: function(i, wp, n) {
-        if (i === 0) return L.marker(wp.latLng, { icon: L.divIcon({ html: '<div style="background:#10b981; color:white; padding:4px 8px; border-radius:4px; font-weight:700; font-size:11px; box-shadow:0 2px 4px rgba(0,0,0,0.2);">🏁 START</div>', className: 'start-pin', iconSize:[60,20] }) });
-        if (i === n - 1) return L.marker(wp.latLng, { icon: L.divIcon({ html: '<div style="background:#ef4444; color:white; padding:4px 8px; border-radius:4px; font-weight:700; font-size:11px; box-shadow:0 2px 4px rgba(0,0,0,0.2);">🎯 END</div>', className: 'end-pin', iconSize:[60,20] }) });
-        return null;
-      }
-    }).addTo(leafletMap);
-
-    routingControl.on('routeselected', function(e) {
-      const route = e.route;
-      currentActiveRoutePolyline = route.coordinates;
-      
-      const distanceKm = (route.summary.totalDistance / 1000).toFixed(1);
-      const durationHrs = (route.summary.totalTime / 3600).toFixed(1);
-      document.getElementById('route-meta-info').textContent = `${distanceKm} km · ${durationHrs} hrs`;
-
-      if (route.instructions && route.instructions.length > 0) {
-        document.getElementById('directions-steps').innerHTML = route.instructions.map((step, index) => `
-          <div style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; display: flex; gap: 10px; align-items: flex-start;">
-            <span style="color: #2563eb; font-weight: bold;">${index + 1}.</span>
-            <div style="flex: 1;">
-              <div style="color: #1e293b; font-weight: 500;">${step.text}</div>
-              <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Proceed forward ${step.distance.toFixed(0)} meters</div>
-            </div>
-          </div>
-        `).join('');
-      }
-    });
-
-    if (isNavigatingActive && liveUserCoords) {
-      leafletMap.setView([liveUserCoords.lat, liveUserCoords.lon], 17);
-    } else {
-      leafletMap.fitBounds(L.latLngBounds(routeWaypoints), { padding: [40, 40] });
-    }
-    setTimeout(() => { leafletMap.invalidateSize(); }, 300);
   }
 
-  function toggleActiveNavigation() {
-    const navBtn = document.getElementById('btn-start-navigation');
-    const hud = document.getElementById('navigation-hud');
-
-    if (isNavigatingActive) {
-      isNavigatingActive = false;
-      navBtn.textContent = "🚀 Start Navigation";
-      navBtn.classList.remove('nav-btn-active');
-      hud.classList.add('hidden');
-      stopLiveTracking();
-      renderMapAndBookings();
-    } else {
-      isNavigatingActive = true;
-      navBtn.textContent = "🛑 Stop Navigation";
-      navBtn.classList.add('nav-btn-active');
-      hud.classList.remove('hidden');
-      startLiveTrackingEngine();
+  function resetDirections(showEmpty=true) {
+    if (showEmpty) {
+      document.getElementById('directions-wrap').innerHTML = `<div class="dir-empty" id="dir-empty">Select transport mode, enter your locations, and tap "Get Routes".</div>`;
     }
   }
 
-  function startLiveTrackingEngine() {
-    if (!navigator.geolocation) {
-      alert("Your browser environment does not support GPS tracking.");
-      toggleActiveNavigation();
-      return;
-    }
-
-    const blueDotIcon = L.divIcon({
-      html: `<div style="position:relative; width:24px; height:24px;"><div style="position:absolute; width:100%; height:100%; background:rgba(37,99,235,0.3); border-radius:50%; animation: pulse 1.5s infinite;"></div><div style="position:absolute; top:4px; left:4px; background:#2563eb; width:16px; height:16px; border-radius:50%; border:2px solid white; box-shadow:0 0 8px rgba(0,0,0,0.3);"></div></div><style>@keyframes pulse{0%{transform:scale(0.5);opacity:1;}100%{transform:scale(2);opacity:0;}}</style>`,
-      className: 'gps-active-pointer', iconSize: [24, 24], iconAnchor: [12, 12]
-    });
-
-    trackingWatchId = navigator.geolocation.watchPosition((position) => {
-      const lat = position.coords.latitude;
-      const lon = position.coords.longitude;
-      const speed = position.coords.speed ? (position.coords.speed * 3.6).toFixed(0) : 0;
-      liveUserCoords = { lat, lon };
-
-      if (!userLocationMarker) {
-        userLocationMarker = L.marker([lat, lon], { icon: blueDotIcon }).addTo(leafletMap);
-      } else {
-        userLocationMarker.setLatLng([lat, lon]);
-      }
-
-      if (isNavigatingActive) {
-        document.getElementById('hud-instruction').innerHTML = `<b>🚙 Driving at ${speed} km/h</b> — Active Guidance Engine online.`;
-        leafletMap.setView([lat, lon], 17);
-        
-        checkRouteDeviationAndReroute(lat, lon);
-        checkUpcomingAIStops(lat, lon);
-      }
-    }, (err) => {
-      console.error(err);
-      if (err.code === 1) {
-        alert("🔒 Location Access Denied! Please ensure your page URL is running via HTTPS encryption protocol and location permissions are enabled.");
-      } else {
-        alert("🛰️ GPS Signal Timeout. Searching for hardware signal tracking vectors...");
-      }
-      toggleActiveNavigation();
-    }, { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 });
+  function showDirEmpty(msg) {
+    document.getElementById('directions-wrap').innerHTML = `<div class="dir-empty">${msg}</div>`;
   }
 
-  function checkRouteDeviationAndReroute(userLat, userLon) {
-    if (!currentActiveRoutePolyline || currentActiveRoutePolyline.length === 0) return;
-    let minDistanceToPath = Infinity;
-    for (let i = 0; i < currentActiveRoutePolyline.length; i++) {
-      let pt = currentActiveRoutePolyline[i];
-      let distance = Math.sqrt(Math.pow(userLat - pt.lat, 2) + Math.pow(userLon - pt.lng, 2));
-      if (distance < minDistanceToPath) minDistanceToPath = distance;
-    }
-    if (minDistanceToPath > 0.0008) {
-      console.log("Off-route event caught. Recalculating directions line dynamically...");
-      drawGoogleStyleMap(`${userLat}, ${userLon}`, tripData.destination);
-    }
+  function showLoading(msg) {
+    const el = document.getElementById('route-loading');
+    document.getElementById('loading-msg').textContent = msg;
+    el.style.display = 'block';
   }
 
-  function checkUpcomingAIStops(userLat, userLon) {
-    if (aiWaypointsData.length === 0) return;
-    let closestStop = null; let minDistance = Infinity;
-    aiWaypointsData.forEach(stop => {
-      let d = Math.sqrt(Math.pow(userLat - stop.lat, 2) + Math.pow(userLon - stop.lon, 2));
-      if (d < minDistance) { minDistance = d; closestStop = stop; }
-    });
-    if (minDistance < 0.005 && closestStop) {
-      document.getElementById('hud-next-stop').innerHTML = `🎉 ARRIVING AT: <b>${closestStop.name}</b>`;
-    } else if (closestStop) {
-      document.getElementById('hud-next-stop').innerHTML = `Next Stop: <b>${closestStop.name}</b>`;
-    }
+  function hideLoading() {
+    document.getElementById('route-loading').style.display = 'none';
   }
 
-  function stopLiveTracking() {
-    if (trackingWatchId !== null) { navigator.geolocation.clearWatch(trackingWatchId); trackingWatchId = null; }
-    if (userLocationMarker) { leafletMap.removeLayer(userLocationMarker); userLocationMarker = null; }
-  }
-
-  function toggleMapTheme() {
-    if (!leafletMap) return;
-    isNightMode = !isNightMode;
-    const themeBtnText = document.getElementById('theme-btn-text');
-    if (currentTileLayer) leafletMap.removeLayer(currentTileLayer);
-    if (isNightMode) {
-      currentTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(leafletMap);
-      themeBtnText.textContent = "Switch to Light Map";
-    } else {
-      currentTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(leafletMap);
-      themeBtnText.textContent = "Switch to Night Map";
-    }
-  }
-
-  async function renderMapAndBookings() {
-    if (!tripData) return;
-    
-    drawGoogleStyleMap(tripData.origin, tripData.destination);
-    
-    const links = getExternalLinks(tripData.destination);
-    document.getElementById('booking-grid').innerHTML = links.map(b => `
-      <a href="${b.url}" target="_blank" style="text-decoration:none; color:inherit;">
-        <div class="partner-vehicle-card" style="border-top:4px solid ${b.color}; cursor:pointer; height:100%;">
-          <div style="font-weight:700; font-size:14px; color:#1e293b; margin-bottom:4px;">${b.name}</div>
-          <div style="font-size:12px; color:#64748b; line-height:1.4;">${b.desc}</div>
-          <div style="margin-top:12px; font-size:11px; font-weight:700; color:${b.color}; text-transform:uppercase;">Book via Ext Vendor →</div>
-        </div>
-      </a>
-    `).join('');
-
-    searchPartnerVehicles();
-
-    const hotelGrid = document.getElementById('hotel-grid');
-    hotelGrid.innerHTML = '<div style="font-size:13px;color:#64748b;">Searching hotels matching budget profile...</div>';
-    try {
-      const res = await fetch('/api/booking/hotels/search', { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify({ city: tripData.destination, num_rooms: 1 }) 
-      });
-      const hotels = await res.json();
-      renderHotelResults(hotels, hotelGrid);
-    } catch (e) { 
-      hotelGrid.innerHTML = '<div style="font-size:13px;color:#ef4444;">Could not automatically sync internal lodging list. Please use dashboard integration tools.</div>'; 
-    }
-  }
-
-  async function searchPartnerVehicles() {
-    const statusEl = document.getElementById('partner-search-status');
-    const gridEl = document.getElementById('partner-grid');
-    try {
-      const res = await fetch('/api/provider/search', { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify({ origin: tripData.origin, destination: tripData.destination, num_seats: 2 }) 
-      });
-      const results = await res.json();
-      if (!results || !results.length) { 
-        statusEl.textContent = 'No internal cars or transit options found matching this path corridor.'; 
-        gridEl.innerHTML = ''; 
-        return; 
-      }
-      statusEl.textContent = 'Available RoadBuddy Partner Fleets:';
-      gridEl.innerHTML = results.map(v => `
-        <div class="partner-vehicle-card" style="border-left: 4px solid #1D9E75;">
-          <div style="font-weight:700; font-size:14px; color:#1e293b;">${v.vehicle_name}</div>
-          <div style="font-size:12px; color:#64748b; margin:2px 0 6px;">Provider: ${v.provider_name}</div>
-          <div style="font-weight:700; color:#1D9E75; font-size:14px;">₹${v.estimated_fare_inr.toLocaleString()} total</div>
-        </div>
-      `).join('');
-    } catch (e) { 
-      statusEl.textContent = 'Fleet verification system connection timeout.'; 
-    }
-  }
-
-  function renderHotelResults(hotels, container) {
-    if (!hotels || !hotels.length) { 
-      container.innerHTML = '<div style="font-size:13px;color:#64748b;">No direct properties available. Check partner flight and train bundles.</div>'; 
-      return; 
-    }
-    container.innerHTML = hotels.map(h => `
-      <div class="partner-vehicle-card" style="border-left:4px solid #38bdf8;">
-        <div style="font-weight:700; font-size:14px; color:#1e293b;">🏨 ${h.name}</div>
-        <div style="font-size:12px; color:#64748b; margin:4px 0;">Rating: ⭐ ${h.star_rating || '4.0'} / 5</div>
-        <div style="font-weight:700; color:#0284c7; font-size:13px;">₹${Math.round(h.price_per_night_inr).toLocaleString()}/night</div>
-      </div>
-    `).join('');
-  }
-
-  async function saveTrip() { alert('Trip saved successfully! ✅'); window.location.href = '/my-trips'; }
-
-  const today = new Date();
-  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
-  const nextWeek = new Date(today); nextWeek.setDate(nextWeek.getDate() + 7);
-  document.getElementById('start-date').value = tomorrow.toISOString().split('T')[0];
-  document.getElementById('end-date').value = nextWeek.toISOString().split('T')[0];
+  // ─── INITIAL BOOT RUN ───
+  window.addEventListener('DOMContentLoaded', () => {
+    initMap();
+    selectMode('car');
+  });
 </script>
-{% endblock %}
+</body>
+</html>
