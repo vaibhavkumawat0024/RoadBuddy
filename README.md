@@ -1,200 +1,170 @@
-# RoadBuddy — Complete Project Report
-**AI-Powered Road Trip Planner | Web Application**
-**Date: June 2026 | Built by: Mahendra & Kunal**
+# RoadBuddy 🚗
+**AI-Powered Road Trip Planner for India**
+
+RoadBuddy helps Indian travellers plan road trips end-to-end: AI-generated itineraries, fuel & toll cost estimates, route safety checks, a community route-sharing hub, trip journals, and booking across transport (bus/train/flight) and a built-in cab/vehicle provider marketplace.
 
 ---
 
-## 1. Project Overview
-
-RoadBuddy is a full-stack AI-powered road trip planning web application built for Indian travellers. It helps users plan road trips, estimate costs, discover hidden gems, check route safety, and book transport and hotels — all in one place.
-
----
-
-## 2. Tech Stack
+## Tech Stack
 
 | Layer | Technology |
 |---|---|
-| Backend | FastAPI (Python 3.11) |
-| Database | PostgreSQL (Neon Cloud) |
-| AI | Groq API (Llama 3 — free) |
-| Auth | JWT (JSON Web Tokens) |
-| ORM | SQLAlchemy |
-| Migrations | Alembic |
-| Frontend | HTML + CSS + Vanilla JS (Jinja2 templates) |
-| Deployment | Render (backend) |
-| Version Control | GitHub |
+| Backend | FastAPI (Python) |
+| Database | SQLAlchemy ORM + Alembic migrations (PostgreSQL in prod, SQLite for local/test) |
+| Auth | JWT (python-jose) + bcrypt password hashing |
+| AI | Groq API (Llama models), with mock fallbacks when no API key is set |
+| Frontend | Jinja2 server-rendered templates + vanilla JS + Leaflet (maps) |
+| Email | SMTP-based OTP verification |
 
 ---
 
-## 3. Database Models (6 Tables)
+## Project Structure
 
-| Model | Description |
+```
+RoadBuddy/
+├── backend/
+│   ├── app/
+│   │   ├── main.py              # FastAPI app, router registration, CORS, startup migrations
+│   │   ├── core/                 # config, database, JWT auth, email OTP
+│   │   ├── models/models.py      # SQLAlchemy models (Users, Trips, Providers, Bookings, etc.)
+│   │   ├── schemas/               # Pydantic request/response models (user-facing trip/journal/etc.)
+│   │   ├── routers/               # /api/* JSON endpoints — users, trips, fuel, community, journal, transport, booking
+│   │   ├── provider/               # Provider-side system: auth, router (/api/provider/*), schemas, HTML pages
+│   │   ├── pages/                  # User-facing HTML page routes (auth, dashboard, plan-trip, etc.)
+│   │   └── services/                # Business logic + AI integrations (one mock + one Groq path each)
+│   ├── templates/                   # Jinja2 HTML templates
+│   ├── static/                      # CSS/JS assets
+│   ├── alembic/                     # DB migrations
+│   ├── seed_data.py                 # Sample data seeding script
+│   └── requirements.txt
+├── frontend/                         # Reserved for a future standalone frontend (currently empty)
+├── docs/architecture.md
+└── infra/
+```
+
+---
+
+## Core Features
+
+### Trip Planning (AI)
+- **AI itinerary generator** (`POST /api/trips/generate`) — day-by-day plan with stops, costs, season/group/budget awareness
+- **AI waypoint suggestions** — hidden gems, dhabas, viewpoints along a route
+- **AI route safety analyzer** — hazard flags, safety score, seasonal warnings
+- **AI trip chatbot** — conversational trip-planning assistant
+- **AI trip recommendations** — personalized suggestions based on interests/budget
+- **AI journal summarizer** — turns daily journal entries into a trip story
+- **AI smart search** — natural-language community route search
+
+All AI features call **Groq**; every service has a deterministic **mock fallback** so the app works fully offline / without an API key.
+
+### Fuel & Cost
+- Fuel cost + toll estimate calculator (`/api/fuel/*`)
+- Current fuel price lookup
+
+### Community
+- Publish, browse, clone, and review shared routes (`/api/community/*`)
+
+### Trip Journal
+- Daily entries with expense tracking and AI-generated trip summaries (`/api/journal/*`)
+
+### Transport & Booking
+- Search/book buses, trains, and flights (`/api/transport/*`, `/api/booking/*`) — mock data, structured for real provider API integration later
+
+### Cab / Vehicle Provider Marketplace
+A two-sided system layered on top of the rider-facing app:
+- **Providers** (cab owners, rental companies, bus/traveller operators) register, complete an onboarding "Quick Setup" (service type + booking mode), and list vehicles through a dedicated dashboard (`/provider/*` pages, `/api/provider/*` API).
+- Vehicles are listed either as **private** (distance-based, price-per-km, available from a city) or **route-based/public** (fixed origin → destination, schedule, fixed fare).
+- **`GET /api/provider/services`** lists all active vehicles across every provider — private cabs, company/operator fleets, and self-drive rentals together — for the rider-facing **Cab tab** on the Plan Trip page, regardless of exact route match.
+- Riders can book directly via `POST /api/provider/book`.
+
+---
+
+## Database Models
+
+`User`, `Vehicle`, `Trip`, `TripStop`, `TransportOption`, `Booking`, `CommunityRoute`, `RouteReview`, `Journal`, `JournalEntry`, `Hotel`/`HotelBooking`, `Train`/`TrainBooking`, `Bus`/`BusBooking`, `Flight`/`FlightBooking`, `Provider`, `ProviderVehicle`, `ProviderBooking`.
+
+---
+
+## API Overview
+
+| Router | Prefix | Highlights |
+|---|---|---|
+| `users` | `/api/users` | register, login, profile, vehicles |
+| `trips` | `/api/trips` | generate (AI), my trips, cost, waypoints, chat, safety-check, recommendations |
+| `fuel` | `/api/fuel` | calculate, fuel-prices, toll-estimate |
+| `community` | `/api/community` | publish/browse/clone routes, reviews, AI smart-search |
+| `journal` | `/api/journal` | entries, publish, expense summary, AI summarize |
+| `transport` | `/api/transport` | search, book, my bookings, cancel |
+| `booking` | `/api/booking` | hotel/train/bus/flight search + book |
+| `provider` | `/api/provider` | register, login, vehicle CRUD, **services** (public listing), search, book |
+
+Full interactive docs at **`/docs`** once the server is running.
+
+---
+
+## Web Pages
+
+| Page | URL |
 |---|---|
-| User | Stores user accounts with hashed passwords |
-| Vehicle | User's vehicles with fuel type and mileage |
-| Trip | Planned trips with full cost breakdown |
-| TripStop | Individual stops for each trip |
-| CommunityRoute | Publicly shared routes |
-| RouteReview | Reviews and ratings for community routes |
-| Journal | Trip journals with daily entries |
-| JournalEntry | Individual journal entries with expenses |
-| Booking | Transport bookings (bus/train/flight) |
-| TransportOption | Available transport options |
+| Register / Login (OTP-verified) | `/register`, `/login` |
+| Dashboard | `/dashboard` |
+| Plan Trip (map, AI itinerary, transit tabs incl. Cab) | `/plan-trip` |
+| My Trips | `/my-trips` |
+| My Vehicles | `/add-vehicle` |
+| Community | `/community` |
+| Profile | `/profile` |
+| Provider Register/Login/Dashboard/Vehicles/Bookings | `/provider/*` |
 
 ---
 
-## 4. API Endpoints (40+)
-
-### Users
-- POST /api/users/register
-- POST /api/users/login
-- POST /api/users/refresh
-- GET /api/users/me
-- POST /api/users/logout
-
-### Trips
-- POST /api/trips/generate — AI itinerary generation
-- GET /api/trips/my — List user trips
-- GET /api/trips/{id} — Get trip details
-- GET /api/trips/{id}/cost — Cost breakdown
-- DELETE /api/trips/{id} — Delete trip
-- POST /api/trips/suggest-waypoints — AI waypoint suggestions
-- POST /api/trips/chat — AI trip chatbot
-- POST /api/trips/safety-check — AI route safety
-- POST /api/trips/recommendations — AI trip recommendations
-
-### Fuel
-- POST /api/fuel/estimate
-- GET /api/fuel/prices
-- GET /api/fuel/tolls
-- POST /api/fuel/compare
-- GET /api/fuel/history
-
-### Community
-- GET /api/community/routes
-- POST /api/community/routes
-- GET /api/community/routes/{id}
-- POST /api/community/routes/{id}/review
-- POST /api/community/routes/{id}/save
-- POST /api/community/routes/{id}/clone
-- GET /api/community/routes/trending
-- POST /api/community/smart-search — AI smart search
-
-### Journal
-- POST /api/journal
-- GET /api/journal/trip/{id}
-- PUT /api/journal/{id}
-- DELETE /api/journal/{id}
-- POST /api/journal/expenses
-- GET /api/journal/expenses/trip/{id}
-- POST /api/journal/summarize — AI journal summarizer
-
-### Transport
-- GET /api/transport/search
-- POST /api/transport/book
-
----
-
-## 5. AI Features (7 Total)
-
-| Feature | Endpoint | Description |
-|---|---|---|
-| AI Trip Planner | POST /api/trips/generate | Generates full day-by-day itinerary with stops, costs, hotels, food |
-| AI Waypoint Suggestions | POST /api/trips/suggest-waypoints | Suggests hidden gems, dhabas, viewpoints between two cities |
-| AI Trip Chatbot | POST /api/trips/chat | Multi-turn conversational trip planning assistant |
-| AI Journal Summarizer | POST /api/journal/summarize | Turns daily journal entries into a beautiful trip story |
-| AI Route Safety Analyzer | POST /api/trips/safety-check | Flags hazards, gives safety score, seasonal warnings |
-| AI Smart Search | POST /api/community/smart-search | Natural language search — "beach trip under 5000 for couple" |
-| AI Trip Recommendations | POST /api/trips/recommendations | 5 personalized trip suggestions based on preferences |
-
-All AI features powered by **Groq API (Llama 3)** — free and fast.
-
----
-
-## 6. Web Pages
-
-| Page | URL | Description |
-|---|---|---|
-| Register | /register | Create new account |
-| OTP Verify | /verify-otp | Verify with OTP (default: 1234) |
-| Login | /login | Login with email/password |
-| Dashboard | /dashboard | Main dashboard with all 6 AI feature widgets |
-| Plan Trip | /plan-trip | 4-step trip planner with AI itinerary + safety + map + bookings |
-| My Trips | /my-trips | View all saved trips with stops and cost breakdown |
-| My Vehicles | /add-vehicle | Add and manage vehicles |
-| Community | /community | Browse and search community routes |
-| Profile | /profile | View and update profile |
-
----
-
-## 7. Key Features
-
-### Trip Planning
-- AI generates complete day-by-day itinerary
-- Real Indian highway numbers (NH-48, NH-8 etc.)
-- Season-aware recommendations (summer/monsoon/winter)
-- Group-type specific stops (family/couple/friends/solo)
-- Budget breakdown per category
-
-### Maps & Booking
-- Google Maps route embed
-- Train booking → IRCTC, Ixigo
-- Bus booking → RedBus, Ixigo
-- Flight booking → Google Flights, MakeMyTrip, EaseMyTrip
-- Hotel booking → Booking.com, MakeMyTrip, OYO, Airbnb
-- Toll calculator → NHAI
-- Fuel prices → Google Search
-
-### Safety
-- AI analyzes route hazards
-- Safety score out of 10
-- Seasonal warnings (flood, fog, landslide)
-- Emergency contact numbers (1033, 108, 1073)
-
-### Community
-- Publish and discover routes
-- Rate and review routes
-- Clone routes as personal trips
-- AI smart search in natural language
-
----
-
-## 8. Authentication Flow
+## Authentication
 
 ```
-Register → OTP (1234) → Login → JWT Cookie → Dashboard
+Register → Email OTP verification → Login → JWT (httponly cookie / Bearer token) → Protected routes
 ```
-
-- Passwords hashed with bcrypt
-- JWT tokens stored in httponly cookies
-- Token expiry: 24 hours
+- Passwords hashed with **bcrypt**
+- JWT signed with `SECRET_KEY`, default 24-hour expiry
+- Providers have a **separate** auth system (`app/provider/auth.py`) from riders
 
 ---
 
-## 9. Deployment
-
-| Service | Platform | URL |
-|---|---|---|
-| Backend API | Render (free) | https://roadbuddy-backend.onrender.com |
-| Database | Neon PostgreSQL (free) | Cloud hosted |
-| Code | GitHub | https://github.com/Kunal14695/RoadBuddy |
-
----
-
-## 10. Environment Variables
+## Environment Variables
 
 ```
-DATABASE_URL    = Neon PostgreSQL connection string
-GROQ_API_KEY    = Groq API key for AI features
-SECRET_KEY      = JWT signing secret
-ANTHROPIC_API_KEY = (optional, not used)
-GEMINI_API_KEY  = (optional, not used)
-GOOGLE_MAPS_API_KEY = (optional, for real routing)
+DATABASE_URL         # PostgreSQL connection string (or sqlite:///./test.db for local dev)
+SECRET_KEY           # JWT signing secret
+GROQ_API_KEY         # optional — enables real AI responses; falls back to mocks if unset
+MAIL_USERNAME        # optional — SMTP sender for OTP emails
+MAIL_PASSWORD
+MAIL_FROM
 ```
 
 ---
 
-## 11. Work Division
+## Running Locally
+
+```bash
+git clone https://github.com/<your-org>/RoadBuddy.git
+cd RoadBuddy/backend
+
+python -m venv venv
+venv\Scripts\activate        # Windows
+# source venv/bin/activate   # Mac/Linux
+
+pip install -r requirements.txt
+
+# create a .env with at least DATABASE_URL and SECRET_KEY
+uvicorn app.main:app --reload
+```
+
+Then open:
+- `http://localhost:8000/dashboard` — rider app
+- `http://localhost:8000/provider/dashboard` — provider portal
+- `http://localhost:8000/docs` — interactive API reference
+
+---
+
+## Work Division
 
 ### Kunal (AI & Frontend)
 - Built all 7 AI services from scratch
@@ -222,59 +192,26 @@ GOOGLE_MAPS_API_KEY = (optional, for real routing)
 - Vehicle management API
 - Fuel and toll calculator
 - Transport booking (bus/train/flight)
-- Neon PostgreSQL setup
-- All 6 database tables
-- 33 automated tests
+- Database setup
+- Database tables and migrations (Alembic)
+- Automated test suite
 - Community routes module
 - Trip journal module
-- Alembic migrations
-- Render deployment
-- HTML templates (base, login, register, verify_otp, dashboard)
+- Provider / cab marketplace backend (`/api/provider/*`)
+- HTML templates (base, login, register, dashboard, etc.)
 
 ---
 
-## 12. What's Remaining (Future Work)
+## Known Gaps / Next Steps
 
-| Feature | Status | Notes |
-|---|---|---|
-| Real Google Maps API | Pending | Needs paid API key |
-| Real IRCTC/RedBus API | Pending | Needs partnership/paid access |
-| Real fuel price API | Pending | Indian Oil API |
-| Real toll API | Pending | NHAI API |
-| Push notifications | Pending | Firebase |
-| Photo uploads | Pending | S3/Cloudinary |
-| Email OTP | Pending | Replace hardcoded 1234 |
-| React Native app | Not planned | Web app instead |
-| Payment integration | Future | Razorpay |
+| Item | Notes |
+|---|---|
+| Real maps/routing | Currently OpenStreetMap/OSRM (free) — swap for Google Maps if paid routing is needed |
+| Real transport/hotel data | Bus/train/flight/hotel search is mock data, structured for real API integration |
+| Rider auth on provider booking | `POST /api/provider/book` doesn't yet attach the logged-in rider's real user ID |
+| Payments | Not integrated yet |
+| Push notifications, photo uploads | Not yet implemented |
 
 ---
 
-## 13. How to Run Locally
-
-```bash
-# Clone repo
-git clone https://github.com/Kunal14695/RoadBuddy.git
-cd RoadBuddy/backend
-
-# Create virtual environment
-python -m venv venv
-venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Create .env file
-copy .env.example .env
-# Fill in DATABASE_URL and GROQ_API_KEY
-
-# Run server
-uvicorn app.main:app --reload
-
-# Open browser
-http://localhost:8000/dashboard
-http://localhost:8000/docs
-```
-
----
-
-*RoadBuddy — Plan smarter, travel better 🚗*
+*RoadBuddy — Plan smarter, travel better.*
