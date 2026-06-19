@@ -9,6 +9,13 @@ from app.routers import trips, fuel, users, community, journal, transport
 from app.pages import auth_pages, dashboard_pages
 from app.core.database import engine
 from sqlalchemy import text
+from app.core.config import settings
+
+app = FastAPI(
+    title="RoadBuddy AI",
+    description="India's Ultimate Road Trip Companion — API Backend",
+    version="1.0.0",
+)
 
 # Run schema updates on startup
 @app.on_event("startup")
@@ -21,13 +28,7 @@ async def run_migrations():
         except Exception as e:
             print("Schema update error:", e)
 
-from app.core.config import settings
 
-app = FastAPI(
-    title="RoadBuddy AI",
-    description="India's Ultimate Road Trip Companion — API Backend",
-    version="1.0.0",
-)
 
 # Static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
