@@ -870,7 +870,110 @@
         return;
       }
       hideLoading();
-      drawTransitOptions(currentMode, originCoords, destCoords, originVal, destVal);
+
+      if (currentMode === 'cab') {
+        drawTransitOptions(currentMode, originCoords, destCoords, originVal, destVal);
+        loadCabServices(originVal, destVal);
+      } else {
+        drawTransitOptions(currentMode, originCoords, destCoords, originVal, destVal);
+      }
+    }
+  }
+
+  // ─── CAB SERVICES (real provider listings) ───────────────────
+  async function loadCabServices(originVal, destVal) {
+    const wrap = document.getElementById('directions-wrap');
+    const loadingCard = document.createElement('div');
+    loadingCard.id = 'cab-loading-card';
+    loadingCard.style.cssText = 'padding:14px;font-size:13px;color:#64748b;';
+    loadingCard.textContent = 'Loading cab services from providers...';
+    wrap.appendChild(loadingCard);
+
+    let services = [];
+    try {
+      const params = new URLSearchParams({ origin: originVal, destination: destVal });
+      const res = await fetch(`/api/provider/services?${params.toString()}`);
+      if (res.ok) services = await res.json();
+    } catch (e) {
+      console.warn('Cab services fetch failed', e);
+    }
+
+    const loadCard = document.getElementById('cab-loading-card');
+    if (loadCard) loadCard.remove();
+
+    renderCabServices(services);
+  }
+
+  function renderCabServices(services) {
+    const wrap = document.getElementById('directions-wrap');
+    const categoryLabels = { private: '🚖 Private Cab', company: '🏢 Company / Operator', rental: '🔑 Self-Drive Rental' };
+
+    if (!services.length) {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'padding:14px;font-size:13px;color:#64748b;';
+      empty.textContent = 'No registered cab providers found for this route yet.';
+      wrap.appendChild(empty);
+      return;
+    }
+
+    const list = document.createElement('div');
+    list.id = 'cab-services-list';
+    list.innerHTML = `
+      <div class="dir-header" style="margin-top:10px;">
+        <span class="dir-header-title">Available Cab Services (${services.length})</span>
+      </div>
+      ${services.map(s => {
+        const fare = s.fixed_fare_inr ? `₹${s.fixed_fare_inr}` : (s.price_per_km_inr ? `₹${s.price_per_km_inr}/km` : 'Price on request');
+        const isPrivate = s.destination === 'Private';
+        const routeLine = isPrivate
+          ? `<div class="stop-line"><div class="stop-dot" style="background:#ec4899;"></div><span>📍 Available at: ${s.origin} (Private Rental)</span></div>`
+          : `
+          <div class="stop-line"><div class="stop-dot" style="background:#ec4899;"></div><span>${s.origin}${s.departure_time ? ' · ' + s.departure_time : ''}</span></div>
+          <div class="stop-line-v"></div>
+          <div class="stop-line"><div class="stop-dot" style="background:#ef4444;"></div><span>${s.destination}</span></div>`;
+        return `
+        <div class="transit-route-card">
+          <div class="trc-header">
+            <div class="trc-mode">${categoryLabels[s.cab_category] || s.cab_category} · ${s.provider_name}</div>
+            <div class="trc-price">${fare}</div>
+          </div>
+          <div class="trc-meta">
+            <span class="trc-chip chip-time">${s.vehicle_name} (${s.vehicle_type})</span>
+            <span class="trc-chip chip-book">${s.driver_included ? 'Driver included' : 'Self-drive'}</span>
+            <span class="trc-chip">${s.seats_available} seat(s) available</span>
+          </div>
+          <div class="trc-stops">
+            ${routeLine}
+          </div>
+          <button class="get-routes-btn" style="margin-top:8px;" onclick="bookCab(${s.id})">Book this cab</button>
+        </div>`;
+      }).join('')}
+    `;
+    wrap.appendChild(list);
+  }
+
+  async function bookCab(vehicleId) {
+    const passengerName = prompt('Passenger name for booking:');
+    if (!passengerName) return;
+    try {
+      const res = await fetch('/api/provider/book', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vehicle_id: vehicleId,
+          passenger_name: passengerName,
+          travel_date: new Date().toISOString().slice(0, 10),
+          num_seats: 1,
+        }),
+      });
+      if (res.ok) {
+        alert('Cab booked successfully!');
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert('Booking failed: ' + (err.detail || res.status));
+      }
+    } catch (e) {
+      alert('Booking failed: network error');
     }
   }
 

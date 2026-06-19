@@ -124,6 +124,29 @@ class VehicleSearchResult(BaseModel):
     seats_available: int
 
 
+# ── Cab Services (all providers, no route filter) ────────────────────────
+
+class CabServiceResult(BaseModel):
+    id: int
+    provider_id: int
+    provider_name: str
+    cab_category: str          # "private" | "company" | "rental"
+    vehicle_type: str
+    vehicle_name: str
+    driver_included: bool
+    origin: str
+    destination: str
+    departure_time: Optional[str]
+    price_per_km_inr: Optional[float]
+    fixed_fare_inr: Optional[float]
+    total_seats: int
+    seats_available: int
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+
 # ── Booking ────────────────────────────────────────────────────────────────
 
 class ProviderBookingCreate(BaseModel):

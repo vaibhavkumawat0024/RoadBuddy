@@ -15,6 +15,7 @@ from app.provider.schemas import (
     VehicleCreate, VehicleUpdate, VehicleOut,
     VehicleSearchRequest, VehicleSearchResult,
     ProviderBookingCreate, ProviderBookingOut,
+    CabServiceResult,
 )
 from app.provider.auth import (
     hash_password, verify_password,
@@ -155,6 +156,86 @@ def list_my_bookings(
 
 
 # ── Public Search (called from USER side) ────────────────────────────────
+
+def _derive_cab_category(provider: Provider, vehicle: ProviderVehicle) -> str:
+    """
+    Classify a listed vehicle as private / company / rental for the
+    user-facing Cab Service tab.
+
+    Real signals (from provider_dashboard.html setup form + provider_vehicles.html):
+      - Provider.service_type: car_rental | bus_traveller_rental | both_car_big | self_drive
+      - ProviderVehicle.destination == "Private" sentinel -> listed via the
+        "Private Booking Service" form (distance-based, price_per_km_inr)
+      - Anything else -> listed via the "Route-Based Public Service" form
+        (fixed origin->destination, schedule, fixed_fare_inr)
+    """
+    service_type = (provider.service_type or "").lower()
+
+    if service_type == "self_drive":
+        return "rental"
+
+    if vehicle.destination == "Private":
+        return "private"
+
+    if service_type in ("bus_traveller_rental", "both_car_big"):
+        return "company"
+
+    # car_rental provider running a scheduled route is still an operator-style listing
+    return "company"
+
+
+@router.get("/services", response_model=list[CabServiceResult])
+def list_cab_services(
+    cab_category: str | None = None,
+    origin: str | None = None,
+    destination: str | None = None,
+    db: Session = Depends(get_db),
+):
+    """
+    List ALL active provider vehicles (private cabs, company/bus operators,
+    rentals) for the user-facing 'Cab Service' tab. No exact route match
+    required — origin/destination are optional loose filters.
+    Public — no auth needed.
+    """
+    query = db.query(ProviderVehicle).filter(ProviderVehicle.is_active == True)
+    if origin:
+        query = query.filter(ProviderVehicle.origin.ilike(f"%{origin}%"))
+    if destination:
+        # "Private" vehicles have no real destination (they're priced per-km,
+        # available from a city, not tied to a fixed route) — don't exclude
+        # them just because the user typed a destination for route-based search.
+        query = query.filter(
+            (ProviderVehicle.destination.ilike(f"%{destination}%")) |
+            (ProviderVehicle.destination == "Private")
+        )
+
+    results = []
+    for v in query.all():
+        provider = db.query(Provider).filter(Provider.id == v.provider_id).first()
+        if not provider:
+            continue
+        category = _derive_cab_category(provider, v)
+        if cab_category and cab_category.lower() != category:
+            continue
+        results.append(CabServiceResult(
+            id=v.id,
+            provider_id=provider.id,
+            provider_name=provider.company_name or "Unknown",
+            cab_category=category,
+            vehicle_type=v.vehicle_type,
+            vehicle_name=v.vehicle_name,
+            driver_included=v.driver_included,
+            origin=v.origin,
+            destination=v.destination,
+            departure_time=v.departure_time,
+            price_per_km_inr=v.price_per_km_inr,
+            fixed_fare_inr=v.fixed_fare_inr,
+            total_seats=v.total_seats,
+            seats_available=v.seats_available,
+            is_active=v.is_active,
+        ))
+    return results
+
 
 @router.post("/search", response_model=list[VehicleSearchResult])
 def search_vehicles(data: VehicleSearchRequest, db: Session = Depends(get_db)):
