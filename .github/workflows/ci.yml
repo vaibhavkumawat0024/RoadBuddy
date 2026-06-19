@@ -50,8 +50,9 @@ jobs:
       - name: Run tests
         env:
           PYTHONPATH: .
-          DATABASE_URL: postgresql://testuser:testpass@localhost:5432/testdb?sslmode=disable
+          DATABASE_URL: postgresql://testuser:testpass@localhost:5432/testdb
           SECRET_KEY: "github_actions_dummy_secret_key_for_testing"
+          PGSSLMODE: disable
         run: |
           mkdir -p static
           pytest tests/ -v
