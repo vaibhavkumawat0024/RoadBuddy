@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}My Bookings — RoadBuddy{% endblock %}
+{% block content %}
+
+<div class="dashboard-header">
+  <h1>📅 My Bookings</h1>
+  <a href="/plan-trip" class="btn-primary">+ Book a Cab / Seat</a>
+</div>
+
+{% if bookings %}
+<p style="font-size:13px;color:#888;margin-bottom:20px;">{{ bookings|length }} booking{{ 's' if bookings|length != 1 }} total</p>
+
+<div class="trips-grid">
+  {% for b in bookings %}
+  <div class="trip-detail-card" style="position: relative; border-left: 4px solid {% if b.status == 'cancelled' %}#ff6b6b{% else %}#1D9E75{% endif %}; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.02); transition: transform 0.2s;">
+    <div class="trip-detail-header">
+      <div>
+        <div class="trip-detail-route" style="color: #1a1a1a;">
+          {{ b.vehicle.vehicle_name }} 
+          {% if b.vehicle.destination == 'Private' %}
+          <span style="font-size: 11px; padding: 2px 6px; background: #e0f2fe; color: #0369a1; border-radius: 4px; font-weight: 600; margin-left: 6px; vertical-align: middle;">Private Cab</span>
+          {% else %}
+          <span style="font-size: 11px; padding: 2px 6px; background: #e0f5ee; color: #0F6E56; border-radius: 4px; font-weight: 600; margin-left: 6px; vertical-align: middle;">Seat Booking</span>
+          {% endif %}
+        </div>
+        <div class="trip-detail-meta" style="color: #666; margin-top: 6px; font-size: 12.5px;">
+          📍 Route: <strong>{{ b.vehicle.origin }} → {{ b.vehicle.destination }}</strong> &nbsp;·&nbsp;
+          📅 Date: <strong>{{ b.travel_date }}</strong> &nbsp;·&nbsp;
+          💺 Seats: <strong>{{ b.num_seats }}</strong> {% if b.selected_seats %}(Seats: {{ b.selected_seats }}){% endif %}
+        </div>
+      </div>
+      
+      <!-- Booking Status & Cancellation -->
+      <div style="text-align: right; min-width: 120px;">
+        <div style="font-size: 13.5px; font-weight: 700; color: {% if b.status == 'cancelled' %}#ff6b6b{% else %}#1D9E75{% endif %}; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px;">
+          {{ b.status | capitalize }}
+        </div>
+        {% if b.status != 'cancelled' %}
+        <form method="POST" action="/cancel-booking/{{ b.id }}" onsubmit="return confirm('Are you sure you want to cancel this booking?')">
+          <button type="submit" style="background: rgba(255, 107, 53, 0.08); border: 1px solid rgba(255, 107, 53, 0.15); color: #ff6b6b; padding: 5px 12px; border-radius: 6px; font-size: 11.5px; font-weight: 600; cursor: pointer; transition: all 0.2s;">Cancel Booking</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+    
+    <!-- Booking Details Box -->
+    <div style="background: #fdfdfd; border: 1px solid #eef2f5; border-radius: 8px; padding: 14px 18px; margin-top: 14px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.01);">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; font-size: 13px; color: #444;">
+        <div>👤 <strong>Passenger:</strong> {{ b.passenger_name }}</div>
+        <div>📞 <strong>Phone:</strong> {{ b.passenger_phone or 'N/A' }}</div>
+        <div>✉️ <strong>Email:</strong> {{ b.passenger_email or 'N/A' }}</div>
+        <div style="font-size: 14px; color: #1a1a1a;">💰 <strong>Fare Paid:</strong> <strong style="color: #0F6E56;">₹{{ b.total_fare_inr | int }}</strong></div>
+      </div>
+      
+      {% if b.pickup_location or b.dropoff_location %}
+      <div style="border-top: 1px solid #eef2f5; margin-top: 10px; padding-top: 10px; font-size: 12.5px; display: flex; flex-direction: column; gap: 6px;">
+        {% if b.pickup_location %}
+        <div style="color: #555;">📥 <strong>Pickup Point:</strong> {{ b.pickup_location.split('|||')[0] }}</div>
+        {% endif %}
+        {% if b.dropoff_location %}
+        <div style="color: #555;">📤 <strong>Drop-off Point:</strong> {{ b.dropoff_location.split('|||')[0] }}</div>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+
+    {% if (b.navigation_status == 'enroute' or b.navigation_status == 'trip_started') and b.status != 'cancelled' %}
+    <div style="background: linear-gradient(135deg, #f0fdf4, #dcfce7); border: 1px solid #bbf7d0; border-radius: 10px; padding: 14px 18px; margin-top: 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px; box-shadow: 0 4px 12px rgba(16,185,129,0.08);">
+      <div style="font-size: 13.5px; color: #166534; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+        <span>🚖</span>
+        {% if b.navigation_status == 'trip_started' %}
+        Your vehicle <strong>{{ b.vehicle.vehicle_name }}</strong> is ready to go, get to your pickup point on time!
+        {% else %}
+        Your driver is on the way to pick you up and ready for a wonderful trip!
+        {% endif %}
+      </div>
+      <button class="btn-primary" style="padding: 8px 16px; font-size: 12px; border-radius: 8px; background: #10b981; border: none; font-weight: 700; color: #fff; cursor: pointer; flex-shrink: 0; box-shadow: 0 4px 12px rgba(16,185,129,0.2);"
+              onclick="openTrackingModal('{{ b.id }}')">
+        Track Cab
+      </button>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="empty-state" style="padding: 60px 20px; text-align: center; background: #fff; border-radius: 12px; border: 1px solid #e5e5e5;">
+  <div class="empty-icon" style="font-size: 48px; margin-bottom: 16px;">📅</div>
+  <h2 style="font-size: 20px; font-weight: 600; color: #333; margin-bottom: 8px;">No bookings found!</h2>
+  <p style="color: #666; font-size: 14px; margin-bottom: 20px;">You haven't booked any cabs or bus seats yet.</p>
+  <a href="/plan-trip" class="btn-primary" style="display: inline-block; text-decoration: none;">+ Book a Cab</a>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -4,7 +4,15 @@
 
 <div class="dashboard-header">
   <h1>Hello, {{ user.name }} 👋</h1>
-  <a href="/plan-trip" class="btn-primary">+ Plan a Trip</a>
+  <div style="display: flex; gap: 12px; align-items: center;">
+    <a href="/my-bookings" class="btn-secondary" style="padding: 10px 18px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; position: relative;">
+      📅 My Bookings
+      {% if has_unread_bookings %}
+      <span style="position: absolute; top: -2px; right: -2px; width: 10px; height: 10px; background: #ff4d4f; border-radius: 50%; border: 2px solid #fff;"></span>
+      {% endif %}
+    </a>
+    <a href="/plan-trip" class="btn-primary">+ Plan a Trip</a>
+  </div>
 </div>
 
 <!-- Stats Row -->

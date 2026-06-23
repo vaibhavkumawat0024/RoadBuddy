@@ -20,6 +20,7 @@
       {% if provider.company_name %}
       <a href="/provider/vehicles">My Vehicles</a>
       <a href="/provider/bookings">Bookings</a>
+      <a href="/provider/settings">Settings</a>
       {% endif %}
       <a href="/provider/logout">Logout</a>
       {% else %}
@@ -31,5 +32,232 @@
   <main>
     {% block content %}{% endblock %}
   </main>
+
+  {% if provider %}
+  <!-- Real-Time Booking Notifications -->
+  <div id="provider-toast-container" style="
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 380px;
+    width: calc(100% - 48px);
+    pointer-events: none;
+  "></div>
+
+  <style>
+    .provider-toast {
+      background: #ffffff;
+      border-left: 5px solid #1d9e75;
+      border-radius: 12px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: auto;
+      animation: toast-slide-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      transition: all 0.3s ease;
+      border: 1px solid #e2e8f0;
+    }
+    @keyframes toast-slide-in {
+      from { transform: translateX(50px); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    .provider-toast.fade-out {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    .provider-toast-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #f1f5f9;
+      padding-bottom: 6px;
+    }
+    .provider-toast-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .provider-toast-close {
+      background: none;
+      border: none;
+      font-size: 18px;
+      color: #94a3b8;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0;
+    }
+    .provider-toast-close:hover {
+      color: #0f172a;
+    }
+    .provider-toast-body {
+      font-size: 12px;
+      color: #475569;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .provider-toast-row {
+      display: flex;
+      justify-content: space-between;
+    }
+    .provider-toast-label {
+      font-weight: 500;
+      color: #64748b;
+    }
+    .provider-toast-value {
+      font-weight: 600;
+      color: #0f172a;
+    }
+  </style>
+
+  <script>
+    (function() {
+      let knownBookingIds = null;
+      const vehicleMap = {};
+
+      // Fetch vehicle list to map vehicle ID to vehicle name
+      async function loadVehicles() {
+        try {
+          const res = await fetch('/api/provider/vehicles');
+          if (res.ok) {
+            const vehicles = await res.json();
+            vehicles.forEach(v => {
+              vehicleMap[v.id] = `${v.vehicle_name} (${v.vehicle_type})`;
+            });
+          }
+        } catch (err) {
+          console.warn("Could not load vehicles for toast notification mapping:", err);
+        }
+      }
+
+      // Show toast notification
+      function showBookingToast(booking) {
+        const container = document.getElementById('provider-toast-container');
+        if (!container) return;
+
+        const toast = document.createElement('div');
+        toast.className = 'provider-toast';
+
+        const vehicleName = vehicleMap[booking.vehicle_id] || `Vehicle #${booking.vehicle_id}`;
+        const seatsText = booking.selected_seats || `${booking.num_seats} seat(s)`;
+
+        toast.innerHTML = `
+          <div class="provider-toast-header">
+            <div class="provider-toast-title">
+              <span>🎉</span> New Booking Confirmed!
+            </div>
+            <button class="provider-toast-close">&times;</button>
+          </div>
+          <div class="provider-toast-body">
+            <div class="provider-toast-row">
+              <span class="provider-toast-label">Passenger:</span>
+              <span class="provider-toast-value">${booking.passenger_name}</span>
+            </div>
+            <div class="provider-toast-row">
+              <span class="provider-toast-label">Phone:</span>
+              <span class="provider-toast-value">${booking.passenger_phone || 'N/A'}</span>
+            </div>
+            <div class="provider-toast-row">
+              <span class="provider-toast-label">Email:</span>
+              <span class="provider-toast-value" style="word-break: break-all;">${booking.passenger_email || 'N/A'}</span>
+            </div>
+            <div class="provider-toast-row">
+              <span class="provider-toast-label">Vehicle:</span>
+              <span class="provider-toast-value">${vehicleName}</span>
+            </div>
+            <div class="provider-toast-row">
+              <span class="provider-toast-label">Seats:</span>
+              <span class="provider-toast-value" style="color: #1d9e75;">${seatsText}</span>
+            </div>
+            <div class="provider-toast-row" style="margin-top: 4px; border-top: 1px dashed #f1f5f9; padding-top: 4px;">
+              <span class="provider-toast-label" style="font-weight: 700;">Fare:</span>
+              <span class="provider-toast-value" style="font-weight: 700; color: #0f172a;">₹${booking.total_fare_inr}</span>
+            </div>
+          </div>
+        `;
+
+        // Close button handler
+        toast.querySelector('.provider-toast-close').addEventListener('click', () => {
+          toast.classList.add('fade-out');
+          setTimeout(() => toast.remove(), 300);
+        });
+
+        container.appendChild(toast);
+
+        // Play notification sound if supported
+        try {
+          const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+          osc.frequency.setValueAtTime(880.00, audioCtx.currentTime + 0.1); // A5
+          gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.4);
+        } catch (e) {
+          // AudioContext blocked/unsupported
+        }
+
+        // Auto dismiss after 10 seconds
+        setTimeout(() => {
+          if (toast.parentNode) {
+            toast.classList.add('fade-out');
+            setTimeout(() => toast.remove(), 300);
+          }
+        }, 10000);
+      }
+
+      // Poll bookings endpoint
+      async function pollBookings() {
+        try {
+          const res = await fetch('/api/provider/bookings');
+          if (res.ok) {
+            const bookings = await res.json();
+            const currentIds = bookings.map(b => b.id);
+
+            if (knownBookingIds === null) {
+              // Baseline setup: on initial load, do not show toasts, just save existing IDs
+              knownBookingIds = new Set(currentIds);
+            } else {
+              // Find bookings that are new compared to the baseline
+              bookings.forEach(booking => {
+                if (!knownBookingIds.has(booking.id)) {
+                  knownBookingIds.add(booking.id);
+                  showBookingToast(booking);
+                }
+              });
+            }
+          }
+        } catch (err) {
+          console.warn("Real-time booking polling failed:", err);
+        }
+      }
+
+      // Initialize
+      async function initRealTimeNotifications() {
+        await loadVehicles();
+        // Poll initially to establish baseline
+        await pollBookings();
+        // Then poll every 4 seconds
+        setInterval(pollBookings, 4000);
+      }
+
+      window.addEventListener('DOMContentLoaded', initRealTimeNotifications);
+    })();
+  </script>
+  {% endif %}
 </body>
 </html>

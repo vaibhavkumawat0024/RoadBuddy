@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 
 from app.core.database import get_db
-from app.models.models import Provider, ProviderVehicle, ProviderBooking
+from app.models.models import Provider, ProviderVehicle, ProviderBooking, ProviderVehicleAsset
 from app.provider.auth import (
     hash_password, verify_password,
     create_provider_token, get_provider_from_cookie,
@@ -173,26 +173,26 @@ def vehicles_page(request: Request, db: Session = Depends(get_db)):
         ProviderVehicle.provider_id == provider.id
     ).all()
 
+    # Query vehicle assets too
+    vehicle_assets = db.query(ProviderVehicleAsset).filter(
+        ProviderVehicleAsset.provider_id == provider.id
+    ).all()
+
     success = request.query_params.get("success")
     return templates.TemplateResponse(request, "provider_vehicles.html", {
         "provider": provider,
         "vehicles": vehicles,
+        "vehicle_assets": vehicle_assets,
         "success": success,
     })
 
 
-@router.post("/vehicles", response_class=HTMLResponse)
-def add_vehicle_submit(
+@router.post("/vehicle-assets", response_class=HTMLResponse)
+def add_vehicle_asset_submit(
     request: Request,
     vehicle_type: str = Form(...),
     vehicle_name: str = Form(...),
-    origin: Optional[str] = Form(None),
-    destination: Optional[str] = Form(None),
-    departure_time: Optional[str] = Form(None),
-    arrival_time: Optional[str] = Form(None),
     total_seats: int = Form(...),
-    fixed_fare_inr: Optional[float] = Form(None),
-    price_per_km_inr: Optional[float] = Form(None),
     driver_included: str = Form("true"),
     db: Session = Depends(get_db),
 ):
@@ -202,23 +202,106 @@ def add_vehicle_submit(
     if not provider.company_name:
         return RedirectResponse("/provider/dashboard?setup_required=1", status_code=303)
 
-    vehicle = ProviderVehicle(
+    asset = ProviderVehicleAsset(
         provider_id=provider.id,
         vehicle_type=vehicle_type,
         vehicle_name=vehicle_name,
         driver_included=(driver_included == "true"),
+        total_seats=total_seats,
+    )
+    db.add(asset)
+    db.commit()
+
+    return RedirectResponse("/provider/vehicles?success=Vehicle added to fleet successfully!", status_code=303)
+
+
+@router.post("/vehicle-assets/{asset_id}/delete")
+def delete_vehicle_asset_submit(
+    asset_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    provider = get_provider_from_cookie(request, db)
+    if not provider:
+        return RedirectResponse("/provider/login", status_code=303)
+    if not provider.company_name:
+        return RedirectResponse("/provider/dashboard?setup_required=1", status_code=303)
+
+    asset = db.query(ProviderVehicleAsset).filter(
+        ProviderVehicleAsset.id == asset_id,
+        ProviderVehicleAsset.provider_id == provider.id,
+    ).first()
+    if asset:
+        # Nullify reference on any active listings/vehicles
+        db.query(ProviderVehicle).filter(
+            ProviderVehicle.vehicle_asset_id == asset_id
+        ).update({ProviderVehicle.vehicle_asset_id: None})
+        db.delete(asset)
+        db.commit()
+
+    return RedirectResponse("/provider/vehicles?success=Vehicle deleted from fleet.", status_code=303)
+
+
+@router.post("/vehicles", response_class=HTMLResponse)
+def add_vehicle_submit(
+    request: Request,
+    vehicle_type: Optional[str] = Form(None),
+    vehicle_name: Optional[str] = Form(None),
+    origin: Optional[str] = Form(None),
+    destination: Optional[str] = Form(None),
+    departure_time: Optional[str] = Form(None),
+    arrival_time: Optional[str] = Form(None),
+    total_seats: Optional[int] = Form(None),
+    fixed_fare_inr: Optional[float] = Form(None),
+    price_per_km_inr: Optional[float] = Form(None),
+    driver_included: str = Form("true"),
+    pickup_points: Optional[str] = Form(None),
+    dropoff_points: Optional[str] = Form(None),
+    vehicle_asset_id: Optional[int] = Form(None),
+    db: Session = Depends(get_db),
+):
+    provider = get_provider_from_cookie(request, db)
+    if not provider:
+        return RedirectResponse("/provider/login", status_code=303)
+    if not provider.company_name:
+        return RedirectResponse("/provider/dashboard?setup_required=1", status_code=303)
+
+    v_type = vehicle_type
+    v_name = vehicle_name
+    v_driver = (driver_included == "true")
+    v_seats = total_seats
+
+    if vehicle_asset_id:
+        asset = db.query(ProviderVehicleAsset).filter(
+            ProviderVehicleAsset.id == vehicle_asset_id,
+            ProviderVehicleAsset.provider_id == provider.id
+        ).first()
+        if asset:
+            v_type = asset.vehicle_type
+            v_name = asset.vehicle_name
+            v_driver = asset.driver_included
+            v_seats = asset.total_seats
+
+    vehicle = ProviderVehicle(
+        provider_id=provider.id,
+        vehicle_asset_id=vehicle_asset_id,
+        vehicle_type=v_type or "sedan",
+        vehicle_name=v_name or "Vehicle",
+        driver_included=v_driver,
         origin=origin or "Unknown",
         destination=destination or "Private",
         departure_time=departure_time,
         arrival_time=arrival_time,
         fixed_fare_inr=fixed_fare_inr,
         price_per_km_inr=price_per_km_inr,
-        total_seats=total_seats,
+        total_seats=v_seats or 4,
+        pickup_points=pickup_points,
+        dropoff_points=dropoff_points,
     )
     db.add(vehicle)
     db.commit()
 
-    return RedirectResponse("/provider/vehicles?success=Vehicle added successfully!", status_code=303)
+    return RedirectResponse("/provider/vehicles?success=Vehicle listing added successfully!", status_code=303)
 
 
 @router.post("/vehicles/{vehicle_id}/delete")
@@ -250,9 +333,10 @@ def bookings_page(request: Request, db: Session = Depends(get_db)):
     if not provider.company_name:
         return RedirectResponse("/provider/dashboard?setup_required=1", status_code=303)
 
-    vehicle_ids = [v.id for v in db.query(ProviderVehicle).filter(
+    vehicles = db.query(ProviderVehicle).filter(
         ProviderVehicle.provider_id == provider.id
-    ).all()]
+    ).all()
+    vehicle_ids = [v.id for v in vehicles]
 
     bookings = db.query(ProviderBooking).filter(
         ProviderBooking.vehicle_id.in_(vehicle_ids)
@@ -261,4 +345,52 @@ def bookings_page(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse(request, "provider_bookings.html", {
         "provider": provider,
         "bookings": bookings,
+        "vehicles": vehicles,
     })
+
+
+# ── Settings ───────────────────────────────────────────────────────────────
+
+@router.get("/settings", response_class=HTMLResponse)
+def settings_page(request: Request, db: Session = Depends(get_db)):
+    provider = get_provider_from_cookie(request, db)
+    if not provider:
+        return RedirectResponse("/provider/login", status_code=303)
+    if not provider.company_name:
+        return RedirectResponse("/provider/dashboard?setup_required=1", status_code=303)
+
+    success = request.query_params.get("success")
+    return templates.TemplateResponse(request, "provider_settings.html", {
+        "provider": provider,
+        "success": success,
+    })
+
+
+@router.post("/settings", response_class=HTMLResponse)
+def settings_submit(
+    request: Request,
+    company_name: str = Form(...),
+    contact_person: str = Form(...),
+    phone: str = Form(...),
+    alternate_email: Optional[str] = Form(None),
+    city: Optional[str] = Form(None),
+    service_type: str = Form(...),
+    booking_mode: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+):
+    provider = get_provider_from_cookie(request, db)
+    if not provider:
+        return RedirectResponse("/provider/login", status_code=303)
+    if not provider.company_name:
+        return RedirectResponse("/provider/dashboard?setup_required=1", status_code=303)
+
+    provider.company_name = company_name
+    provider.contact_person = contact_person
+    provider.phone = phone
+    provider.alternate_email = alternate_email
+    provider.city = city or ""
+    provider.service_type = service_type
+    provider.booking_mode = booking_mode
+    db.commit()
+
+    return RedirectResponse("/provider/settings?success=Settings updated successfully!", status_code=303)

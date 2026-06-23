@@ -25,6 +25,16 @@ def get_user_from_cookie(request: Request, db: Session):
         return None
 
 
+def check_unread_bookings(user, db: Session) -> bool:
+    if not user:
+        return False
+    from app.models.models import ProviderBooking
+    return db.query(ProviderBooking).filter(
+        ProviderBooking.user_id == user.id,
+        ProviderBooking.message_unread == True
+    ).count() > 0
+
+
 # ---------------- DASHBOARD ----------------
 
 @router.get("/dashboard", response_class=HTMLResponse)
@@ -40,11 +50,13 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
     trip_count = db.query(Trip).filter(Trip.user_id == user.id).count()
     vehicles = db.query(Vehicle).filter(Vehicle.user_id == user.id).all()
 
+    has_unread_bookings = check_unread_bookings(user, db)
     return templates.TemplateResponse(request, "dashboard.html", {
         "user": user,
         "trips": trips,
         "trip_count": trip_count,
-        "vehicle_count": len(vehicles)
+        "vehicle_count": len(vehicles),
+        "has_unread_bookings": has_unread_bookings
     })
 
 
@@ -59,10 +71,12 @@ def plan_trip_page(request: Request, db: Session = Depends(get_db)):
     vehicles = db.query(Vehicle).filter(Vehicle.user_id == user.id).all()
     token = request.cookies.get("access_token")
 
+    has_unread_bookings = check_unread_bookings(user, db)
     return templates.TemplateResponse(request, "plan_trip.html", {
         "user": user,
         "vehicles": vehicles,
-        "token": token
+        "token": token,
+        "has_unread_bookings": has_unread_bookings
     })
 
 
@@ -77,10 +91,12 @@ def add_vehicle_page(request: Request, db: Session = Depends(get_db)):
     vehicles = db.query(Vehicle).filter(Vehicle.user_id == user.id).all()
     success = request.query_params.get("success")
 
+    has_unread_bookings = check_unread_bookings(user, db)
     return templates.TemplateResponse(request, "add_vehicle.html", {
         "user": user,
         "vehicles": vehicles,
         "success": success,
+        "has_unread_bookings": has_unread_bookings
     })
 
 
@@ -147,9 +163,11 @@ def my_trips_page(request: Request, db: Session = Depends(get_db)):
             TripStop.trip_id == trip.id
         ).order_by(TripStop.day, TripStop.time_slot).all()
 
+    has_unread_bookings = check_unread_bookings(user, db)
     return templates.TemplateResponse(request, "my_trips.html", {
         "user": user,
-        "trips": trips
+        "trips": trips,
+        "has_unread_bookings": has_unread_bookings
     })
 
 
@@ -190,11 +208,13 @@ async def community_page(request: Request, db: Session = Depends(get_db)):
         routes = []
 
     token = request.cookies.get("access_token")
+    has_unread_bookings = check_unread_bookings(user, db)
 
     return templates.TemplateResponse(request, "community.html", {
         "user": user,
         "routes": routes,
         "token": token,
+        "has_unread_bookings": has_unread_bookings
     })
 # ---------------- PROFILE ----------------
 
@@ -212,10 +232,12 @@ async def profile_page(request: Request, db: Session = Depends(get_db)):
 
     vehicles = db.query(Vehicle).filter(Vehicle.user_id == user.id).all()
 
+    has_unread_bookings = check_unread_bookings(user, db)
     return templates.TemplateResponse(request, "profile.html", {
         "user": user,
         "trip_count": len(trips),
         "vehicle_count": len(vehicles),
+        "has_unread_bookings": has_unread_bookings
     })
 
 
@@ -245,3 +267,63 @@ async def update_profile(
     db.commit()
 
     return RedirectResponse("/profile?success=Profile updated!", status_code=303)
+
+
+# ---------------- MY BOOKINGS ----------------
+
+@router.get("/my-bookings", response_class=HTMLResponse)
+def my_bookings_page(request: Request, db: Session = Depends(get_db)):
+    user = get_user_from_cookie(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=303)
+
+    from app.models.models import ProviderBooking
+
+    # Mark unread bookings for this user as read
+    unread = db.query(ProviderBooking).filter(
+        ProviderBooking.user_id == user.id,
+        ProviderBooking.message_unread == True
+    ).all()
+    for b in unread:
+        b.message_unread = False
+    if unread:
+        db.commit()
+
+    bookings = db.query(ProviderBooking).filter(
+        ProviderBooking.user_id == user.id
+    ).order_by(ProviderBooking.created_at.desc()).all()
+
+    return templates.TemplateResponse(request, "my_bookings.html", {
+        "user": user,
+        "bookings": bookings,
+        "has_unread_bookings": False
+    })
+
+
+@router.post("/cancel-booking/{booking_id}")
+def cancel_booking(booking_id: int, request: Request, db: Session = Depends(get_db)):
+    user = get_user_from_cookie(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=303)
+
+    from app.models.models import ProviderBooking
+
+    booking = db.query(ProviderBooking).filter(
+        ProviderBooking.id == booking_id,
+        ProviderBooking.user_id == user.id
+    ).first()
+
+    if booking and booking.status != "cancelled":
+        booking.status = "cancelled"
+        
+        # Decrement the vehicle's booked seats count
+        vehicle = booking.vehicle
+        if vehicle:
+            if vehicle.destination == "Private":
+                vehicle.seats_booked = 0
+            else:
+                vehicle.seats_booked = max(vehicle.seats_booked - booking.num_seats, 0)
+        
+        db.commit()
+
+    return RedirectResponse("/my-bookings", status_code=303)

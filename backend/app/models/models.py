@@ -373,14 +373,30 @@ class Provider(Base):
     alternate_email = Column(String, nullable=True)
     booking_mode    = Column(String, nullable=True)
 
-    vehicles = relationship("ProviderVehicle", back_populates="provider")
- 
- 
+    vehicles       = relationship("ProviderVehicle", back_populates="provider")
+    vehicle_assets = relationship("ProviderVehicleAsset", back_populates="provider")
+
+
+class ProviderVehicleAsset(Base):
+    __tablename__ = "provider_vehicle_assets"
+
+    id              = Column(Integer, primary_key=True, index=True)
+    provider_id     = Column(Integer, ForeignKey("providers.id"), nullable=False)
+    vehicle_type    = Column(String, nullable=False)   # sedan, suv, hatchback, mini_bus, traveller_bus, luxury_bus
+    vehicle_name    = Column(String, nullable=False)   # e.g. "Volvo Multi-Axle", "Tempo Traveller"
+    driver_included = Column(Boolean, default=True)
+    total_seats     = Column(Integer, default=40)
+    created_at      = Column(DateTime, server_default=func.now())
+
+    provider = relationship("Provider", back_populates="vehicle_assets")
+
+
 class ProviderVehicle(Base):
     __tablename__ = "provider_vehicles"
  
     id              = Column(Integer, primary_key=True, index=True)
     provider_id     = Column(Integer, ForeignKey("providers.id"), nullable=False)
+    vehicle_asset_id = Column(Integer, ForeignKey("provider_vehicle_assets.id"), nullable=True)
     vehicle_type    = Column(String, nullable=False)   # sedan, suv, hatchback, mini_bus, traveller_bus
     vehicle_name    = Column(String, nullable=False)   # e.g. "Swift Dzire", "Tempo Traveller 12-seater"
     driver_included = Column(Boolean, default=True)
@@ -393,10 +409,13 @@ class ProviderVehicle(Base):
     total_seats     = Column(Integer, default=4)
     seats_booked    = Column(Integer, default=0)
     is_active       = Column(Boolean, default=True)
+    pickup_points   = Column(String, nullable=True)
+    dropoff_points  = Column(String, nullable=True)
     created_at      = Column(DateTime, server_default=func.now())
  
     provider = relationship("Provider", back_populates="vehicles")
     bookings = relationship("ProviderBooking", back_populates="vehicle")
+    vehicle_asset = relationship("ProviderVehicleAsset")
  
     @property
     def seats_available(self):
@@ -410,12 +429,24 @@ class ProviderBooking(Base):
     vehicle_id      = Column(Integer, ForeignKey("provider_vehicles.id"), nullable=False)
     user_id         = Column(Integer, ForeignKey("users.id"), nullable=False)
     passenger_name  = Column(String, nullable=False)
+    passenger_phone = Column(String, nullable=True)
+    passenger_email = Column(String, nullable=True)
     travel_date     = Column(String, nullable=False)
     num_seats       = Column(Integer, default=1)
     pickup_location = Column(String, nullable=True)
+    dropoff_location = Column(String, nullable=True)
+    selected_seats  = Column(String, nullable=True)
     total_fare_inr  = Column(Float, nullable=False)
     status          = Column(String, default="confirmed")
+    navigation_status = Column(String, nullable=True)
+    driver_lat      = Column(Float, nullable=True)
+    driver_lon      = Column(Float, nullable=True)
+    message_unread  = Column(Boolean, default=False)
     created_at      = Column(DateTime, server_default=func.now())
  
     vehicle = relationship("ProviderVehicle", back_populates="bookings")
     user    = relationship("User")
+
+    @property
+    def vehicle_name(self):
+        return self.vehicle.vehicle_name if self.vehicle else "Vehicle"

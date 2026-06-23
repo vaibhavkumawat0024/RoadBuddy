@@ -20,13 +20,64 @@ app = FastAPI(
 # Run schema updates on startup
 @app.on_event("startup")
 async def run_migrations():
+    statements = [
+        "ALTER TABLE providers ADD COLUMN IF NOT EXISTS alternate_email VARCHAR;",
+        "ALTER TABLE providers ADD COLUMN IF NOT EXISTS booking_mode VARCHAR;",
+        "ALTER TABLE provider_vehicles ADD COLUMN IF NOT EXISTS arrival_time VARCHAR;",
+        "ALTER TABLE provider_vehicles ADD COLUMN IF NOT EXISTS pickup_points VARCHAR;",
+        "ALTER TABLE provider_vehicles ADD COLUMN IF NOT EXISTS dropoff_points VARCHAR;",
+        "ALTER TABLE provider_bookings ADD COLUMN IF NOT EXISTS dropoff_location VARCHAR;",
+        "ALTER TABLE provider_bookings ADD COLUMN IF NOT EXISTS selected_seats VARCHAR;",
+        "ALTER TABLE provider_bookings ADD COLUMN IF NOT EXISTS passenger_phone VARCHAR;",
+        "ALTER TABLE provider_bookings ADD COLUMN IF NOT EXISTS passenger_email VARCHAR;",
+        "ALTER TABLE provider_bookings ADD COLUMN IF NOT EXISTS navigation_status VARCHAR;",
+        "ALTER TABLE provider_bookings ADD COLUMN IF NOT EXISTS driver_lat FLOAT;",
+        "ALTER TABLE provider_bookings ADD COLUMN IF NOT EXISTS driver_lon FLOAT;",
+        "ALTER TABLE provider_bookings ADD COLUMN IF NOT EXISTS message_unread BOOLEAN DEFAULT FALSE;"
+    ]
     with engine.begin() as connection:
+        dialect = connection.dialect.name
+        if dialect == "sqlite":
+            create_assets_table = """
+            CREATE TABLE IF NOT EXISTS provider_vehicle_assets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                provider_id INTEGER NOT NULL,
+                vehicle_type VARCHAR NOT NULL,
+                vehicle_name VARCHAR NOT NULL,
+                driver_included BOOLEAN DEFAULT 1,
+                total_seats INTEGER NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(provider_id) REFERENCES providers(id)
+            );
+            """
+        else:
+            create_assets_table = """
+            CREATE TABLE IF NOT EXISTS provider_vehicle_assets (
+                id SERIAL PRIMARY KEY,
+                provider_id INTEGER NOT NULL REFERENCES providers(id) ON DELETE CASCADE,
+                vehicle_type VARCHAR NOT NULL,
+                vehicle_name VARCHAR NOT NULL,
+                driver_included BOOLEAN DEFAULT TRUE,
+                total_seats INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """
         try:
-            connection.execute(text("ALTER TABLE providers ADD COLUMN IF NOT EXISTS alternate_email VARCHAR;"))
-            connection.execute(text("ALTER TABLE providers ADD COLUMN IF NOT EXISTS booking_mode VARCHAR;"))
-            connection.execute(text("ALTER TABLE provider_vehicles ADD COLUMN IF NOT EXISTS arrival_time VARCHAR;"))
+            connection.execute(text(create_assets_table))
         except Exception as e:
-            print("Schema update error:", e)
+            print(f"Failed to create provider_vehicle_assets table: {e}")
+
+        for stmt in statements:
+            try:
+                connection.execute(text(stmt))
+            except Exception as e:
+                print(f"Schema update statement skipped: {stmt}. Reason: {e}")
+
+        try:
+            connection.execute(text("ALTER TABLE provider_vehicles ADD COLUMN IF NOT EXISTS vehicle_asset_id INTEGER;"))
+        except Exception as e:
+            print(f"Failed to add vehicle_asset_id to provider_vehicles: {e}")
+
 
 
 

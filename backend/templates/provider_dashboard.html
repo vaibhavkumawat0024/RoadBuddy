@@ -131,31 +131,17 @@
         <label>Service Type *</label>
         <div class="service-type-options custom-grid">
           <label class="radio-card">
-            <input type="radio" name="service_type" value="car_rental" checked />
-            <div class="radio-card-content">
-              <span class="rc-icon">🚗</span>
-              <span class="rc-label">Car Rental</span>
-            </div>
-          </label>
-          <label class="radio-card">
-            <input type="radio" name="service_type" value="bus_traveller_rental" />
-            <div class="radio-card-content">
-              <span class="rc-icon">🚌</span>
-              <span class="rc-label">Bus/Traveller</span>
-            </div>
-          </label>
-          <label class="radio-card">
-            <input type="radio" name="service_type" value="both_car_big" />
+            <input type="radio" name="service_type" value="cabs_buses" checked />
             <div class="radio-card-content">
               <span class="rc-icon">🚐</span>
-              <span class="rc-label">Both car/big vehicle</span>
+              <span class="rc-label">Cabs, Buses & Travellers</span>
             </div>
           </label>
           <label class="radio-card">
-            <input type="radio" name="service_type" value="self_drive" onchange="toggleBookingModeSection(this)" />
+            <input type="radio" name="service_type" value="self_drive_rentals" />
             <div class="radio-card-content">
-              <span class="rc-icon">🔑</span>
-              <span class="rc-label">Self Drive</span>
+              <span class="rc-icon">🏢</span>
+              <span class="rc-label">Self Drive + Rentals</span>
             </div>
           </label>
         </div>
@@ -163,7 +149,9 @@
 
       <div class="setup-group" id="booking-mode-section">
         <label>Booking / Business Mode (Select One) *</label>
-        <div class="booking-mode-options">
+        
+        <!-- Standard Options (car_rental, bus_traveller_rental, both_car_big) -->
+        <div class="booking-mode-options" id="opts-standard">
           <label class="mode-card">
             <input type="radio" name="booking_mode" value="solo_owner" checked />
             <div class="mode-card-content">
@@ -195,6 +183,51 @@
             </div>
           </label>
         </div>
+
+        <!-- Rentals Options (self_drive_rentals) -->
+        <div class="booking-mode-options" id="opts-rentals" style="display:none;">
+          <label class="mode-card">
+            <input type="radio" name="booking_mode" value="self_drive_only" checked disabled />
+            <div class="mode-card-content">
+              <div class="mode-radio-circle"></div>
+              <div class="mode-details">
+                <span class="mode-title">Only self drive</span>
+                <span class="mode-desc">For self-drive rentals only</span>
+              </div>
+            </div>
+          </label>
+          <label class="mode-card">
+            <input type="radio" name="booking_mode" value="self_drive_private" disabled />
+            <div class="mode-card-content">
+              <div class="mode-radio-circle"></div>
+              <div class="mode-details">
+                <span class="mode-title">Self drive & private vehicles for rent</span>
+                <span class="mode-desc">For standard private rental bookings</span>
+              </div>
+            </div>
+          </label>
+          <label class="mode-card">
+            <input type="radio" name="booking_mode" value="self_drive_public" disabled />
+            <div class="mode-card-content">
+              <div class="mode-radio-circle"></div>
+              <div class="mode-details">
+                <span class="mode-title">Self drive & public vehicle for bookings</span>
+                <span class="mode-desc">Route-based self drive bookings</span>
+              </div>
+            </div>
+          </label>
+          <label class="mode-card">
+            <input type="radio" name="booking_mode" value="self_drive_both" disabled />
+            <div class="mode-card-content">
+              <div class="mode-radio-circle"></div>
+              <div class="mode-details">
+                <span class="mode-title">Self drive, private & public bookings</span>
+                <span class="mode-desc">All-in-one flexible options</span>
+              </div>
+            </div>
+          </label>
+        </div>
+
       </div>
 
       <button type="submit" class="btn-setup">Complete Setup & Activate</button>
@@ -223,34 +256,45 @@
     }
   }
 
-  function toggleBookingModeSection(el) {
-    const section = document.getElementById("booking-mode-section");
-    if (section) {
-      if (el.value === "self_drive" && el.checked) {
-        section.style.display = "none";
-        section.querySelectorAll("input").forEach(i => i.disabled = true);
-      } else {
-        section.style.display = "block";
-        section.querySelectorAll("input").forEach(i => i.disabled = false);
+  function updateBookingModeUI(serviceType) {
+    const optsStandard = document.getElementById("opts-standard");
+    const optsRentals = document.getElementById("opts-rentals");
+    
+    if (serviceType === "self_drive_rentals") {
+      optsStandard.style.display = "none";
+      optsStandard.querySelectorAll("input").forEach(i => { i.disabled = true; i.checked = false; });
+      
+      optsRentals.style.display = "flex";
+      optsRentals.querySelectorAll("input").forEach(i => i.disabled = false);
+      const checked = optsRentals.querySelector("input:checked");
+      if (!checked) {
+        optsRentals.querySelector("input").checked = true;
+      }
+    } else {
+      optsRentals.style.display = "none";
+      optsRentals.querySelectorAll("input").forEach(i => { i.disabled = true; i.checked = false; });
+      
+      optsStandard.style.display = "flex";
+      optsStandard.querySelectorAll("input").forEach(i => i.disabled = false);
+      const checked = optsStandard.querySelector("input:checked");
+      if (!checked) {
+        optsStandard.querySelector("input").checked = true;
       }
     }
   }
 
-  // Set listeners for other service types to show the section back
+  // Set listeners for service type changes
   document.querySelectorAll('input[name="service_type"]').forEach(r => {
     r.addEventListener('change', function() {
-      const section = document.getElementById("booking-mode-section");
-      if (section) {
-        if (this.value === "self_drive") {
-          section.style.display = "none";
-          section.querySelectorAll("input").forEach(i => i.disabled = true);
-        } else {
-          section.style.display = "block";
-          section.querySelectorAll("input").forEach(i => i.disabled = false);
-        }
-      }
+      updateBookingModeUI(this.value);
     });
   });
+
+  // Init UI state
+  const checkedService = document.querySelector('input[name="service_type"]:checked');
+  if (checkedService) {
+    updateBookingModeUI(checkedService.value);
+  }
 </script>
 
 {% endblock %}

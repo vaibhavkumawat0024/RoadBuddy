@@ -57,11 +57,32 @@ class ProviderOut(BaseModel):
         from_attributes = True
 
 
+# ── Vehicle Asset Management ──────────────────────────────────────────────
+
+class VehicleAssetCreate(BaseModel):
+    vehicle_type: VehicleType
+    vehicle_name: str
+    driver_included: bool = True
+    total_seats: int = 40
+
+
+class VehicleAssetOut(BaseModel):
+    id: int
+    provider_id: int
+    vehicle_type: str
+    vehicle_name: str
+    driver_included: bool
+    total_seats: int
+
+    class Config:
+        from_attributes = True
+
+
 # ── Vehicle Management ────────────────────────────────────────────────────
 
 class VehicleCreate(BaseModel):
-    vehicle_type: VehicleType
-    vehicle_name: str
+    vehicle_type: Optional[VehicleType] = None
+    vehicle_name: Optional[str] = None
     driver_included: bool = True
     origin: str
     destination: str
@@ -69,6 +90,9 @@ class VehicleCreate(BaseModel):
     price_per_km_inr: Optional[float] = None
     fixed_fare_inr: Optional[float] = None
     total_seats: int = 4
+    pickup_points: Optional[str] = None
+    dropoff_points: Optional[str] = None
+    vehicle_asset_id: Optional[int] = None
 
 
 class VehicleUpdate(BaseModel):
@@ -97,6 +121,9 @@ class VehicleOut(BaseModel):
     seats_booked: int
     seats_available: int
     is_active: bool
+    pickup_points: Optional[str] = None
+    dropoff_points: Optional[str] = None
+    vehicle_asset_id: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -142,6 +169,8 @@ class CabServiceResult(BaseModel):
     total_seats: int
     seats_available: int
     is_active: bool
+    pickup_points: Optional[str] = None
+    dropoff_points: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -155,16 +184,32 @@ class ProviderBookingCreate(BaseModel):
     travel_date: str
     num_seats: int = 1
     pickup_location: Optional[str] = None
+    dropoff_location: Optional[str] = None
+    selected_seats: Optional[str] = None
+    user_id: Optional[int] = None
+    passenger_phone: Optional[str] = None
+    passenger_email: Optional[str] = None
 
 
 class ProviderBookingOut(BaseModel):
     id: int
     vehicle_id: int
     passenger_name: str
+    passenger_phone: Optional[str] = None
+    passenger_email: Optional[str] = None
     travel_date: str
     num_seats: int
+    pickup_location: Optional[str] = None
+    dropoff_location: Optional[str] = None
+    selected_seats: Optional[str] = None
     total_fare_inr: float
     status: str
+    navigation_status: Optional[str] = None
+    driver_lat: Optional[float] = None
+    driver_lon: Optional[float] = None
+    message_unread: Optional[bool] = None
+    vehicle_name: Optional[str] = None
 
     class Config:
         from_attributes = True
+

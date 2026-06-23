@@ -50,10 +50,15 @@ def decode_provider_token(token: str) -> int:
         raise HTTPException(status_code=401, detail="Invalid or expired provider token")
 
 
+from fastapi import Depends, HTTPException, status, Request
+
 def get_current_provider(
+    request: Request,
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> Provider:
+    if not token:
+        token = request.cookies.get("provider_access_token")
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
     provider_id = decode_provider_token(token)

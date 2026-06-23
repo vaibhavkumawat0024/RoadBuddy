@@ -1,0 +1,192 @@
+{% extends "provider_base.html" %}
+{% block title %}Settings — RoadBuddy Partner{% endblock %}
+{% block content %}
+
+<div class="auth-card" style="max-width: 600px; margin: 30px auto; background: linear-gradient(145deg, #1a1a30, #20203a); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 36px 32px; box-shadow: 0 25px 80px rgba(0,0,0,0.6);">
+  <div style="text-align: center; margin-bottom: 24px;">
+    <span style="font-size: 36px;">⚙️</span>
+    <h2 style="font-size: 22px; font-weight: 700; color: #fff; margin-top: 8px; margin-bottom: 4px;">Partner Settings</h2>
+    <p style="font-size: 13px; color: #7878a0;">Update your company details and business settings</p>
+  </div>
+
+  {% if success %}
+  <div class="success" style="color: #1DB954; background: rgba(29,185,84,0.08); border: 1px solid rgba(29,185,84,0.15); padding: 10px 14px; border-radius: 10px; font-size: 13px; margin-bottom: 20px; text-align: center;">
+    {{ success }}
+  </div>
+  {% endif %}
+
+  <form method="POST" action="/provider/settings" class="setup-form">
+    <div class="setup-group" style="margin-bottom: 16px;">
+      <label style="display: block; font-size: 11px; font-weight: 600; color: #8888aa; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Business / Company Name *</label>
+      <input type="text" name="company_name" value="{{ provider.company_name }}" required style="width: 100%; padding: 12px 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; font-size: 14px; color: #e0e0f0; transition: all 0.2s; font-family: 'Inter', system-ui, sans-serif;" />
+    </div>
+
+    <div class="setup-group" style="margin-bottom: 16px;">
+      <label style="display: block; font-size: 11px; font-weight: 600; color: #8888aa; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Owner Name *</label>
+      <input type="text" name="contact_person" value="{{ provider.contact_person }}" required style="width: 100%; padding: 12px 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; font-size: 14px; color: #e0e0f0; transition: all 0.2s; font-family: 'Inter', system-ui, sans-serif;" />
+    </div>
+
+    <div class="setup-group" style="margin-bottom: 16px;">
+      <label style="display: block; font-size: 11px; font-weight: 600; color: #8888aa; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Phone Number *</label>
+      <input type="tel" name="phone" value="{{ provider.phone }}" required style="width: 100%; padding: 12px 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; font-size: 14px; color: #e0e0f0; transition: all 0.2s; font-family: 'Inter', system-ui, sans-serif;" />
+    </div>
+
+    <div class="setup-group" style="margin-bottom: 16px;">
+      <label style="display: block; font-size: 11px; font-weight: 600; color: #8888aa; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Alternate Email (Optional)</label>
+      <input type="email" name="alternate_email" value="{{ provider.alternate_email or '' }}" style="width: 100%; padding: 12px 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; font-size: 14px; color: #e0e0f0; transition: all 0.2s; font-family: 'Inter', system-ui, sans-serif;" />
+    </div>
+
+    <div class="setup-group" style="margin-bottom: 16px;">
+      <label style="display: block; font-size: 11px; font-weight: 600; color: #8888aa; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Company City (Optional)</label>
+      <input type="text" name="city" value="{{ provider.city or '' }}" style="width: 100%; padding: 12px 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; font-size: 14px; color: #e0e0f0; transition: all 0.2s; font-family: 'Inter', system-ui, sans-serif;" />
+    </div>
+
+    <div class="setup-group" style="margin-bottom: 16px;">
+      <label style="display: block; font-size: 11px; font-weight: 600; color: #8888aa; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Service Type *</label>
+      <div class="service-type-options custom-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 4px;">
+        <label class="radio-card" style="cursor: pointer;">
+          <input type="radio" name="service_type" value="cabs_buses" {% if provider.service_type == 'cabs_buses' %}checked{% endif %} style="display: none;" />
+          <div class="radio-card-content">
+            <span class="rc-icon" style="font-size: 22px;">🚐</span>
+            <span class="rc-label" style="font-size: 10px; font-weight: 600; color: #b0b0c8; text-transform: uppercase; letter-spacing: 0.3px; text-align: center;">Cabs, Buses & Travellers</span>
+          </div>
+        </label>
+        <label class="radio-card" style="cursor: pointer;">
+          <input type="radio" name="service_type" value="self_drive_rentals" {% if provider.service_type == 'self_drive_rentals' %}checked{% endif %} style="display: none;" />
+          <div class="radio-card-content">
+            <span class="rc-icon" style="font-size: 22px;">🏢</span>
+            <span class="rc-label" style="font-size: 10px; font-weight: 600; color: #b0b0c8; text-transform: uppercase; letter-spacing: 0.3px; text-align: center;">Self Drive + Rentals</span>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <div class="setup-group" id="booking-mode-section" style="margin-bottom: 16px;">
+      <label style="display: block; font-size: 11px; font-weight: 600; color: #8888aa; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Booking / Business Mode (Select One) *</label>
+      
+      <!-- Standard Options -->
+      <div class="booking-mode-options" id="opts-standard" style="display: flex; flex-direction: column; gap: 10px; margin-top: 4px;">
+        <label class="mode-card" style="cursor: pointer;">
+          <input type="radio" name="booking_mode" value="solo_owner" {% if provider.booking_mode == 'solo_owner' %}checked{% endif %} style="display: none;" />
+          <div class="mode-card-content">
+            <div class="mode-radio-circle"></div>
+            <div class="mode-details">
+              <span class="mode-title">Solo vehicle owner</span>
+              <span class="mode-desc">For private bookings</span>
+            </div>
+          </div>
+        </label>
+        <label class="mode-card" style="cursor: pointer;">
+          <input type="radio" name="booking_mode" value="route_based" {% if provider.booking_mode == 'route_based' %}checked{% endif %} style="display: none;" />
+          <div class="mode-card-content">
+            <div class="mode-radio-circle"></div>
+            <div class="mode-details">
+              <span class="mode-title">Route based public bookings</span>
+              <span class="mode-desc">Pre-decided routes (e.g. Jaipur to Udaipur)</span>
+            </div>
+          </div>
+        </label>
+        <label class="mode-card" style="cursor: pointer;">
+          <input type="radio" name="booking_mode" value="both_services" {% if provider.booking_mode == 'both_services' %}checked{% endif %} style="display: none;" />
+          <div class="mode-card-content">
+            <div class="mode-radio-circle"></div>
+            <div class="mode-details">
+              <span class="mode-title">Both private & public service</span>
+              <span class="mode-desc">Flexible business model</span>
+            </div>
+          </div>
+        </label>
+      </div>
+
+      <!-- Rentals Options -->
+      <div class="booking-mode-options" id="opts-rentals" style="display: none; flex-direction: column; gap: 10px; margin-top: 4px;">
+        <label class="mode-card" style="cursor: pointer;">
+          <input type="radio" name="booking_mode" value="self_drive_only" {% if provider.booking_mode == 'self_drive_only' %}checked{% endif %} disabled style="display: none;" />
+          <div class="mode-card-content">
+            <div class="mode-radio-circle"></div>
+            <div class="mode-details">
+              <span class="mode-title">Only self drive</span>
+              <span class="mode-desc">For self-drive rentals only</span>
+            </div>
+          </div>
+        </label>
+        <label class="mode-card" style="cursor: pointer;">
+          <input type="radio" name="booking_mode" value="self_drive_private" {% if provider.booking_mode == 'self_drive_private' %}checked{% endif %} disabled style="display: none;" />
+          <div class="mode-card-content">
+            <div class="mode-radio-circle"></div>
+            <div class="mode-details">
+              <span class="mode-title">Self drive & private vehicles for rent</span>
+              <span class="mode-desc">For standard private rental bookings</span>
+            </div>
+          </div>
+        </label>
+        <label class="mode-card" style="cursor: pointer;">
+          <input type="radio" name="booking_mode" value="self_drive_public" {% if provider.booking_mode == 'self_drive_public' %}checked{% endif %} disabled style="display: none;" />
+          <div class="mode-card-content">
+            <div class="mode-radio-circle"></div>
+            <div class="mode-details">
+              <span class="mode-title">Self drive & public vehicle for bookings</span>
+              <span class="mode-desc">Route-based self drive bookings</span>
+            </div>
+          </div>
+        </label>
+        <label class="mode-card" style="cursor: pointer;">
+          <input type="radio" name="booking_mode" value="self_drive_both" {% if provider.booking_mode == 'self_drive_both' %}checked{% endif %} disabled style="display: none;" />
+          <div class="mode-card-content">
+            <div class="mode-radio-circle"></div>
+            <div class="mode-details">
+              <span class="mode-title">Self drive, private & public bookings</span>
+              <span class="mode-desc">All-in-one flexible options</span>
+            </div>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <button type="submit" class="btn-setup" style="width: 100%; margin-top: 24px; padding: 14px; background: linear-gradient(135deg, #FF6B35, #FF8F5E); color: #fff; border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.25s; font-family: 'Inter', system-ui, sans-serif;">Save Changes</button>
+  </form>
+</div>
+
+<script>
+  function updateBookingModeUI(serviceType) {
+    const optsStandard = document.getElementById("opts-standard");
+    const optsRentals = document.getElementById("opts-rentals");
+    
+    if (serviceType === "self_drive_rentals") {
+      optsStandard.style.display = "none";
+      optsStandard.querySelectorAll("input").forEach(i => { i.disabled = true; i.checked = false; });
+      
+      optsRentals.style.display = "flex";
+      optsRentals.querySelectorAll("input").forEach(i => i.disabled = false);
+      const checked = optsRentals.querySelector("input:checked");
+      if (!checked) {
+        optsRentals.querySelector("input").checked = true;
+      }
+    } else {
+      optsRentals.style.display = "none";
+      optsRentals.querySelectorAll("input").forEach(i => { i.disabled = true; i.checked = false; });
+      
+      optsStandard.style.display = "flex";
+      optsStandard.querySelectorAll("input").forEach(i => i.disabled = false);
+      const checked = optsStandard.querySelector("input:checked");
+      if (!checked) {
+        optsStandard.querySelector("input").checked = true;
+      }
+    }
+  }
+
+  // Set listeners for service type changes
+  document.querySelectorAll('input[name="service_type"]').forEach(r => {
+    r.addEventListener('change', function() {
+      updateBookingModeUI(this.value);
+    });
+  });
+
+  // Init UI state
+  const checkedService = document.querySelector('input[name="service_type"]:checked');
+  if (checkedService) {
+    updateBookingModeUI(checkedService.value);
+  }
+</script>
+
+{% endblock %}

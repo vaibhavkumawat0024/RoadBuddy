@@ -8,15 +8,38 @@
     grid-template-columns: 1fr;
     gap: 24px;
   }
-  .both-grids {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 24px;
-  }
-  @media (max-width: 992px) {
-    .both-grids {
-      grid-template-columns: 1fr;
+  @media (min-width: 992px) {
+    .vehicles-container {
+      grid-template-columns: 1fr 1.2fr;
     }
+  }
+  .form-toggle-buttons {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    justify-content: center;
+  }
+  .btn-toggle {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #a0a0c0;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  .btn-toggle.active {
+    background: linear-gradient(135deg, #FF6B35, #FF8F5E);
+    border-color: #FF6B35;
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(255, 107, 53, 0.25);
+  }
+  .btn-toggle:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
   }
   .form-card {
     background: linear-gradient(145deg, #1a1a30, #20203a);
@@ -192,145 +215,349 @@
   <a href="/provider/dashboard" class="btn-secondary" style="background: rgba(255,255,255,0.05); color: #fff; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-size: 13px; border: 1px solid rgba(255,255,255,0.1);">← Dashboard</a>
 </div>
 
+{% set bmode = provider.booking_mode %}
+{% if bmode not in ('route_based', 'both_services', 'self_drive_public', 'self_drive_both') %}
+<style>
+  .vehicles-container {
+    grid-template-columns: 1fr !important;
+  }
+</style>
+{% endif %}
+
 <div class="vehicles-container">
-  {% set bmode = provider.booking_mode %}
+  {% set show_private_btn = bmode in ('solo_owner', 'both_services', 'self_drive_private', 'self_drive_both', 'self_drive_only') or not bmode %}
+  {% set show_public_btn = bmode in ('route_based', 'both_services', 'self_drive_public', 'self_drive_both') %}
 
-  <!-- Setup Forms Grid -->
-  <div class="{% if bmode == 'both_services' %}both-grids{% endif %}">
+  <!-- Left Side: Public Route Fleet & Active Listings -->
+  <div style="display: flex; flex-direction: column; gap: 24px;">
     
-    <!-- PRIVATE SERVICE FORM (Shown if solo_owner, both_services, or default) -->
-    {% if bmode == 'solo_owner' or bmode == 'both_services' or not bmode or bmode == 'self_drive' %}
+    <!-- 1. Saved Public Fleet (only shown if public route services are supported) -->
+    {% if show_public_btn %}
     <div class="form-card">
-      <h2>🚗 Private Booking Service</h2>
-      <p class="card-subtitle">List vehicle available for private distance-based bookings</p>
-      
-      <form id="form-private" onsubmit="handleFormSubmit(event, 'private')">
-        <div class="form-grid">
-          <div class="form-group">
-            <label>Vehicle Type *</label>
-            <select name="vehicle_type" required>
-              <option value="hatchback">Hatchback</option>
-              <option value="sedan">Sedan</option>
-              <option value="suv">SUV</option>
-              <option value="muv">MUV</option>
-              <option value="mini_bus">Mini Bus</option>
-              <option value="traveller_bus">Traveller Bus</option>
-              <option value="luxury_bus">Luxury Bus</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Vehicle Name *</label>
-            <input type="text" name="vehicle_name" placeholder="e.g. Toyota Innova" required />
-          </div>
-          <div class="form-group">
-            <label>Seats *</label>
-            <input type="number" name="total_seats" value="4" min="1" required />
-          </div>
-          <div class="form-group">
-            <label>Fare per KM (₹) *</label>
-            <input type="number" name="price_per_km_inr" placeholder="e.g. 15" step="0.5" required />
-          </div>
-          <div class="form-group full-width">
-            <label>Current City Available *</label>
-            <input type="text" name="origin" placeholder="e.g. Jaipur" required />
-          </div>
+      <h2>📋 Saved Public Fleet ({{ vehicle_assets|length }})</h2>
+      <p class="card-subtitle">These vehicles can be assigned when adding a route.</p>
+      {% if vehicle_assets %}
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          {% for asset in vehicle_assets %}
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <div style="font-weight: 600; color: #fff; font-size: 13.5px;">
+                  {{ asset.vehicle_name }}
+                </div>
+                <div style="font-size: 11.5px; color: #7878a0; margin-top: 2px;">
+                  Type: {{ asset.vehicle_type|capitalize }} · Seats: {{ asset.total_seats }}
+                </div>
+              </div>
+              <form method="POST" action="/provider/vehicle-assets/{{ asset.id }}/delete" onsubmit="return confirm('Delete this vehicle from your fleet?')">
+                <button type="submit" style="background: none; border: none; font-size: 14px; cursor: pointer; color: #ff6b6b; padding: 4px;">🗑️</button>
+              </form>
+            </div>
+          {% endfor %}
         </div>
-        <button type="submit" class="btn-add-vehicle">+ Add Private Vehicle</button>
-      </form>
+      {% else %}
+        <p style="color: #6a6a8a; font-size: 13px; text-align: center; padding: 10px 0; margin: 0;">No fleet vehicles saved yet.</p>
+      {% endif %}
     </div>
     {% endif %}
 
-    <!-- PUBLIC ROUTE-BASED FORM (Shown if route_based or both_services) -->
-    {% if bmode == 'route_based' or bmode == 'both_services' %}
-    <div class="form-card">
-      <h2>🚌 Route-Based Public Service</h2>
-      <p class="card-subtitle">List vehicles running on pre-decided routes and schedules</p>
-
-      <form id="form-public" onsubmit="handleFormSubmit(event, 'public')">
-        <div class="form-grid">
-          <div class="form-group">
-            <label>Vehicle Type *</label>
-            <select name="vehicle_type" required>
-              <option value="sedan">Sedan</option>
-              <option value="suv">SUV</option>
-              <option value="mini_bus">Mini Bus</option>
-              <option value="traveller_bus">Traveller Bus</option>
-              <option value="luxury_bus" selected>Luxury Bus</option>
-            </select>
+    <!-- 2. Listed Vehicles / Active Listings -->
+    <div>
+      <h2 style="font-size: 18px; font-weight: 600; color: #fff; margin-bottom: 16px; margin-top: 10px;">Your Active Listings ({{ vehicles|length }})</h2>
+      {% if vehicles %}
+      <div class="vehicle-list">
+        {% for v in vehicles %}
+        <div class="vehicle-card" style="background: linear-gradient(145deg, #1a1a30, #20203a); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+          <div style="display: flex; align-items: center; gap: 16px;">
+            <div style="font-size: 28px;">
+              {% if not v.driver_included %}🔑
+              {% elif 'bus' in v.vehicle_type %}🚌
+              {% elif v.vehicle_type == 'suv' %}🚙
+              {% else %}🚗
+              {% endif %}
+            </div>
+            <div>
+              <div style="font-weight: 600; color: #fff; font-size: 14.5px;">
+                {{ v.vehicle_name }} 
+                {% if not v.driver_included %}<span style="font-size: 11px; padding: 2px 6px; background: rgba(255,107,53,0.15); color: #FF6B35; border-radius: 4px; font-weight: 500; margin-left: 6px;">Self-Drive</span>{% endif %}
+              </div>
+              <div style="font-size: 12px; color: #7878a0; margin-top: 2px;">
+                {% if not v.driver_included %}
+                📍 Available at: {{ v.origin }} · ₹{{ v.fixed_fare_inr|int }}/day rental
+                {% elif v.destination == 'Private' %}
+                📍 Available at: {{ v.origin }} (Chauffeur Cab) · ₹{{ v.price_per_km_inr }}/KM
+                {% else %}
+                📍 Route: {{ v.origin }} → {{ v.destination }} · 🕐 {{ v.departure_time }} - {{ v.arrival_time }} · ₹{{ v.fixed_fare_inr }} per seat
+                {% endif %}
+              </div>
+              <div style="font-size: 11.5px; color: #505075; margin-top: 2px;">
+                💺 Seats: {{ v.total_seats }}
+              </div>
+              {% if v.pickup_points %}
+              <div style="font-size: 11.5px; color: #FF6B35; margin-top: 4px; display: flex; align-items: center; gap: 4px;">
+                <span>📥</span> <strong>Pickups:</strong> {{ v.pickup_points.split(';')|join(', ') }}
+              </div>
+              {% endif %}
+              {% if v.dropoff_points %}
+              <div style="font-size: 11.5px; color: #4b88ff; margin-top: 2px; display: flex; align-items: center; gap: 4px;">
+                <span>📤</span> <strong>Drop-offs:</strong> {{ v.dropoff_points.split(';')|join(', ') }}
+              </div>
+              {% endif %}
+            </div>
           </div>
-          <div class="form-group">
-            <label>Vehicle Name *</label>
-            <input type="text" name="vehicle_name" placeholder="e.g. Volvo Multi-Axle" required />
-          </div>
-          <div class="form-group">
-            <label>Origin *</label>
-            <input type="text" name="origin" placeholder="e.g. Jaipur" required />
-          </div>
-          <div class="form-group">
-            <label>Destination *</label>
-            <input type="text" name="destination" placeholder="e.g. Udaipur" required />
-          </div>
-          <div class="form-group">
-            <label>Departure Time *</label>
-            <input type="time" name="departure_time" required />
-          </div>
-          <div class="form-group">
-            <label>Arrival Time *</label>
-            <input type="time" name="arrival_time" required />
-          </div>
-          <div class="form-group">
-            <label>Total Seats *</label>
-            <input type="number" name="total_seats" value="40" min="1" required />
-          </div>
-          <div class="form-group">
-            <label>Fare per Seat (₹) *</label>
-            <input type="number" name="fixed_fare_inr" placeholder="e.g. 800" required />
-          </div>
+          <form method="POST" action="/provider/vehicles/{{ v.id }}/delete" onsubmit="return confirm('Delete this vehicle listing?')">
+            <button type="submit" style="background: none; border: none; font-size: 15px; cursor: pointer; color: #ff6b6b; padding: 8px;">🗑️</button>
+          </form>
         </div>
-        <button type="submit" class="btn-add-vehicle">+ Add Route Vehicle</button>
-      </form>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="empty" style="color: #6a6a8a; font-size: 13.5px; margin-top: 8px;">No listings added yet.</p>
+      {% endif %}
     </div>
-    {% endif %}
 
   </div>
-</div>
 
-<!-- listed vehicles list -->
-<h2 class="listed-vehicles-title">Your Listed Vehicles ({{ vehicles|length }})</h2>
-{% if vehicles %}
-<div class="vehicle-list">
-  {% for v in vehicles %}
-  <div class="vehicle-card" style="background: linear-gradient(145deg, #1a1a30, #20203a); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
-    <div style="display: flex; align-items: center; gap: 16px;">
-      <div style="font-size: 28px;">
-        {% if 'bus' in v.vehicle_type %}🚌
-        {% elif v.vehicle_type == 'suv' %}🚙
-        {% else %}🚗
+  <!-- Right Side: Listings & Routes Creation Forms -->
+  <div style="display: flex; flex-direction: column; gap: 24px;">
+    
+    <!-- Top-Level Toggle Buttons -->
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 8px;">
+      {% if show_private_btn or show_public_btn %}
+      <div style="display: flex; gap: 12px; justify-content: center; width: 100%; flex-wrap: wrap;">
+        {% if show_private_btn %}
+        <button type="button" class="btn-toggle" id="btn-toggle-private-veh" onclick="showMainFormBlock('private-veh')">Add Private Vehicle</button>
+        {% endif %}
+        {% if show_public_btn %}
+        <button type="button" class="btn-toggle" id="btn-toggle-public-veh" onclick="showMainFormBlock('public-veh')">Add Public Vehicle (Fleet)</button>
         {% endif %}
       </div>
-      <div>
-        <div style="font-weight: 600; color: #fff; font-size: 15px;">{{ v.vehicle_name }}</div>
-        <div style="font-size: 12.5px; color: #7878a0; margin-top: 2px;">
-          {% if v.destination == 'Private' %}
-          📍 Available at: {{ v.origin }} (Private Rental) · ₹{{ v.price_per_km_inr }}/KM
-          {% else %}
-          📍 Route: {{ v.origin }} → {{ v.destination }} · 🕐 {{ v.departure_time }} - {{ v.arrival_time }} · ₹{{ v.fixed_fare_inr }} per seat
-          {% endif %}
-        </div>
-        <div style="font-size: 12px; color: #505075; margin-top: 2px;">
-          💺 Seats: {{ v.total_seats }}
-        </div>
-      </div>
+      {% if show_public_btn %}
+      <button type="button" class="btn-toggle" id="btn-toggle-public-route" onclick="showMainFormBlock('public-route')">Add Route for Public Vehicle</button>
+      {% endif %}
+      {% endif %}
     </div>
-    <form method="POST" action="/provider/vehicles/{{ v.id }}/delete" onsubmit="return confirm('Delete this vehicle?')">
-      <button type="submit" style="background: none; border: none; font-size: 16px; cursor: pointer; color: #ff6b6b; padding: 8px;">🗑️</button>
-    </form>
+
+    <!-- Active Form Cards -->
+    <div>
+      
+      <!-- 1. PUBLIC VEHICLE FLEET FORM -->
+      {% if show_public_btn %}
+      <div class="form-card" id="block-public-veh" style="display: none;">
+        <h2>🚍 Add Vehicle to Fleet</h2>
+        <p class="card-subtitle">Save your bus/cab details once to use them on route schedules.</p>
+        
+        <form id="form-asset" method="POST" action="/provider/vehicle-assets">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Vehicle Type *</label>
+              <select name="vehicle_type" required>
+                <option value="sedan">Sedan</option>
+                <option value="suv">SUV</option>
+                <option value="mini_bus">Mini Bus</option>
+                <option value="traveller_bus">Tempo Traveller</option>
+                <option value="luxury_bus" selected>Luxury Bus</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Vehicle Name *</label>
+              <input type="text" name="vehicle_name" placeholder="e.g. Volvo Multi-Axle (RJ-14-PA-1234)" required />
+            </div>
+            <div class="form-group">
+              <label>Total Seats *</label>
+              <input type="number" name="total_seats" value="40" min="1" required />
+            </div>
+            <input type="hidden" name="driver_included" value="true" />
+          </div>
+          <button type="submit" class="btn-add-vehicle" style="background: linear-gradient(135deg, #1DB954, #1ed760); margin-top: 16px;">+ Add to Fleet</button>
+        </form>
+      </div>
+      {% endif %}
+
+      <!-- 2. PRIVATE VEHICLES GROUP (Self-Drive / Chauffeur) -->
+      {% if show_private_btn %}
+      <div class="form-card" id="block-private-group" style="display: none;">
+        {% set has_both_private = bmode in ('self_drive_private', 'self_drive_both') %}
+        {% if has_both_private %}
+        <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 15px;">
+          <button type="button" class="btn-toggle active" id="btn-sub-selfdrive" onclick="showPrivateSubBlock('selfdrive')" style="padding: 6px 16px; font-size: 12.5px;">Self-Drive</button>
+          <button type="button" class="btn-toggle" id="btn-sub-private" onclick="showPrivateSubBlock('private')" style="padding: 6px 16px; font-size: 12.5px;">Private Chauffeur</button>
+        </div>
+        {% endif %}
+
+        <!-- Self-Drive sub-form -->
+        {% if bmode in ('self_drive_only', 'self_drive_private', 'self_drive_both', 'self_drive_public') %}
+        <div id="sub-block-selfdrive" style="display: block;">
+          <h2>🔑 Self-Drive Rental Vehicle</h2>
+          <p class="card-subtitle">List vehicles available for self-driven customer rentals (priced per day)</p>
+          
+          <form id="form-selfdrive" onsubmit="handleFormSubmit(event, 'selfdrive')">
+            <input type="hidden" name="driver_included" value="false" />
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Vehicle Type *</label>
+                <select name="vehicle_type" required>
+                  <option value="hatchback">Hatchback</option>
+                  <option value="sedan">Sedan</option>
+                  <option value="suv">SUV</option>
+                  <option value="muv">MUV</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Vehicle Name *</label>
+                <input type="text" name="vehicle_name" placeholder="e.g. Swift (Self-Drive)" required />
+              </div>
+              <div class="form-group">
+                <label>Seats *</label>
+                <input type="number" name="total_seats" value="5" min="1" required />
+              </div>
+              <div class="form-group">
+                <label>Rent per Day (₹) *</label>
+                <input type="number" name="fixed_fare_inr" placeholder="e.g. 2500" required />
+              </div>
+              <div class="form-group full-width">
+                <label>Current Location City *</label>
+                <div style="display: flex; gap: 8px;">
+                  <input type="text" id="selfdrive-origin" name="origin" placeholder="e.g. Jaipur" style="flex: 1;" required />
+                  <button type="button" class="btn-toggle" onclick="detectProviderGPS('selfdrive-origin')" style="padding: 0 12px; margin: 0; display: flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap; font-size: 12.5px; background: rgba(29, 158, 117, 0.15); border-color: rgba(29, 158, 117, 0.25); color: #1DB954;">
+                    📍 Detect Location
+                  </button>
+                </div>
+              </div>
+            </div>
+            <button type="submit" class="btn-add-vehicle">+ Add Self-Drive Vehicle</button>
+          </form>
+        </div>
+        {% endif %}
+
+        <!-- Private Chauffeur sub-form -->
+        {% if bmode in ('solo_owner', 'both_services', 'self_drive_private', 'self_drive_both') or not bmode %}
+        <div id="sub-block-private" style="display: {% if bmode in ('self_drive_private', 'self_drive_both') %}none{% else %}block{% endif %};">
+          <h2>🚗 Private Chauffeur Booking</h2>
+          <p class="card-subtitle">List vehicle available for private distance-based chauffeur driven bookings</p>
+          
+          <form id="form-private" onsubmit="handleFormSubmit(event, 'private')">
+            <input type="hidden" name="driver_included" value="true" />
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Vehicle Type *</label>
+                <select name="vehicle_type" required>
+                  <option value="hatchback">Hatchback</option>
+                  <option value="sedan">Sedan</option>
+                  <option value="suv">SUV</option>
+                  <option value="muv">MUV</option>
+                  <option value="mini_bus">Mini Bus</option>
+                  <option value="traveller_bus">Traveller Bus</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Vehicle Name *</label>
+                <input type="text" name="vehicle_name" placeholder="e.g. Toyota Innova" required />
+              </div>
+              <div class="form-group">
+                <label>Seats *</label>
+                <input type="number" name="total_seats" value="4" min="1" required />
+              </div>
+              <div class="form-group">
+                <label>Fare per KM (₹) *</label>
+                <input type="number" name="price_per_km_inr" placeholder="e.g. 15" step="0.5" required />
+              </div>
+              <div class="form-group full-width">
+                <label>Current City Available *</label>
+                <div style="display: flex; gap: 8px;">
+                  <input type="text" id="private-origin" name="origin" placeholder="e.g. Jaipur" style="flex: 1;" required />
+                  <button type="button" class="btn-toggle" onclick="detectProviderGPS('private-origin')" style="padding: 0 12px; margin: 0; display: flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap; font-size: 12.5px; background: rgba(29, 158, 117, 0.15); border-color: rgba(29, 158, 117, 0.25); color: #1DB954;">
+                    📍 Detect Location
+                  </button>
+                </div>
+              </div>
+            </div>
+            <button type="submit" class="btn-add-vehicle">+ Add Private Vehicle</button>
+          </form>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <!-- 3. PUBLIC ROUTE-BASED FORM (Add Route) -->
+      {% if show_public_btn %}
+      <div class="form-card" id="block-public-route" style="display: none;">
+        <h2>🚌 Route-Based Public Booking</h2>
+        <p class="card-subtitle">List transport vehicles running on pre-decided routes and schedules</p>
+
+        <form id="form-public" onsubmit="handleFormSubmit(event, 'public')">
+          <input type="hidden" name="driver_included" value="true" />
+          <div class="form-grid">
+            <div class="form-group full-width">
+              <label>Select Vehicle from Fleet *</label>
+              <select name="vehicle_asset_id" required style="width: 100%;">
+                <option value="" disabled selected>-- Select a Fleet Vehicle --</option>
+                {% for asset in vehicle_assets %}
+                  <option value="{{ asset.id }}">{{ asset.vehicle_name }} ({{ asset.vehicle_type|upper }}, {{ asset.total_seats }} seats)</option>
+                {% endfor %}
+              </select>
+              {% if not vehicle_assets %}
+                <div style="color: #ff6b6b; font-size: 12px; margin-top: 6px; font-weight: 500;">
+                  ⚠️ You must add a vehicle to your fleet first (select "Add Public Vehicle").
+                </div>
+              {% endif %}
+            </div>
+            
+            <div class="form-group">
+              <label>Origin *</label>
+              <input type="text" name="origin" placeholder="e.g. Jaipur" required />
+            </div>
+            <div class="form-group">
+              <label>Destination *</label>
+              <input type="text" name="destination" placeholder="e.g. Udaipur" required />
+            </div>
+            <div class="form-group">
+              <label>Departure Time *</label>
+              <input type="time" name="departure_time" required />
+            </div>
+            <div class="form-group">
+              <label>Arrival Time *</label>
+              <input type="time" name="arrival_time" required />
+            </div>
+            <div class="form-group full-width">
+              <label>Fare per Seat (₹) *</label>
+              <input type="number" name="fixed_fare_inr" placeholder="e.g. 800" required />
+            </div>
+            
+            <div class="form-group full-width" style="margin-top: 10px;">
+              <label>Route Stop Locations</label>
+              
+              <!-- Pickup Points dynamic group -->
+              <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); padding: 14px; border-radius: 8px; margin-bottom: 12px;">
+                <label style="font-size: 11px; color: #FF6B35; font-weight: 700; display: block; margin-bottom: 8px; text-transform: uppercase;">📥 Passenger Pickup Points</label>
+                <div id="public-pickup-inputs-wrap" style="display: flex; flex-direction: column; gap: 8px;">
+                  <div style="display: flex; gap: 8px;">
+                    <input type="text" class="dynamic-pickup-input" placeholder="e.g. Main Bus Stand" style="flex: 1;" />
+                    <button type="button" class="btn-toggle" onclick="detectProviderGPSForInput(this)" style="padding: 0 10px; margin: 0; background: rgba(29, 158, 117, 0.15); border-color: rgba(29, 158, 117, 0.25); color: #1DB954; font-size: 12px; display: flex; align-items: center; justify-content: center;">📍</button>
+                  </div>
+                </div>
+                <button type="button" class="btn-toggle" onclick="addDynamicPickupInput()" style="margin-top: 8px; padding: 4px 10px; font-size: 11px; background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.1); color: #a0a0c0;">+ Add Pickup Point</button>
+              </div>
+              
+              <!-- Drop-off Points dynamic group -->
+              <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); padding: 14px; border-radius: 8px;">
+                <label style="font-size: 11px; color: #4b88ff; font-weight: 700; display: block; margin-bottom: 8px; text-transform: uppercase;">📤 Passenger Drop-off Points</label>
+                <div id="public-dropoff-inputs-wrap" style="display: flex; flex-direction: column; gap: 8px;">
+                  <div style="display: flex; gap: 8px;">
+                    <input type="text" class="dynamic-dropoff-input" placeholder="e.g. Bypass Circle" style="flex: 1;" />
+                    <button type="button" class="btn-toggle" onclick="detectProviderGPSForInput(this)" style="padding: 0 10px; margin: 0; background: rgba(29, 158, 117, 0.15); border-color: rgba(29, 158, 117, 0.25); color: #1DB954; font-size: 12px; display: flex; align-items: center; justify-content: center;">📍</button>
+                  </div>
+                </div>
+                <button type="button" class="btn-toggle" onclick="addDynamicDropoffInput()" style="margin-top: 8px; padding: 4px 10px; font-size: 11px; background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.1); color: #a0a0c0;">+ Add Drop-off Point</button>
+              </div>
+            </div>
+          </div>
+          <button type="submit" class="btn-add-vehicle" {% if not vehicle_assets %}disabled style="opacity: 0.5; cursor: not-allowed; background: #505050;"{% endif %}>+ Add Route Vehicle</button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
   </div>
-  {% endfor %}
 </div>
-{% else %}
-<p class="empty" style="color: #6a6a8a; font-size: 13.5px; margin-top: 8px;">No vehicles added yet.</p>
-{% endif %}
 
 
 <!-- ═══ MODAL POPUPS (Confirmation & Success) ═══ -->
@@ -388,6 +615,16 @@
     const form = activeSubmitEvent.target;
     const formData = new FormData(form);
 
+    if (activeFormType === 'public') {
+      // Gather dynamic pickup points
+      const pickupInputs = Array.from(form.querySelectorAll('.dynamic-pickup-input')).map(input => input.value.trim()).filter(Boolean);
+      formData.set('pickup_points', pickupInputs.join(';'));
+
+      // Gather dynamic dropoff points
+      const dropoffInputs = Array.from(form.querySelectorAll('.dynamic-dropoff-input')).map(input => input.value.trim()).filter(Boolean);
+      formData.set('dropoff_points', dropoffInputs.join(';'));
+    }
+
     // Call POST API asynchronously
     fetch("/provider/vehicles", {
       method: "POST",
@@ -396,11 +633,18 @@
     .then(response => {
       if (response.ok) {
         // Build customized success message
-        const vType = form.querySelector('[name="vehicle_type"]').value;
-        const vName = form.querySelector('[name="vehicle_name"]').value;
-        const vSeats = form.querySelector('[name="total_seats"]').value;
+        let successMsg = "Vehicle listing added successfully!";
+        const assetSelect = form.querySelector('[name="vehicle_asset_id"]');
+        if (assetSelect) {
+          const selectedText = assetSelect.options[assetSelect.selectedIndex].text;
+          successMsg = `Route listing added using ${selectedText}, thank you.`;
+        } else {
+          const vType = form.querySelector('[name="vehicle_type"]')?.value || 'vehicle';
+          const vName = form.querySelector('[name="vehicle_name"]')?.value || '';
+          const vSeats = form.querySelector('[name="total_seats"]')?.value || '';
+          successMsg = `Vehicle added, your ${vType}, ${vName} ${vSeats} seater is available for bookings, thank you.`;
+        }
         
-        const successMsg = `Vehicle added, your ${vType}, ${vName} ${vSeats} seater is available for bookings, thank you.`;
         document.getElementById("success-message-text").textContent = successMsg;
 
         // Open success modal
@@ -414,6 +658,173 @@
       alert("An error occurred. Please try again.");
     });
   });
+
+  function showMainFormBlock(type) {
+    const blockPrivate = document.getElementById("block-private-group");
+    const blockPublicVeh = document.getElementById("block-public-veh");
+    const blockPublicRoute = document.getElementById("block-public-route");
+    
+    const btnPrivate = document.getElementById("btn-toggle-private-veh");
+    const btnPublicVeh = document.getElementById("btn-toggle-public-veh");
+    const btnPublicRoute = document.getElementById("btn-toggle-public-route");
+
+    // Hide all form cards
+    if (blockPrivate) blockPrivate.style.display = "none";
+    if (blockPublicVeh) blockPublicVeh.style.display = "none";
+    if (blockPublicRoute) blockPublicRoute.style.display = "none";
+    
+    // Deactivate all buttons
+    if (btnPrivate) btnPrivate.classList.remove("active");
+    if (btnPublicVeh) btnPublicVeh.classList.remove("active");
+    if (btnPublicRoute) btnPublicRoute.classList.remove("active");
+
+    // Show and activate selected
+    if (type === 'private-veh') {
+      if (blockPrivate) blockPrivate.style.display = "block";
+      if (btnPrivate) btnPrivate.classList.add("active");
+    } else if (type === 'public-veh') {
+      if (blockPublicVeh) blockPublicVeh.style.display = "block";
+      if (btnPublicVeh) btnPublicVeh.classList.add("active");
+    } else if (type === 'public-route') {
+      if (blockPublicRoute) blockPublicRoute.style.display = "block";
+      if (btnPublicRoute) btnPublicRoute.classList.add("active");
+    }
+  }
+
+  function showPrivateSubBlock(subType) {
+    const subSelfDrive = document.getElementById("sub-block-selfdrive");
+    const subPrivate = document.getElementById("sub-block-private");
+    const btnSubSelfDrive = document.getElementById("btn-sub-selfdrive");
+    const btnSubPrivate = document.getElementById("btn-sub-private");
+
+    if (subSelfDrive) subSelfDrive.style.display = "none";
+    if (subPrivate) subPrivate.style.display = "none";
+    if (btnSubSelfDrive) btnSubSelfDrive.classList.remove("active");
+    if (btnSubPrivate) btnSubPrivate.classList.remove("active");
+
+    if (subType === 'selfdrive') {
+      if (subSelfDrive) subSelfDrive.style.display = "block";
+      if (btnSubSelfDrive) btnSubSelfDrive.classList.add("active");
+    } else if (subType === 'private') {
+      if (subPrivate) subPrivate.style.display = "block";
+      if (btnSubPrivate) btnSubPrivate.classList.add("active");
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", function() {
+    const showPublic = {{ 'true' if bmode in ('route_based', 'both_services', 'self_drive_public', 'self_drive_both') else 'false' }};
+    const showPrivate = {{ 'true' if bmode in ('solo_owner', 'both_services', 'self_drive_private', 'self_drive_both', 'self_drive_only') or not bmode else 'false' }};
+    
+    if (showPublic) {
+      showMainFormBlock('public-route');
+    } else if (showPrivate) {
+      showMainFormBlock('private-veh');
+    }
+  });
+
+  function detectProviderGPS(inputId) {
+    const input = document.getElementById(inputId);
+    const originalText = input.value;
+    input.value = "Detecting location...";
+    
+    if (!navigator.geolocation) {
+      alert("Geolocation not supported by browser.");
+      input.value = originalText;
+      return;
+    }
+    
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data && data.display_name) {
+              const addr = data.address || {};
+              const shortName = addr.road || addr.suburb || addr.city || addr.town || data.display_name.split(',')[0];
+              const fullCity = [shortName, addr.city || addr.town || '', addr.state || ''].filter(Boolean).join(', ');
+              input.value = fullCity;
+            } else {
+              input.value = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+            }
+          })
+          .catch(() => {
+            input.value = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+          });
+      },
+      (err) => {
+        alert("Failed to detect location: " + err.message);
+        input.value = originalText;
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
+
+  function addDynamicPickupInput() {
+    const wrap = document.getElementById("public-pickup-inputs-wrap");
+    const div = document.createElement("div");
+    div.style.cssText = "display: flex; gap: 8px;";
+    div.innerHTML = `
+      <input type="text" class="dynamic-pickup-input" placeholder="e.g. Next Pickup Stop" style="flex: 1;" />
+      <button type="button" class="btn-toggle" onclick="detectProviderGPSForInput(this)" style="padding: 0 10px; margin: 0; background: rgba(29, 158, 117, 0.15); border-color: rgba(29, 158, 117, 0.25); color: #1DB954; font-size: 12px; display: flex; align-items: center; justify-content: center;">📍</button>
+      <button type="button" class="btn-toggle" onclick="this.parentNode.remove()" style="padding: 0 10px; margin: 0; background: rgba(255, 107, 53, 0.1); border-color: rgba(255, 107, 53, 0.2); color: #ff6b6b; font-size: 14px; line-height: 1;">&times;</button>
+    `;
+    wrap.appendChild(div);
+  }
+
+  function addDynamicDropoffInput() {
+    const wrap = document.getElementById("public-dropoff-inputs-wrap");
+    const div = document.createElement("div");
+    div.style.cssText = "display: flex; gap: 8px;";
+    div.innerHTML = `
+      <input type="text" class="dynamic-dropoff-input" placeholder="e.g. Next Dropoff Stop" style="flex: 1;" />
+      <button type="button" class="btn-toggle" onclick="detectProviderGPSForInput(this)" style="padding: 0 10px; margin: 0; background: rgba(29, 158, 117, 0.15); border-color: rgba(29, 158, 117, 0.25); color: #1DB954; font-size: 12px; display: flex; align-items: center; justify-content: center;">📍</button>
+      <button type="button" class="btn-toggle" onclick="this.parentNode.remove()" style="padding: 0 10px; margin: 0; background: rgba(255, 107, 53, 0.1); border-color: rgba(255, 107, 53, 0.2); color: #ff6b6b; font-size: 14px; line-height: 1;">&times;</button>
+    `;
+    wrap.appendChild(div);
+  }
+
+  function detectProviderGPSForInput(btn) {
+    const input = btn.parentNode.querySelector("input");
+    const originalText = input.value;
+    input.value = "Detecting location...";
+    
+    if (!navigator.geolocation) {
+      alert("Geolocation not supported by browser.");
+      input.value = originalText;
+      return;
+    }
+    
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data && data.display_name) {
+              const addr = data.address || {};
+              const shortName = addr.road || addr.suburb || addr.city || addr.town || data.display_name.split(',')[0];
+              const fullCity = [shortName, addr.city || addr.town || '', addr.state || ''].filter(Boolean).join(', ');
+              input.value = fullCity;
+            } else {
+              input.value = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+            }
+          })
+          .catch(() => {
+            input.value = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+          });
+      },
+      (err) => {
+        alert("Failed to detect location: " + err.message);
+        input.value = originalText;
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
 </script>
 
 {% endblock %}

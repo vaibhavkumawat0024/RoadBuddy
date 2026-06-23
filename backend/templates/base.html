@@ -5,6 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}RoadBuddy{% endblock %}</title>
   <link rel="stylesheet" href="/static/css/style.css">
+  
+  <!-- Leaflet Maps CSS & JS Imports -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+  <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+
+  <style>
+    /* Hide Leaflet routing text control panels */
+    .leaflet-routing-container {
+      display: none !important;
+    }
+    /* Pulse keyframe for toast icon bouncing or pulsing */
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-5px); }
+    }
+  </style>
 </head>
 <body>
 
@@ -14,6 +32,12 @@
       {% if user %}
       <a href="/dashboard">Dashboard</a>
       <a href="/my-trips">My Trips</a>
+      <a href="/my-bookings" style="position: relative;" id="nav-my-bookings-link">
+        My Bookings
+        {% if has_unread_bookings %}
+        <span class="unread-dot" style="position: absolute; top: -3px; right: -8px; width: 8px; height: 8px; background: #ff4d4f; border-radius: 50%;"></span>
+        {% endif %}
+      </a>
       <a href="/add-vehicle">My Vehicles</a>
       <a href="/community">🌍 Community</a>
       <a href="/profile">👤 Profile</a>
@@ -29,5 +53,509 @@
     {% block content %}{% endblock %}
   </main>
 
+  <!-- Global Tracking Modal Popup -->
+  <div id="tracking-modal-overlay" style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 9999; opacity: 0; transition: opacity 0.2s ease;">
+    <div style="background: #fff; border-radius: 16px; max-width: 700px; width: 90%; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.25);">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #eee;">
+        <h3 style="margin: 0; color: #1a1a1a; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px;">🚖 Live Cab Tracking</h3>
+        <button onclick="closeTrackingModal()" style="background: none; border: none; font-size: 24px; color: #888; cursor: pointer; padding: 4px; line-height: 1;">&times;</button>
+      </div>
+      <div style="position: relative; flex: 1; min-height: 380px;">
+        <div id="tracking-map" style="width: 100%; height: 400px; background: #f8fafc;"></div>
+        
+        <!-- Live HUD Info -->
+        <div id="tracking-hud" style="position: absolute; bottom: 16px; left: 16px; right: 16px; background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border: 1px solid rgba(0,0,0,0.06); border-radius: 12px; padding: 12px 16px; z-index: 1000; box-shadow: 0 4px 20px rgba(0,0,0,0.15); display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <div id="tracking-status-title" style="font-size: 11px; color: #1D9E75; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Driver Enroute</div>
+            <div id="tracking-hud-eta" style="font-size: 14px; font-weight: 700; color: #1a1a1a; margin-top: 2px;">Calculating route...</div>
+          </div>
+          <div style="font-size: 24px; animation: bounce 1.5s infinite;">🚖</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Global Driver Alert Toast -->
+  <div id="driver-alert-toast" style="position: fixed; bottom: 24px; right: 24px; background: linear-gradient(135deg, #10b981, #059669); color: #fff; padding: 16px 20px; border-radius: 12px; display: none; align-items: center; gap: 16px; z-index: 9998; box-shadow: 0 10px 25px rgba(0,0,0,0.15); transform: translateY(100px); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s; opacity: 0; max-width: 380px;">
+    <div style="font-size: 24px; flex-shrink: 0;">🚖</div>
+    <div style="flex: 1;">
+      <div style="font-weight: 700; font-size: 13.5px; margin-bottom: 2px;" id="toast-title">Your driver is on the way!</div>
+      <div style="font-size: 12px; color: rgba(255,255,255,0.9); line-height: 1.4;" id="toast-body">Ready for a wonderful trip. Track your driver's live location now.</div>
+      <div style="margin-top: 10px; display: flex; gap: 8px;">
+        <button id="btn-toast-track" style="background: #fff; color: #059669; border: none; border-radius: 6px; padding: 6px 12px; font-size: 11.5px; font-weight: 700; cursor: pointer; transition: all 0.2s;" onclick="triggerToastTracking()">Track Cab</button>
+        <button style="background: rgba(255,255,255,0.2); color: #fff; border: none; border-radius: 6px; padding: 6px 12px; font-size: 11.5px; font-weight: 600; cursor: pointer;" onclick="closeToast()">Dismiss</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let trackingMap = null;
+    let trackingRoutingControl = null;
+    let trackingDestRoutingControl = null;
+    let trackingDriverMarker = null;
+    let trackingPickupMarker = null;
+    let trackingDropoffMarker = null;
+    let trackingIntervalId = null;
+    let isFirstTrackingLoad = true;
+    let hasDriverReachedPickup = false;
+    
+    let activeToastBookingId = null;
+    let currentUserId = null;
+
+    function geocodeAddress(query) {
+      if (!query) return Promise.resolve(null);
+      query = query.trim();
+
+      const cacheKey = `geo_cache_${query.toLowerCase()}`;
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        try {
+          return Promise.resolve(JSON.parse(cached));
+        } catch (e) {
+          localStorage.removeItem(cacheKey);
+        }
+      }
+
+      const executeFetch = (q) => {
+        return fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}`)
+          .then(res => {
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            return res.json();
+          })
+          .then(data => {
+            if (data && data.length > 0) {
+              return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+            }
+            return null;
+          });
+      };
+
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          executeFetch(query).then(result => {
+            if (result) {
+              localStorage.setItem(cacheKey, JSON.stringify(result));
+              resolve(result);
+            } else {
+              if (query.includes(",")) {
+                const parts = query.split(",");
+                if (parts.length >= 2) {
+                  const cityContext = parts[parts.length - 1].trim();
+                  const firstPart = parts[0].trim();
+                  const fallbackQuery = `${firstPart}, ${cityContext}`;
+                  
+                  setTimeout(() => {
+                    executeFetch(fallbackQuery).then(fallbackResult => {
+                      if (fallbackResult) {
+                        localStorage.setItem(cacheKey, JSON.stringify(fallbackResult));
+                        resolve(fallbackResult);
+                      } else {
+                        if (parts.length > 2) {
+                          const secondPart = parts[1].trim();
+                          const fallbackQuery2 = `${secondPart}, ${cityContext}`;
+                          setTimeout(() => {
+                            executeFetch(fallbackQuery2).then(fallbackResult2 => {
+                              if (fallbackResult2) {
+                                localStorage.setItem(cacheKey, JSON.stringify(fallbackResult2));
+                                resolve(fallbackResult2);
+                              } else {
+                                resolve(null);
+                              }
+                            });
+                          }, 400);
+                        } else {
+                          resolve(null);
+                        }
+                      }
+                    });
+                  }, 400);
+                } else {
+                  resolve(null);
+                }
+              } else {
+                resolve(null);
+              }
+            }
+          }).catch(err => {
+            console.warn("Geocoding fetch error:", err);
+            resolve(null);
+          });
+        }, Math.random() * 400);
+      });
+    }
+
+    {% if user %}
+    currentUserId = "{{ user.id }}";
+    
+    // Check for enroute bookings on page load and poll periodically
+    window.addEventListener("DOMContentLoaded", () => {
+      checkEnrouteBookings();
+      // Poll every 10 seconds for driver status
+      setInterval(checkEnrouteBookings, 10000);
+    });
+    {% endif %}
+
+    async function checkEnrouteBookings() {
+      if (!currentUserId) return;
+      try {
+        const res = await fetch(`/api/provider/bookings/active-enroute?user_id=${currentUserId}`);
+        if (!res.ok) return;
+        const bookings = await res.json();
+        
+        if (bookings && bookings.length > 0) {
+          const booking = bookings[0]; // focus on the first active enroute booking
+          activeToastBookingId = booking.id;
+
+          // Ensure red dot is shown on My Bookings
+          let dot = document.querySelector("#nav-my-bookings-link .unread-dot");
+          if (!dot) {
+            dot = document.createElement("span");
+            dot.className = "unread-dot";
+            dot.style.cssText = "position: absolute; top: -3px; right: -8px; width: 8px; height: 8px; background: #ff4d4f; border-radius: 50%;";
+            document.getElementById("nav-my-bookings-link").appendChild(dot);
+          }
+
+          // Customize toast text
+          const title = document.getElementById("toast-title");
+          const body = document.getElementById("toast-body");
+          if (booking.navigation_status === "trip_started") {
+            title.textContent = "Your vehicle is ready!";
+            body.innerHTML = `Your vehicle <strong>${booking.vehicle_name || 'xyz'}</strong> is ready to go, get to your pickup point on time.`;
+          } else {
+            title.textContent = "Your driver is on the way!";
+            body.textContent = "Ready for a wonderful trip. Track your driver's live location now.";
+          }
+
+          // Show Toast notification if tracking modal is not open
+          const modalOverlay = document.getElementById("tracking-modal-overlay");
+          const toast = document.getElementById("driver-alert-toast");
+          if (modalOverlay.style.display !== "flex" && toast.style.display !== "flex") {
+            toast.style.display = "flex";
+            setTimeout(() => {
+              toast.style.opacity = "1";
+              toast.style.transform = "translateY(0)";
+            }, 50);
+          }
+        }
+
+      } catch (err) {
+        console.warn("Failed to check enroute bookings:", err);
+      }
+    }
+
+    function triggerToastTracking() {
+      if (activeToastBookingId) {
+        openTrackingModal(activeToastBookingId);
+      }
+    }
+
+    function closeToast() {
+      const toast = document.getElementById("driver-alert-toast");
+      if (toast) {
+        toast.style.opacity = "0";
+        toast.style.transform = "translateY(100px)";
+        setTimeout(() => {
+          toast.style.display = "none";
+        }, 300);
+      }
+    }
+
+    function openTrackingModal(bookingId) {
+      closeToast();
+      isFirstTrackingLoad = true;
+      hasDriverReachedPickup = false;
+
+      const overlay = document.getElementById("tracking-modal-overlay");
+      overlay.style.display = "flex";
+      setTimeout(() => {
+        overlay.style.opacity = "1";
+      }, 50);
+
+      // Initialize Leaflet Map if not done
+      setTimeout(() => {
+        if (!trackingMap) {
+          trackingMap = L.map('tracking-map').setView([26.9124, 75.7873], 13);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+          }).addTo(trackingMap);
+        } else {
+          clearTrackingLayers();
+        }
+
+        // Fetch first payload
+        fetchTrackingData(bookingId);
+        
+        // Start polling tracking payload every 5 seconds
+        if (trackingIntervalId) clearInterval(trackingIntervalId);
+        trackingIntervalId = setInterval(() => fetchTrackingData(bookingId), 5000);
+      }, 200);
+    }
+
+    async function fetchTrackingData(bookingId) {
+      try {
+        const res = await fetch(`/api/provider/bookings/${bookingId}/track`);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        // Resolve Pickup LatLng (either direct or client-side geocoding fallback)
+        let pickupLatLng = null;
+        if (data.pickup_lat && data.pickup_lon) {
+          pickupLatLng = L.latLng(data.pickup_lat, data.pickup_lon);
+        } else if (data.pickup_name) {
+          let query = data.pickup_name;
+          if (data.origin && !query.toLowerCase().includes(data.origin.toLowerCase())) {
+            query += `, ${data.origin}`;
+          }
+          const coord = await geocodeAddress(query);
+          if (coord) {
+            pickupLatLng = L.latLng(coord.lat, coord.lon);
+          }
+        }
+
+        // Resolve Drop-off LatLng (either direct or client-side geocoding fallback)
+        let dropoffLatLng = null;
+        if (data.dropoff_lat && data.dropoff_lon) {
+          dropoffLatLng = L.latLng(data.dropoff_lat, data.dropoff_lon);
+        } else if (data.dropoff_name) {
+          let query = data.dropoff_name;
+          const suffix = data.destination || data.origin;
+          if (suffix && !query.toLowerCase().includes(suffix.toLowerCase())) {
+            query += `, ${suffix}`;
+          }
+          const coord = await geocodeAddress(query);
+          if (coord) {
+            dropoffLatLng = L.latLng(coord.lat, coord.lon);
+          }
+        }
+
+        // Fallback to vehicle's destination city
+        if (!dropoffLatLng && data.destination) {
+          const coord = await geocodeAddress(data.destination);
+          if (coord) {
+            dropoffLatLng = L.latLng(coord.lat, coord.lon);
+          }
+        }
+
+        let driverLatLng = (data.driver_lat && data.driver_lon) ? L.latLng(data.driver_lat, data.driver_lon) : null;
+        if (!driverLatLng && data.origin) {
+          const coord = await geocodeAddress(data.origin);
+          if (coord) {
+            driverLatLng = L.latLng(coord.lat, coord.lon);
+          }
+        }
+
+
+        const statusTitle = document.getElementById("tracking-status-title");
+        const hudEta = document.getElementById("tracking-hud-eta");
+
+        if (data.status === "cancelled") {
+          statusTitle.textContent = "Booking Cancelled";
+          statusTitle.style.color = "#ef4444";
+          hudEta.textContent = "This booking has been cancelled.";
+          closeTrackingModal();
+          return;
+        }
+
+        if (data.navigation_status === "trip_started") {
+          statusTitle.textContent = "Trip Started";
+          statusTitle.style.color = "#FF6B35";
+          hudEta.textContent = "Vehicle is on the way to pick you up.";
+        } else if (data.navigation_status === "enroute") {
+          statusTitle.textContent = "Driver Enroute";
+          statusTitle.style.color = "#1D9E75";
+          hudEta.textContent = "Calculating route...";
+        } else {
+          statusTitle.textContent = "Driver Status";
+          hudEta.textContent = "Driver is preparing your cab...";
+        }
+
+
+        // Markers
+        if (pickupLatLng && !trackingPickupMarker) {
+          const pickupIcon = L.divIcon({ html:`<div style="background:#1DB954;color:#fff;padding:4px 8px;border-radius:4px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.2);transform: translate(-50%, -50%);">📥 Pickup: ${data.pickup_name || 'Passenger'}</div>`, className:'', iconSize:[null,22] });
+          trackingPickupMarker = L.marker(pickupLatLng, { icon: pickupIcon }).addTo(trackingMap);
+        }
+
+        if (hasDriverReachedPickup && dropoffLatLng) {
+          if (!trackingDropoffMarker) {
+            const destIcon = L.divIcon({ html:`<div style="background:#ef4444;color:#fff;padding:4px 8px;border-radius:4px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.2);transform: translate(-50%, -50%);">🏁 Drop-off: ${data.dropoff_name || data.destination || 'Destination'}</div>`, className:'', iconSize:[null,22] });
+            trackingDropoffMarker = L.marker(dropoffLatLng, { icon: destIcon }).addTo(trackingMap);
+          }
+        } else {
+          if (trackingDropoffMarker) {
+            trackingMap.removeLayer(trackingDropoffMarker);
+            trackingDropoffMarker = null;
+          }
+        }
+
+        if (driverLatLng) {
+          const driverIcon = L.divIcon({ html:`<div style="font-size:28px; transform: translate(-50%, -50%);">🚖</div>`, className:'', iconSize:[28,28] });
+          if (!trackingDriverMarker) {
+            trackingDriverMarker = L.marker(driverLatLng, { icon: driverIcon }).addTo(trackingMap);
+          } else {
+            trackingDriverMarker.setLatLng(driverLatLng);
+          }
+        }
+
+        // Check if driver has reached/passed pickup
+        if (driverLatLng && pickupLatLng && dropoffLatLng && !hasDriverReachedPickup) {
+          const distToPickup = trackingMap.distance(driverLatLng, pickupLatLng);
+          const distToDestination = trackingMap.distance(driverLatLng, dropoffLatLng);
+          const pickupToDestination = trackingMap.distance(pickupLatLng, dropoffLatLng);
+
+          if (distToPickup < 150 || distToDestination < (pickupToDestination - 150)) {
+            hasDriverReachedPickup = true;
+            isFirstTrackingLoad = true; // Trigger map refit for the whole route!
+          }
+        } else if (driverLatLng && pickupLatLng && !hasDriverReachedPickup) {
+          const distToPickup = trackingMap.distance(driverLatLng, pickupLatLng);
+          if (distToPickup < 150) {
+            hasDriverReachedPickup = true;
+            isFirstTrackingLoad = true; // Trigger map refit for the whole route!
+          }
+        }
+
+        // Route calculation and map centering
+        const activeCoords = [];
+        if (driverLatLng) activeCoords.push(driverLatLng);
+        if (pickupLatLng) activeCoords.push(pickupLatLng);
+        if (hasDriverReachedPickup && dropoffLatLng) activeCoords.push(dropoffLatLng);
+
+        // 1. Segment 1: Driver to Pickup (only shown before reaching pickup)
+        if (driverLatLng && pickupLatLng && !hasDriverReachedPickup) {
+          if (trackingRoutingControl) {
+            trackingRoutingControl.setWaypoints([driverLatLng, pickupLatLng]);
+          } else {
+            trackingRoutingControl = L.Routing.control({
+              waypoints: [driverLatLng, pickupLatLng],
+              routeWhileDragging: false,
+              addWaypoints: false,
+              createMarker: () => null,
+              fitSelectedRoutes: false,
+              router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1', profile: 'driving' }),
+              lineOptions: { styles: [{ color: '#FF6B35', opacity:0.85, weight:6 }] }
+            }).addTo(trackingMap);
+
+            trackingRoutingControl.on('routeselected', function(e) {
+              const route = e.route;
+              const distKm = (route.summary.totalDistance / 1000).toFixed(1);
+              const durMins = Math.round(route.summary.totalTime / 60);
+              hudEta.textContent = `Driver is ${distKm} km away (approx. ${durMins} mins)`;
+            });
+          }
+        } else {
+          if (trackingRoutingControl) {
+            trackingMap.removeControl(trackingRoutingControl);
+            trackingRoutingControl = null;
+          }
+        }
+
+        // 2. Segment 2: Pickup to Destination (only shown once reaching pickup)
+        //    Always route through the pickup point so the line covers the pickup marker
+        if (hasDriverReachedPickup && pickupLatLng && dropoffLatLng) {
+          const waypts = driverLatLng ? [driverLatLng, pickupLatLng, dropoffLatLng] : [pickupLatLng, dropoffLatLng];
+          if (trackingDestRoutingControl) {
+            trackingDestRoutingControl.setWaypoints(waypts);
+          } else {
+            trackingDestRoutingControl = L.Routing.control({
+              waypoints: waypts,
+              routeWhileDragging: false,
+              addWaypoints: false,
+              createMarker: () => null,
+              fitSelectedRoutes: false,
+              router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1', profile: 'driving' }),
+              lineOptions: { styles: [{ color: '#3b82f6', opacity:0.75, weight:5, dashArray: '10, 5' }] }
+            }).addTo(trackingMap);
+
+            trackingDestRoutingControl.on('routeselected', function(e) {
+              const route = e.route;
+              const distKm = (route.summary.totalDistance / 1000).toFixed(1);
+              const durMins = Math.round(route.summary.totalTime / 60);
+              hudEta.textContent = `Heading to destination: ${distKm} km away (approx. ${durMins} mins)`;
+            });
+          }
+        } else {
+          if (trackingDestRoutingControl) {
+            trackingMap.removeControl(trackingDestRoutingControl);
+            trackingDestRoutingControl = null;
+          }
+        }
+
+        // Centering bounds (executed only on initial load to prevent resetting user zoom/pan)
+        if (isFirstTrackingLoad) {
+          if (activeCoords.length >= 2) {
+            const bounds = L.latLngBounds(activeCoords);
+            trackingMap.fitBounds(bounds, { padding: [50, 50] });
+            isFirstTrackingLoad = false;
+          } else if (driverLatLng) {
+            trackingMap.setView(driverLatLng, 14);
+            isFirstTrackingLoad = false;
+          } else if (pickupLatLng) {
+            trackingMap.setView(pickupLatLng, 14);
+            isFirstTrackingLoad = false;
+          } else {
+            // Fallback to geocode vehicle origin
+            if (data.origin) {
+              geocodeAddress(data.origin).then(coord => {
+                if (coord && trackingMap && isFirstTrackingLoad) {
+                  trackingMap.setView(L.latLng(coord.lat, coord.lon), 12);
+                  isFirstTrackingLoad = false;
+                }
+              });
+            }
+          }
+        }
+
+        // Update ETA status text on every poll if routing control is not active
+        if (!driverLatLng && pickupLatLng) {
+          hudEta.textContent = "Waiting for driver to share live location...";
+        } else if (!driverLatLng && !pickupLatLng) {
+          hudEta.textContent = "Waiting for driver location updates...";
+        } else if (driverLatLng && !pickupLatLng) {
+          hudEta.textContent = "Driver is enroute.";
+        }
+
+      } catch (err) {
+        console.warn("Error fetching tracking data:", err);
+      }
+    }
+
+    function clearTrackingLayers() {
+      if (trackingRoutingControl) {
+        trackingMap.removeControl(trackingRoutingControl);
+        trackingRoutingControl = null;
+      }
+      if (trackingDestRoutingControl) {
+        trackingMap.removeControl(trackingDestRoutingControl);
+        trackingDestRoutingControl = null;
+      }
+      if (trackingDriverMarker) {
+        trackingMap.removeLayer(trackingDriverMarker);
+        trackingDriverMarker = null;
+      }
+      if (trackingPickupMarker) {
+        trackingMap.removeLayer(trackingPickupMarker);
+        trackingPickupMarker = null;
+      }
+      if (trackingDropoffMarker) {
+        trackingMap.removeLayer(trackingDropoffMarker);
+        trackingDropoffMarker = null;
+      }
+    }
+
+    function closeTrackingModal() {
+      const overlay = document.getElementById("tracking-modal-overlay");
+      overlay.style.opacity = "0";
+      setTimeout(() => {
+        overlay.style.display = "none";
+      }, 200);
+
+      if (trackingIntervalId) {
+        clearInterval(trackingIntervalId);
+        trackingIntervalId = null;
+      }
+      clearTrackingLayers();
+    }
+  </script>
 </body>
-</html>
+</html>
