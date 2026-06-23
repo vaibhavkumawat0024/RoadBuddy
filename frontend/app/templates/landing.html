@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>RoadBuddy | Precision Logistics &amp; Safe Travel</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "secondary-fixed-dim": "#ffb59d",
+            "error": "#ba1a1a",
+            "surface-container-low": "#f5f3f3",
+            "primary": "#00694c",
+            "on-tertiary-fixed": "#002108",
+            "surface-container-high": "#eae8e7",
+            "secondary": "#ab3500",
+            "on-secondary-fixed": "#390c00",
+            "on-tertiary-container": "#f7fff2",
+            "tertiary-fixed-dim": "#53e076",
+            "on-secondary": "#ffffff",
+            "on-error-container": "#93000a",
+            "on-primary-fixed-variant": "#00513a",
+            "surface-tint": "#006c4e",
+            "on-surface": "#1b1c1c",
+            "inverse-primary": "#68dbae",
+            "primary-fixed": "#86f8c9",
+            "on-primary-container": "#f5fff7",
+            "on-secondary-fixed-variant": "#832600",
+            "primary-fixed-dim": "#68dbae",
+            "on-tertiary-fixed-variant": "#005320",
+            "inverse-on-surface": "#f2f0f0",
+            "surface": "#fbf9f8",
+            "secondary-container": "#fe6a34",
+            "tertiary-fixed": "#72fe8f",
+            "on-primary-fixed": "#002115",
+            "on-error": "#ffffff",
+            "on-background": "#1b1c1c",
+            "surface-container": "#efeded",
+            "tertiary": "#006b2b",
+            "surface-container-lowest": "#ffffff",
+            "secondary-fixed": "#ffdbd0",
+            "inverse-surface": "#303030",
+            "on-surface-variant": "#3d4943",
+            "primary-container": "#008560",
+            "surface-variant": "#e4e2e2",
+            "on-primary": "#ffffff",
+            "on-tertiary": "#ffffff",
+            "surface-bright": "#fbf9f8",
+            "tertiary-container": "#008739",
+            "surface-container-highest": "#e4e2e2",
+            "surface-dim": "#dbdad9",
+            "error-container": "#ffdad6",
+            "outline-variant": "#bccac1",
+            "on-secondary-container": "#5d1900",
+            "outline": "#6d7a73",
+            "background": "#fbf9f8"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "lg": "16px",
+            "sm": "8px",
+            "layout": "32px",
+            "max-width": "1100px",
+            "md": "12px",
+            "xl": "20px",
+            "xs": "4px",
+            "xxl": "24px",
+            "base": "4px"
+          },
+          "fontFamily": {
+            "headline-md": ["Inter"],
+            "headline-lg-mobile": ["Inter"],
+            "body-sm": ["Inter"],
+            "display-stat": ["Inter"],
+            "body-base": ["Inter"],
+            "label-caps": ["Inter"],
+            "headline-lg": ["Inter"]
+          },
+          "fontSize": {
+            "headline-md": ["18px", {"lineHeight": "1.3", "fontWeight": "600"}],
+            "headline-lg-mobile": ["20px", {"lineHeight": "1.2", "fontWeight": "700"}],
+            "body-sm": ["13px", {"lineHeight": "1.5", "fontWeight": "400"}],
+            "display-stat": ["48px", {"lineHeight": "1.1", "fontWeight": "700"}],
+            "body-base": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}],
+            "label-caps": ["11px", {"lineHeight": "1.2", "letterSpacing": "0.5px", "fontWeight": "600"}],
+            "headline-lg": ["24px", {"lineHeight": "1.2", "fontWeight": "700"}]
+          }
+        },
+      },
+    }
+  </script>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(0, 105, 76, 0.1);
+    }
+    .hero-gradient {
+      background: radial-gradient(circle at top right, rgba(134, 248, 201, 0.15), transparent),
+                  radial-gradient(circle at bottom left, rgba(0, 105, 76, 0.05), transparent);
+    }
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(12px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    .animate-fade-in-up {
+      animation: fadeInUp 0.5s ease forwards;
+    }
+  </style>
+</head>
+<body class="bg-background text-on-surface selection:bg-primary-fixed selection:text-on-primary-fixed">
+
+  <!-- Top Navigation Shell -->
+  <nav class="sticky top-0 z-50 bg-surface-container-lowest border-b border-outline-variant">
+    <div class="max-w-max-width mx-auto px-layout h-16 flex justify-between items-center">
+      <!-- Brand -->
+      <div class="flex items-center gap-sm">
+        <span class="material-symbols-outlined text-primary text-3xl" style="font-variation-settings: 'FILL' 1;">directions_car</span>
+        <span class="text-headline-lg font-headline-lg font-bold text-primary">RoadBuddy</span>
+      </div>
+      
+      <!-- Actions -->
+      <div class="flex items-center gap-md">
+        {% if is_logged_in %}
+          <a href="/dashboard" class="bg-primary hover:bg-primary-container text-on-primary px-xl py-sm rounded-lg font-body-base transition-all active:scale-95 text-xs font-bold text-white flex items-center justify-center h-9">Go to Dashboard</a>
+        {% else %}
+          <a href="/login" class="font-body-base text-xs text-primary hover:bg-primary/5 px-3 py-2 rounded-lg transition-colors font-semibold">Login</a>
+          <a href="/register" class="bg-primary hover:bg-primary-container text-on-primary px-xl py-sm rounded-lg font-body-base transition-all active:scale-95 text-xs font-bold text-white flex items-center justify-center h-9">Sign Up</a>
+        {% endif %}
+      </div>
+    </div>
+  </nav>
+
+  <main class="animate-fade-in-up">
+    <!-- Hero Section -->
+    <section class="relative min-h-[600px] flex items-center py-20 overflow-hidden hero-gradient">
+      <div class="max-w-max-width mx-auto px-layout grid lg:grid-cols-2 gap-xxl items-center relative z-10 w-full">
+        <div class="space-y-xl">
+          <div class="inline-flex items-center gap-sm px-md py-xs bg-primary-fixed text-on-primary-fixed rounded-full">
+            <span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">bolt</span>
+            <span class="font-label-caps text-label-caps uppercase tracking-wider">AI-Powered Routing Now Live</span>
+          </div>
+          <h1 class="font-headline-lg text-4xl lg:text-5xl font-extrabold tracking-tight text-on-surface leading-tight">
+            Precision Logistics for the <span class="text-primary">Modern Explorer.</span>
+          </h1>
+          <p class="font-body-base text-sm text-on-surface-variant max-w-[500px]">
+            The ultimate travel companion combining real-time vehicle diagnostics, high-security route planning, and an elite partner ecosystem.
+          </p>
+          
+          <!-- Search Bar Shell -->
+          <form action="/plan-trip" method="GET" class="bg-surface-container-lowest p-sm rounded-xl shadow-xl border border-outline-variant flex flex-col md:flex-row gap-sm">
+            <div class="flex-1 flex items-center gap-sm px-md border-r border-slate-100">
+              <span class="material-symbols-outlined text-outline">location_on</span>
+              <input name="origin" class="w-full bg-transparent border-none focus:ring-0 font-body-base py-sm text-xs text-slate-800" placeholder="Starting Point" type="text" required/>
+            </div>
+            <div class="flex-1 flex items-center gap-sm px-md">
+              <span class="material-symbols-outlined text-primary">navigation</span>
+              <input name="destination" class="w-full bg-transparent border-none focus:ring-0 font-body-base py-sm text-xs text-slate-800" placeholder="Destination" type="text" required/>
+            </div>
+            <button type="submit" class="bg-primary text-on-primary px-xxl py-md rounded-lg font-headline-md hover:bg-primary-container transition-all text-xs font-bold text-white">
+              Search Route
+            </button>
+          </form>
+        </div>
+        
+        <div class="relative hidden lg:block">
+          <!-- Map/Visual Representation -->
+          <div class="rounded-xxl overflow-hidden shadow-2xl border-4 border-surface-container-lowest">
+            <img class="w-full h-[400px] object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBs82gf0ZmJaS9LvtP3KS3qTbw0TLDk9C-PNVE5fEW2ENgFFikZ4YMfWuR5eRlI-O7YknQGQ5pDifAUWsgPJnZTH4truPAD9So3KSLjrmtpDNSiSPvyT-8DywQ4kkXsBzzOombyYJ-BOMMvj7MOoFNTFResli7BxuGQORhtihI2kXzbBtw1yFV09oqqKd90IPldyOddQy2ljNo5JYOJNj3RvTDvi_2Dv5v0CudkVfnYm05lYIKKCzsmSiex7wXxIxQEptI6qYB1agw"/>
+          </div>
+          <!-- Floating Data Cards -->
+          <div class="absolute -bottom-6 -left-6 glass-panel p-md rounded-xl shadow-lg flex items-center gap-md">
+            <div class="w-10 h-10 rounded-full bg-tertiary-container flex items-center justify-center">
+              <span class="material-symbols-outlined text-on-tertiary-container text-lg" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+            </div>
+            <div>
+              <p class="font-label-caps text-on-surface-variant text-[9px]">SAFETY SCORE</p>
+              <p class="font-headline-md text-primary text-sm font-bold">98/100</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features Bento Grid -->
+    <section class="py-16 bg-surface-container-low">
+      <div class="max-w-max-width mx-auto px-layout">
+        <div class="text-center mb-xxl space-y-sm">
+          <h2 class="font-headline-lg text-3xl text-on-surface">Precision Features</h2>
+          <p class="font-body-base text-sm text-on-surface-variant max-w-xl mx-auto">Advanced technology designed to keep your journey efficient, safe, and uninterrupted.</p>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-lg">
+          <!-- AI Routing -->
+          <div class="md:col-span-2 bg-surface-container-lowest p-xl rounded-xxl border border-outline-variant flex flex-col md:flex-row gap-xl items-center">
+            <div class="flex-1 space-y-md">
+              <div class="w-14 h-14 bg-primary-fixed text-on-primary-fixed rounded-xl flex items-center justify-center">
+                <span class="material-symbols-outlined text-3xl text-primary">psychology</span>
+              </div>
+              <h3 class="font-headline-md text-xl text-on-surface">AI-Driven Route Planning</h3>
+              <p class="font-body-base text-xs text-on-surface-variant">Our neural engine analyzes traffic patterns, weather anomalies, and fuel efficiency in real-time to provide the most dependable path forward.</p>
+            </div>
+            <div class="flex-1">
+              <img class="rounded-xl w-full h-44 object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAsw8J0MJ2opjRR9cp3db4bQZjQcvCr8yADOEdsNYfzrDn6LWW_rbRyQAGIh_q-D7l6wU3E9Osxy68YztWX8Enc_o9RRjKGDWsOYiQpOLovFEuj14tdHVL-nEFPznCO2jnjmy_uvkyncy9D0NxU1b0eeRfFYkzKtjSTkrDLq8kijLQqDLngKrQ-3deWhDQyVWK-WYU5vy9wXtivXcFtYe7C0wjiVbwa97toNYPRR2xiDXjUYk1tMmoUqkwQJjSW5HaMJZ_m2JwxfzQ"/>
+            </div>
+          </div>
+          <!-- Safety Protocol -->
+          <div class="bg-primary p-xl rounded-xxl text-on-primary flex flex-col justify-between">
+            <span class="material-symbols-outlined text-5xl mb-xl text-white">shield_with_heart</span>
+            <div class="space-y-sm">
+              <h3 class="font-headline-md text-xl text-white">Safety-First Protocol</h3>
+              <p class="font-body-base text-xs opacity-90 text-white/90">24/7 real-time monitoring and advanced driver safety scoring to minimize risk on every mile.</p>
+              <div class="pt-md">
+                <div class="h-1 w-full bg-on-primary/20 rounded-full">
+                  <div class="h-1 w-[92%] bg-tertiary-fixed rounded-full"></div>
+                </div>
+                <p class="text-[9px] mt-xs opacity-80 font-label-caps text-white/80">OPTIMAL SAFETY RATING</p>
+              </div>
+            </div>
+          </div>
+          <!-- Partner Ecosystem -->
+          <div class="bg-surface-container-lowest p-xl rounded-xxl border border-outline-variant space-y-md group cursor-pointer hover:shadow-xl transition-all">
+            <div class="w-14 h-14 bg-secondary-fixed text-on-secondary-fixed rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+              <span class="material-symbols-outlined text-3xl text-secondary">storefront</span>
+            </div>
+            <h3 class="font-headline-md text-lg text-on-surface">Partner Ecosystem</h3>
+            <p class="font-body-base text-xs text-on-surface-variant">Exclusive access to premium rest stops, charging stations, and logistics hubs with pre-verified safety standards.</p>
+          </div>
+          <!-- Predictive Maintenance -->
+          <div class="md:col-span-2 bg-surface-container-highest p-xl rounded-xxl flex flex-col md:flex-row gap-xl items-center overflow-hidden">
+            <div class="flex-1 space-y-md">
+              <div class="w-14 h-14 bg-surface-container-lowest text-primary rounded-xl flex items-center justify-center">
+                <span class="material-symbols-outlined text-3xl">build_circle</span>
+              </div>
+              <h3 class="font-headline-md text-xl text-on-surface">Predictive Maintenance</h3>
+              <p class="font-body-base text-xs text-on-surface-variant">Sync your vehicle’s OBD-II data to predict mechanical failures before they happen, keeping your fleet on the road longer.</p>
+            </div>
+            <div class="flex-1 h-full min-h-[160px] relative">
+              <img class="absolute inset-0 w-full h-full object-cover rounded-xl" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDTSsoo0nVYHnxsS36AI2vtZSRJzQIvxrVKmVY6tuBnhRdtSa7NxyKaijbTRMesMud3lXyvgodOVUF3CMmQCgaoaq6BWD3aVeq4h4BjGsNuDdbo0d4P1qnXzDGlElqRNoww83sjtUcSLBZSzCPgQh92OnkDawmM5gGFvptagIOwQkCHCOF6INFPtGXsEyT6vdhqTP3GojiZDtdHkLfppBYGNahJlCg3jMmvPmHeV7vEL9LLGN6SloBw9FeXLUgf5zDV7xjzpHyINn8"/>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Testimonials -->
+    <section class="py-16 max-w-max-width mx-auto px-layout">
+      <h2 class="font-headline-lg text-2xl text-center mb-xxl text-on-surface font-bold">Voices from the Road</h2>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-xl">
+        <!-- Logistics Manager -->
+        <div class="bg-surface-container-lowest p-xl rounded-xl border border-outline-variant flex flex-col gap-lg shadow-sm">
+          <p class="font-body-base italic text-xs text-on-surface-variant leading-relaxed">
+            "RoadBuddy transformed our operational transparency. Monitoring a fleet of 50 trucks became seamless with the AI-driven routing and safety scores."
+          </p>
+          <div class="flex items-center gap-md">
+            <div class="w-10 h-10 rounded-full bg-primary-fixed overflow-hidden">
+              <img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCrN7a6o7AMEq4tp-THHnDOPA_CBzzO--621VRtPO2LMOLvqTqEraZqWIH2VPI08GY7EhoEUUk8oADueSky1zsy5sbhZz1VUZLdABoxkpcV-TdqxiNerEhtYxEio1ZFHDbjznODcHXb-wu18ikbvGI2uwIcW7MzMXtKdEu0CENgh0YmiI_eKnUR0eIFOOvMN0kShnuyBeO3pvE691xzsG7f3r-aOGMOIxJqshvG-pWRM_skWf5a_bRUCuV_AQmXZdLkZFpvOiADYfU"/>
+            </div>
+            <div>
+              <p class="font-headline-md text-primary text-xs font-bold">Marcus Thorne</p>
+              <p class="font-label-caps text-on-surface-variant text-[9px]">Logistics Director</p>
+            </div>
+          </div>
+        </div>
+        <!-- Solo Traveler -->
+        <div class="bg-surface-container-lowest p-xl rounded-xl border border-outline-variant flex flex-col gap-lg shadow-sm">
+          <p class="font-body-base italic text-xs text-on-surface-variant leading-relaxed">
+            "As a solo traveler, safety is my number one priority. Knowing my route is pre-screened and help is just one tap away gives me total peace of mind."
+          </p>
+          <div class="flex items-center gap-md">
+            <div class="w-10 h-10 rounded-full bg-tertiary-fixed overflow-hidden">
+              <img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBax3-F4HrWYPqnRkHuYLif86WunkHDYVsE6vNPvrMd9cgCW_63mbEC8GX-A2IzHoabJ3M0RmjV_EYAk2pPPyn1pi4o3zpABDc4Dzb1PC3kmT3F2KPcvuYvqsr9rsV-GL2Wa4rG6nfwKC57QuCYWAkuhJ2xRHkmdGUe8WKV9SLVgvoc5GiHo8QTXei-U_3v4IVrRPMsjPk8DdLp5mo4Y1XT7T22_l2zDQAi6r0eQaCO43O03eSWiLXPlmge9d-YoK4GYY8T_Zr04J0"/>
+            </div>
+            <div>
+              <p class="font-headline-md text-primary text-xs font-bold">Elena Rodriguez</p>
+              <p class="font-label-caps text-on-surface-variant text-[9px]">Digital Nomad</p>
+            </div>
+          </div>
+        </div>
+        <!-- Fleet Owner -->
+        <div class="bg-surface-container-lowest p-xl rounded-xl border border-outline-variant flex flex-col gap-lg shadow-sm">
+          <p class="font-body-base italic text-xs text-on-surface-variant leading-relaxed">
+            "The predictive maintenance feature saved us over $20,000 in emergency repairs this quarter alone. It's not just an app; it's an asset."
+          </p>
+          <div class="flex items-center gap-md">
+            <div class="w-10 h-10 rounded-full bg-secondary-fixed overflow-hidden">
+              <img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDbgt4pfl6Akk2zqALjD1d0FHvAvZKVHx7W8SiGaQ8u0Dl_KeVqsxS3fNnYfumqLZp8tbPWMqJCseqxFrsjqsmFvJ1uXpU92Fgb2GlCCGk-n2Dpk9iJZ3GYiVRkvT5vwSjDSxvyt_2T8q2e0unhbaxaYY0KZAcN-mXq2o1caej7_iMjpPCogRhodAzaWv5PTKXO_NKAArSDuL70HtD4oV37HcIWIeiaHYsD-JdrNlQeuOGZExoLrgmcM3pEeuaAmCrNh0iPponddUA"/>
+            </div>
+            <div>
+              <p class="font-headline-md text-primary text-xs font-bold">David Jenkins</p>
+              <p class="font-label-caps text-on-surface-variant text-[9px]">Owner, DJ Logistics</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="py-16">
+      <div class="max-w-max-width mx-auto px-layout">
+        <div class="bg-primary rounded-xxl p-xl text-center text-on-primary relative overflow-hidden">
+          <div class="absolute inset-0 opacity-10 pointer-events-none" style="background-image: radial-gradient(#ffffff 1px, transparent 1px); background-size: 20px 20px;"></div>
+          <div class="relative z-10 space-y-lg max-w-2xl mx-auto">
+            <h2 class="font-headline-lg text-3xl text-white font-bold">Ready for a Smarter Journey?</h2>
+            <p class="font-body-base text-sm opacity-90 text-white/90">Join over 10,000 professional drivers and travelers who trust RoadBuddy for their daily logistics.</p>
+            <div class="flex flex-col md:flex-row justify-center gap-md pt-lg">
+              {% if is_logged_in %}
+                <a href="/dashboard" class="bg-on-primary text-primary px-xxl py-md rounded-lg font-headline-md hover:bg-primary-fixed transition-all inline-block font-bold">Go to Dashboard</a>
+              {% else %}
+                <a href="/register" class="bg-on-primary text-primary px-xxl py-md rounded-lg font-headline-md hover:bg-primary-fixed transition-all inline-block font-bold">Get Started Free</a>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer Shell -->
+  <footer class="bg-surface-container-highest border-t border-outline-variant py-layout">
+    <div class="max-w-max-width mx-auto px-layout">
+      <div class="flex flex-col md:flex-row justify-between items-start gap-xxl mb-xxl">
+        <div class="space-y-md">
+          <div class="flex items-center gap-sm">
+            <span class="material-symbols-outlined text-primary text-3xl">directions_car</span>
+            <span class="text-headline-md font-bold text-primary">RoadBuddy</span>
+          </div>
+          <p class="font-body-sm text-[11px] text-on-surface-variant max-w-xs">Adventure with Precision. Our platform brings high-end logistics technology to every traveler and fleet manager.</p>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-xl">
+          <div class="space-y-md">
+            <p class="font-label-caps text-primary text-[10px] font-bold">PLATFORM</p>
+            <ul class="space-y-sm text-xs">
+              <li><a class="text-on-surface-variant hover:text-primary transition-colors" href="/plan-trip">Planner</a></li>
+              <li><a class="text-on-surface-variant hover:text-primary transition-colors" href="/community">Safety Scoring</a></li>
+              <li><a class="text-on-surface-variant hover:text-primary transition-colors" href="/bookings">Transit Portal</a></li>
+            </ul>
+          </div>
+          <div class="space-y-md">
+            <p class="font-label-caps text-primary text-[10px] font-bold">LEGAL</p>
+            <ul class="space-y-sm text-xs">
+              <li><a class="text-on-surface-variant hover:text-primary transition-colors" href="#">Privacy Policy</a></li>
+              <li><a class="text-on-surface-variant hover:text-primary transition-colors" href="#">Terms of Service</a></li>
+            </ul>
+          </div>
+          <div class="space-y-md">
+            <p class="font-label-caps text-primary text-[10px] font-bold">CONNECT</p>
+            <div class="flex gap-md text-slate-500">
+              <span class="material-symbols-outlined hover:text-primary cursor-pointer">public</span>
+              <span class="material-symbols-outlined hover:text-primary cursor-pointer">mail</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pt-lg border-t border-outline-variant flex flex-col md:flex-row justify-between items-center gap-md text-xs text-slate-400">
+        <p>© 2026 RoadBuddy Logistics. Adventure with Precision.</p>
+        <span class="text-[10px] font-label-caps text-primary bg-primary/10 px-sm py-1 rounded">SYSTEM STATUS: OPTIMAL</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    document.querySelectorAll('input').forEach(input => {
+      input.addEventListener('focus', () => {
+        input.parentElement.classList.add('ring-1', 'ring-primary', 'border-primary');
+      });
+      input.addEventListener('blur', () => {
+        input.parentElement.classList.remove('ring-1', 'ring-primary', 'border-primary');
+      });
+    });
+  </script>
+</body>
+</html>

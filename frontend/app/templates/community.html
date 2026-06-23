@@ -1,0 +1,542 @@
+{% extends "dashboard_base.html" %}
+{% set active_page = 'community' %}
+{% block title %}Traveler Feed & Community — RoadBuddy{% endblock %}
+
+{% block extra_head %}
+<style>
+  .feed-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+  }
+  .modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  .modal-backdrop.active {
+    opacity: 1;
+    pointer-events: all;
+  }
+  .modal-card {
+    background: #fff;
+    border-radius: 16px;
+    max-width: 650px;
+    width: 90%;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    border: 1px solid #e2e8f0;
+    transform: translateY(20px);
+    transition: transform 0.3s ease;
+  }
+  .modal-backdrop.active .modal-card {
+    transform: translateY(0);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Heading -->
+<div class="relative bg-slate-900 rounded-2xl overflow-hidden shadow-lg p-8 flex flex-col justify-between min-h-[180px] border border-white/5" style="background: linear-gradient(rgba(15, 23, 42, 0.55), rgba(15, 23, 42, 0.95)), url('/static/images/community_banner.png'); background-size: cover; background-position: center;">
+  <div class="max-w-xl z-10">
+    <h2 class="text-white text-3xl font-extrabold tracking-tight mb-2">RoadBuddy Community Portal</h2>
+    <p class="text-slate-300 text-sm leading-relaxed mb-4">Explore trip itineraries shared by fellow travelers, or search with natural language powered by AI.</p>
+    
+    <form id="smart-search-form" class="bg-white/10 p-1.5 rounded-xl border border-white/15 backdrop-blur-md flex items-center gap-2 max-w-xl">
+      <span class="material-symbols-outlined text-primary-container pl-2">search</span>
+      <input type="text" id="search-input" class="bg-transparent border-none focus:ring-0 text-white placeholder-slate-400 text-xs flex-grow py-1" placeholder="e.g. scenic driving routes under 300km from Delhi with good food stops..." required>
+      <button type="submit" class="bg-primary hover:bg-primary-container text-white text-xs font-semibold px-4 py-1.5 rounded-lg transition-colors">Search</button>
+    </form>
+  </div>
+</div>
+
+<div class="flex flex-col lg:flex-row gap-6 items-start mt-6">
+  <!-- Left Filter Sidebar -->
+  <aside class="w-full lg:w-64 bg-white border border-outline-variant rounded-xl p-5 shadow-sm space-y-5 flex-shrink-0 animate-fade-in-up">
+    <h3 class="font-bold text-slate-800 text-base border-b border-slate-100 pb-2">Refine Feed</h3>
+    
+    <div class="space-y-4">
+      <div>
+        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Category Tag</label>
+        <select id="tag-filter" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-background focus:ring-1 focus:ring-primary focus:border-primary">
+          <option value="">All Tags</option>
+          <option value="scenic">Scenic</option>
+          <option value="adventure">Adventure</option>
+          <option value="family">Family Friendly</option>
+          <option value="weekend">Weekend Getaway</option>
+          <option value="budget">Budget Friendly</option>
+        </select>
+      </div>
+
+      <div>
+        <div class="flex justify-between items-center mb-1">
+          <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Min Rating</label>
+          <span id="rating-val" class="text-xs font-bold text-primary">0.0</span>
+        </div>
+        <input type="range" id="rating-filter" class="w-full accent-primary cursor-pointer" min="0" max="5" step="0.5" value="0">
+      </div>
+    </div>
+
+    {% if is_logged_in %}
+    <button id="open-publish-modal" class="w-full bg-secondary hover:bg-orange-700 text-white text-xs font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-1.5">
+      <span class="material-symbols-outlined text-sm">add_circle</span>
+      Share A Trip
+    </button>
+    {% endif %}
+  </aside>
+
+  <!-- Main Feed Area -->
+  <div class="flex-grow w-full space-y-4 animate-fade-in-up">
+    <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+      <h3 class="font-bold text-slate-800 text-lg">Community Stories</h3>
+      <div class="flex gap-2">
+        <button class="bg-primary/10 text-primary text-xs font-bold px-3 py-1 rounded-lg">Latest</button>
+        <button class="text-slate-500 hover:bg-slate-100 text-xs font-semibold px-3 py-1 rounded-lg transition-colors">Trending</button>
+      </div>
+    </div>
+
+    <!-- Feed Grid -->
+    <div class="feed-grid" id="routes-grid">
+      <div class="col-span-full text-center py-12 text-slate-400 text-xs italic">
+        Loading routes...
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Route Details Modal -->
+<div class="modal-backdrop" id="detail-modal">
+  <div class="modal-card">
+    <div class="bg-slate-900 p-6 text-white relative" style="background: linear-gradient(rgba(15, 23, 42, 0.7), rgba(15, 23, 42, 0.95)), url('/static/images/community_banner.png'); background-size: cover; background-position: center;">
+      <button class="absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-white w-8 h-8 rounded-full flex items-center justify-center transition-colors text-xl font-bold" id="close-detail-modal">×</button>
+      <span class="bg-primary-container text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider" id="modal-badge">Scenic</span>
+      <h2 id="modal-title" class="text-2xl font-bold mt-2">Trip Title</h2>
+      <p id="modal-author" class="text-slate-300 text-xs mt-1">Shared by Traveler</p>
+    </div>
+    <div class="p-6 space-y-6">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-4">
+        <div class="flex gap-4 text-xs font-semibold text-slate-500">
+          <div class="flex items-center gap-1"><span class="text-orange-500 text-base">★</span> <span id="modal-rating" class="text-slate-800 font-bold">4.8</span></div>
+          <div class="flex items-center gap-1">👤 <span id="modal-reviews-count" class="text-slate-800">12 reviews</span></div>
+          <div class="flex items-center gap-1">🔄 <span id="modal-clones" class="text-slate-800">5 clones</span></div>
+        </div>
+        <button class="bg-primary hover:bg-primary-container text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-1" id="clone-route-btn">
+          <span class="material-symbols-outlined text-sm">content_copy</span>
+          Clone Trip
+        </button>
+      </div>
+
+      <div>
+        <h4 class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Description</h4>
+        <p id="modal-desc" class="text-slate-600 text-sm leading-relaxed"></p>
+      </div>
+
+      <!-- Reviews Section -->
+      <div class="border-t border-slate-100 pt-5">
+        <h4 class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3">Traveler Reviews</h4>
+        <div id="reviews-container" class="space-y-3 max-h-48 overflow-y-auto pr-2 no-scrollbar">
+          <p class="text-slate-400 text-xs italic">No reviews yet. Be the first to share your experience!</p>
+        </div>
+      </div>
+
+      <!-- Add Review Form -->
+      {% if is_logged_in %}
+      <form id="review-form" class="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+        <div>
+          <h4 class="text-xs font-bold text-slate-700">Rate & Review Route</h4>
+          <p class="text-[11px] text-slate-400">Rate and describe road quality, scenery, or stops.</p>
+        </div>
+        <div class="flex gap-1">
+          <button type="button" class="star-btn text-2xl text-slate-300 hover:text-orange-400 transition-colors" data-star="1">★</button>
+          <button type="button" class="star-btn text-2xl text-slate-300 hover:text-orange-400 transition-colors" data-star="2">★</button>
+          <button type="button" class="star-btn text-2xl text-slate-300 hover:text-orange-400 transition-colors" data-star="3">★</button>
+          <button type="button" class="star-btn text-2xl text-slate-300 hover:text-orange-400 transition-colors" data-star="4">★</button>
+          <button type="button" class="star-btn text-2xl text-slate-300 hover:text-orange-400 transition-colors" data-star="5">★</button>
+        </div>
+        <input type="hidden" id="review-rating" value="0">
+        
+        <textarea id="review-text" rows="3" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-white focus:ring-1 focus:ring-primary focus:border-primary" placeholder="Write your review here..." required></textarea>
+        <button type="submit" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors">Submit Review</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Share Trip Modal -->
+{% if is_logged_in %}
+<div class="modal-backdrop" id="publish-modal">
+  <div class="modal-card max-w-[450px]">
+    <div class="bg-slate-900 p-5 text-white relative">
+      <button class="absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-white w-8 h-8 rounded-full flex items-center justify-center transition-colors text-xl font-bold" id="close-publish-modal">×</button>
+      <h2 class="text-lg font-bold">Share Your Route</h2>
+      <p class="text-slate-400 text-xs mt-1">Publish an itinerary for the community.</p>
+    </div>
+    <form id="publish-form" class="p-5 space-y-4">
+      <div>
+        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Select Saved Trip</label>
+        {% if trips %}
+        <select id="pub-trip-id" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-background focus:ring-1 focus:ring-primary focus:border-primary" required>
+          <option value="" disabled selected>Select a trip...</option>
+          {% for t in trips %}
+          <option value="{{ t.id }}">{{ t.origin }} → {{ t.destination }} ({{ t.travel_mode }})</option>
+          {% endfor %}
+        </select>
+        {% else %}
+        <p class="text-xs text-red-500">You don't have any saved trips yet. Plan a trip first!</p>
+        {% endif %}
+      </div>
+
+      <div>
+        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Route Title</label>
+        <input type="text" id="pub-title" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-background focus:ring-1 focus:ring-primary focus:border-primary" placeholder="e.g. Epic Monsoon Drive through Western Ghats" required>
+      </div>
+
+      <div>
+        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Route Description</label>
+        <textarea id="pub-desc" rows="4" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-background focus:ring-1 focus:ring-primary focus:border-primary" placeholder="Describe road quality, views, stops..." required></textarea>
+      </div>
+
+      <div>
+        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Category Tag</label>
+        <select id="pub-tag" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-background focus:ring-1 focus:ring-primary focus:border-primary" required>
+          <option value="scenic">Scenic</option>
+          <option value="adventure">Adventure</option>
+          <option value="family">Family Friendly</option>
+          <option value="weekend">Weekend Getaway</option>
+          <option value="budget">Budget Friendly</option>
+        </select>
+      </div>
+
+      <button type="submit" class="w-full bg-primary hover:bg-primary-container text-white text-xs font-bold py-2.5 rounded-lg transition-colors">Publish Route</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let activeRouteId = null;
+  let selectedRating = 0;
+  
+  // Load community routes
+  async function loadRoutes() {
+    const tag = document.getElementById("tag-filter").value;
+    const minRating = document.getElementById("rating-filter").value;
+    document.getElementById("rating-val").textContent = parseFloat(minRating).toFixed(1);
+    
+    const grid = document.getElementById("routes-grid");
+    grid.innerHTML = `<div class="col-span-full text-center py-12 text-slate-400 text-xs italic"><p>Loading routes...</p></div>`;
+    
+    try {
+      let url = `/community/routes?min_rating=${minRating}`;
+      if (tag) url += `&tag=${encodeURIComponent(tag)}`;
+      
+      const res = await fetch(url);
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.detail || "Failed to load routes");
+      
+      if (data.length === 0) {
+        grid.innerHTML = `<div class="col-span-full text-center py-12 text-slate-400 text-xs italic"><p>No community routes found matching filters.</p></div>`;
+        return;
+      }
+      
+      grid.innerHTML = data.map(r => {
+        let bannerColor = 'from-emerald-600 to-emerald-800';
+        if (r.tags.includes('adventure')) {
+          bannerColor = 'from-orange-500 to-orange-700';
+        } else if (r.tags.includes('family')) {
+          bannerColor = 'from-pink-500 to-pink-700';
+        } else if (r.tags.includes('weekend')) {
+          bannerColor = 'from-blue-500 to-blue-700';
+        }
+        
+        return `
+          <article class="bg-white border border-slate-200 rounded-2xl overflow-hidden flex flex-col transition-all hover:-translate-y-1 hover:shadow-md cursor-pointer" onclick="openDetails('${r.id}')">
+            <div class="h-32 bg-gradient-to-br ${bannerColor} p-4 flex flex-col justify-between text-white relative">
+              <div class="flex flex-wrap gap-1">
+                ${r.tags.map(t => `<span class="bg-white/20 backdrop-blur-sm text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">${t}</span>`).join('')}
+              </div>
+              <div class="flex items-center gap-1.5 self-end bg-black/35 backdrop-blur-sm px-2 py-0.5 rounded-lg text-[10px] font-bold">
+                <span class="text-orange-400">★</span> ${r.avg_rating.toFixed(1)}
+              </div>
+            </div>
+            <div class="p-5 flex flex-col flex-1">
+              <h4 class="font-bold text-slate-800 text-sm mb-1 line-clamp-1">${r.title}</h4>
+              <div class="flex items-center gap-1 text-[11px] font-semibold text-slate-400 mb-3">
+                <span class="material-symbols-outlined text-[12px] text-primary">my_location</span>
+                <span>${r.origin || 'Unknown'}</span>
+                <span>→</span>
+                <span>${r.destination || 'Unknown'}</span>
+              </div>
+              <p class="text-slate-500 text-xs leading-relaxed line-clamp-3 mb-4 flex-1">${r.description}</p>
+              <div class="border-t border-slate-100 pt-3 flex justify-between items-center text-[10px] text-slate-400">
+                <span class="font-semibold text-slate-600">👤 ${r.author_name}</span>
+                <div class="flex gap-3 font-medium">
+                  <span>🔄 ${r.clone_count} clones</span>
+                </div>
+              </div>
+            </div>
+          </article>
+        `;
+      }).join('');
+    } catch (err) {
+      grid.innerHTML = `<div class="col-span-full text-center py-12 text-red-500 text-xs font-semibold"><p>Error: ${err.message}</p></div>`;
+    }
+  }
+
+  // Detail Modal actions
+  async function openDetails(routeId) {
+    activeRouteId = routeId;
+    const modal = document.getElementById("detail-modal");
+    modal.classList.add("active");
+    
+    try {
+      const res = await fetch(`/community/routes/${routeId}`);
+      const r = await res.json();
+      
+      document.getElementById("modal-title").textContent = r.title;
+      document.getElementById("modal-badge").textContent = r.tags[0] || 'trip';
+      document.getElementById("modal-author").textContent = `Shared by ${r.author_name}`;
+      document.getElementById("modal-rating").textContent = r.avg_rating.toFixed(1);
+      document.getElementById("modal-reviews-count").textContent = `${r.total_reviews} reviews`;
+      document.getElementById("modal-clones").textContent = `${r.clone_count} clones`;
+      document.getElementById("modal-desc").textContent = r.description;
+      
+      // Reset stars
+      resetStars();
+      
+      // Load reviews
+      loadReviews(routeId);
+    } catch (err) {
+      alert("Failed to load details: " + err.message);
+    }
+  }
+  
+  async function loadReviews(routeId) {
+    const container = document.getElementById("reviews-container");
+    container.innerHTML = `<p class="text-slate-400 text-xs italic">Loading reviews...</p>`;
+    
+    try {
+      const res = await fetch(`/community/routes/${routeId}/reviews`);
+      const data = await res.json();
+      
+      if (data.length === 0) {
+        container.innerHTML = `<p class="text-slate-400 text-xs italic">No reviews yet. Be the first to share your experience!</p>`;
+        return;
+      }
+      
+      container.innerHTML = data.map(rev => `
+        <div class="bg-background border border-slate-200/50 rounded-xl p-3 text-xs space-y-1 shadow-sm">
+          <div class="flex justify-between items-center">
+            <span class="font-bold text-slate-700">Traveler</span>
+            <span class="text-orange-500 font-semibold">${'★'.repeat(rev.rating)}${'☆'.repeat(5 - rev.rating)}</span>
+          </div>
+          <p class="text-slate-500 leading-relaxed">${rev.review_text}</p>
+        </div>
+      `).join('');
+    } catch (err) {
+      container.innerHTML = `<p class="text-red-500 text-xs italic">Could not load reviews.</p>`;
+    }
+  }
+
+  function resetStars() {
+    selectedRating = 0;
+    const starRatingInput = document.getElementById("review-rating");
+    if (starRatingInput) starRatingInput.value = "0";
+    document.querySelectorAll(".star-btn").forEach(btn => btn.style.color = "#cbd5e1");
+  }
+
+  // Modal closes
+  document.getElementById("close-detail-modal").addEventListener("click", () => {
+    document.getElementById("detail-modal").classList.remove("active");
+  });
+  
+  // Cloning
+  document.getElementById("clone-route-btn").addEventListener("click", async () => {
+    if (!activeRouteId) return;
+    try {
+      const res = await fetch(`/community/routes/${activeRouteId}/clone`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Failed to clone route");
+      alert(data.message || "Route cloned to your saved trips!");
+      document.getElementById("modal-clones").textContent = `${parseInt(document.getElementById("modal-clones").textContent) + 1} clones`;
+    } catch (err) {
+      alert(err.message);
+    }
+  });
+
+  // Review form rating selection
+  document.querySelectorAll(".star-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      selectedRating = parseInt(btn.dataset.star);
+      document.getElementById("review-rating").value = selectedRating;
+      document.querySelectorAll(".star-btn").forEach((s, idx) => {
+        if (idx < selectedRating) {
+          s.style.color = "#fb923c"; // tailwind orange-400
+        } else {
+          s.style.color = "#cbd5e1";
+        }
+      });
+    });
+  });
+
+  // Post Review
+  const rForm = document.getElementById("review-form");
+  if (rForm) {
+    rForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (selectedRating === 0) {
+        alert("Please select a star rating!");
+        return;
+      }
+      const text = document.getElementById("review-text").value.trim();
+      try {
+        const res = await fetch(`/community/routes/${activeRouteId}/review`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rating: selectedRating, review_text: text, tags: [] })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Failed to submit review");
+        
+        alert("Review submitted!");
+        document.getElementById("review-text").value = "";
+        resetStars();
+        loadReviews(activeRouteId);
+        loadRoutes();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+  }
+
+  // Publish trip modal
+  const openPubBtn = document.getElementById("open-publish-modal");
+  if (openPubBtn) {
+    openPubBtn.addEventListener("click", () => {
+      document.getElementById("publish-modal").classList.add("active");
+    });
+    document.getElementById("close-publish-modal").addEventListener("click", () => {
+      document.getElementById("publish-modal").classList.remove("active");
+    });
+    
+    document.getElementById("publish-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const payload = {
+        trip_id: document.getElementById("pub-trip-id").value,
+        title: document.getElementById("pub-title").value.trim(),
+        description: document.getElementById("pub-desc").value.trim(),
+        tags: [document.getElementById("pub-tag").value],
+        is_public: true
+      };
+      try {
+        const res = await fetch("/community/routes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Failed to publish route");
+        
+        alert("Route published successfully!");
+        document.getElementById("publish-form").reset();
+        document.getElementById("publish-modal").classList.remove("active");
+        loadRoutes();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+  }
+
+  // AI Smart Search
+  document.getElementById("smart-search-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const query = document.getElementById("search-input").value.trim();
+    const grid = document.getElementById("routes-grid");
+    grid.innerHTML = `<div class="col-span-full text-center py-12 text-slate-400 text-xs italic"><p>Searching with AI Smart Search...</p></div>`;
+    
+    try {
+      const res = await fetch("/community/smart-search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Smart search failed");
+      
+      if (data.length === 0 || !data) {
+        grid.innerHTML = `<div class="col-span-full text-center py-12 text-slate-400 text-xs italic"><p>AI search found no matches. Try a different query.</p></div>`;
+        return;
+      }
+      
+      grid.innerHTML = data.map(r => {
+        let bannerColor = 'from-emerald-600 to-emerald-800';
+        const tagsList = r.tags || [];
+        if (tagsList.includes('adventure')) {
+          bannerColor = 'from-orange-500 to-orange-700';
+        } else if (tagsList.includes('family')) {
+          bannerColor = 'from-pink-500 to-pink-700';
+        } else if (tagsList.includes('weekend')) {
+          bannerColor = 'from-blue-500 to-blue-700';
+        }
+        
+        return `
+          <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden flex flex-col transition-all hover:-translate-y-1 hover:shadow-md cursor-pointer" onclick="openDetails('${r.id}')">
+            <div class="h-32 bg-gradient-to-br ${bannerColor} p-4 flex flex-col justify-between text-white relative">
+              <div class="flex flex-wrap gap-1">
+                ${tagsList.map(t => `<span class="bg-white/20 backdrop-blur-sm text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">${t}</span>`).join('')}
+              </div>
+              <div class="flex items-center gap-1.5 self-end bg-black/35 backdrop-blur-sm px-2 py-0.5 rounded-lg text-[10px] font-bold">
+                <span class="text-orange-400">★</span> ${(r.avg_rating || 0).toFixed(1)}
+              </div>
+            </div>
+            <div class="p-5 flex flex-col flex-1">
+              <h4 class="font-bold text-slate-800 text-sm mb-1 line-clamp-1">${r.title}</h4>
+              <div class="flex items-center gap-1 text-[11px] font-semibold text-slate-400 mb-3">
+                <span class="material-symbols-outlined text-[12px] text-primary">my_location</span>
+                <span>${r.origin || 'Unknown'}</span>
+                <span>→</span>
+                <span>${r.destination || 'Unknown'}</span>
+              </div>
+              <p class="text-slate-500 text-xs leading-relaxed line-clamp-3 mb-4 flex-1">${r.description}</p>
+              <div class="border-t border-slate-100 pt-3 flex justify-between items-center text-[10px] text-slate-400">
+                <span class="font-semibold text-slate-600">👤 ${r.author_name || 'Traveler'}</span>
+                <div class="flex gap-3 font-medium">
+                  <span>🔄 ${r.clone_count || 0} clones</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    } catch (err) {
+      grid.innerHTML = `<div class="col-span-full text-center py-12 text-red-500 text-xs font-semibold"><p>AI search error: ${err.message}</p></div>`;
+    }
+  });
+
+  // Listeners for filters
+  document.getElementById("tag-filter").addEventListener("change", loadRoutes);
+  document.getElementById("rating-filter").addEventListener("input", (e) => {
+    document.getElementById("rating-val").textContent = parseFloat(e.target.value).toFixed(1);
+  });
+  document.getElementById("rating-filter").addEventListener("change", loadRoutes);
+  
+  // Initial Load
+  loadRoutes();
+</script>
+{% endblock %}

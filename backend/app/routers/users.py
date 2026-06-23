@@ -1,9 +1,11 @@
 from fastapi import APIRouter, HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from app.schemas.schemas import UserCreate, UserOut, TokenOut, VehicleCreate, VehicleOut
+from app.schemas.schemas import UserCreate, UserOut, UserUpdate, PasswordChange, TokenOut, VehicleCreate, VehicleOut, OtpVerify
+from sqlalchemy.exc import IntegrityError
 from app.core.auth import hash_password, verify_password, create_access_token, get_current_user
 from app.core.database import get_db
+from app.core.email_otp import generate_and_send_otp, verify_otp, clear_otp, _otp_store
 from app.models.models import User, Vehicle
 
 router = APIRouter()
@@ -11,28 +13,47 @@ router = APIRouter()
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 
-@router.post("/register", response_model=UserOut, status_code=201)
+@router.post("/register", status_code=201)
 def register(data: UserCreate, db: Session = Depends(get_db)):
-    """Create a new user account."""
+    """Start registration: send OTP, stash pending user until verified."""
     existing = db.query(User).filter(User.email == data.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
 
+    try:
+        generate_and_send_otp(data.email, data.name)
+    except ValueError as e:
+        raise HTTPException(status_code=429, detail=str(e))
+
+    _otp_store[data.email]["name"] = data.name
+    _otp_store[data.email]["password"] = hash_password(data.password)
+
+    return {"message": "OTP sent", "email": data.email}
+
+
+@router.post("/verify-otp", response_model=UserOut, status_code=201)
+def verify_otp_endpoint(data: OtpVerify, db: Session = Depends(get_db)):
+    """Verify OTP and create the actual user account."""
+    record = _otp_store.get(data.email)
+    if not record or not verify_otp(data.email, data.otp):
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP")
+
     user = User(
-        name          = data.name,
-        email         = data.email,
-        password_hash = hash_password(data.password),
+        name=record["name"],
+        email=data.email,
+        password_hash=record["password"],
     )
     db.add(user)
     db.commit()
     db.refresh(user)
+    clear_otp(data.email)
 
     return UserOut(
-        id          = str(user.id),
-        name        = user.name,
-        email       = user.email,
-        home_city   = None,
-        total_trips = 0,
+        id=str(user.id),
+        name=user.name,
+        email=user.email,
+        home_city=None,
+        total_trips=0,
     )
 
 
@@ -51,7 +72,6 @@ def login(
 
 
 # ── Profile ───────────────────────────────────────────────────────────────────
-
 @router.get("/me", response_model=UserOut)
 def get_profile(
     current_user: dict = Depends(get_current_user),
@@ -71,6 +91,70 @@ def get_profile(
         home_city   = None,
         total_trips = len(user.trips),
     )
+
+
+
+
+@router.patch("/me", response_model=UserOut)
+def update_profile(
+    data: UserUpdate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update the logged-in user's name and/or email."""
+    user = db.query(User).filter(
+        User.id == int(current_user["user_id"])
+    ).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+ 
+    if data.name is not None:
+        user.name = data.name
+ 
+    if data.email is not None and data.email != user.email:
+        existing = db.query(User).filter(User.email == data.email).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="That email is already in use")
+        user.email = data.email
+ 
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="That email is already in use")
+ 
+    db.refresh(user)
+ 
+    return UserOut(
+        id          = str(user.id),
+        name        = user.name,
+        email       = user.email,
+        home_city   = None,
+        total_trips = len(user.trips),
+    )
+    
+@router.post("/change-password", status_code=204)
+def change_password(
+    data: PasswordChange,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Change the logged-in user's password after verifying the current one."""
+    user = db.query(User).filter(
+        User.id == int(current_user["user_id"])
+    ).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not verify_password(data.current_password, user.password_hash):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+
+    if len(data.new_password) < 8:
+        raise HTTPException(status_code=400, detail="New password must be at least 8 characters")
+
+    user.password_hash = hash_password(data.new_password)
+    db.commit()
+    return None
 
 
 # ── Vehicles ──────────────────────────────────────────────────────────────────

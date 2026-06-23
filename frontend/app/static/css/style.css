@@ -1,0 +1,340 @@
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap');
+
+:root {
+  --asphalt: #090d16; /* Deep futuristic tech dark background */
+  --asphalt-light: #151e33;
+  --sand: #94a3b8;
+  --paper: rgba(21, 30, 51, 0.5); /* Glassmorphic dark card */
+  --highway-yellow: #10b981; /* Premium emerald green instead of plain yellow */
+  --neon-cyan: #06b6d4; /* Tech cyan */
+  --rust: #f43f5e; /* Rose red warning */
+  --sign-green: #10b981;
+  --radius: 12px;
+}
+
+* { 
+  box-sizing: border-box; 
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: var(--asphalt);
+  /* Tech Grid Pattern */
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+  background-size: 32px 32px;
+  font-family: 'Inter', sans-serif;
+  color: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ─── Floating Background Elements (Stytch aesthetic) ─── */
+.floating-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.float-item {
+  position: absolute;
+  font-size: 1.8rem;
+  opacity: 0.25;
+  filter: drop-shadow(0 0 10px rgba(6, 182, 212, 0.2));
+  user-select: none;
+}
+
+/* Glowing Orbs */
+.glow-orb-1 {
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.15) 0%, transparent 70%);
+  top: -50px;
+  left: -50px;
+  filter: blur(40px);
+  animation: driftOrb 15s ease-in-out infinite alternate;
+}
+
+.glow-orb-2 {
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(6, 182, 212, 0.12) 0%, transparent 70%);
+  bottom: -100px;
+  right: -50px;
+  filter: blur(50px);
+  animation: driftOrb 20s ease-in-out infinite alternate-reverse;
+}
+
+/* Staggered floaters */
+@keyframes floatY {
+  0% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-15px) rotate(5deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+
+@keyframes driftOrb {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(50px, 30px); }
+}
+
+.item-key-1 { top: 20%; left: 15%; animation: floatY 6s ease-in-out infinite; font-size: 2.2rem; opacity: 0.2; }
+.item-lock-1 { top: 75%; left: 10%; animation: floatY 8s ease-in-out infinite 1s; opacity: 0.15; }
+.item-pin-1 { top: 15%; right: 18%; animation: floatY 7s ease-in-out infinite 0.5s; opacity: 0.2; }
+.item-car-1 { bottom: 20%; right: 12%; animation: floatY 9s ease-in-out infinite 2s; opacity: 0.12; }
+.item-spark-1 { top: 45%; right: 25%; animation: floatY 5s ease-in-out infinite 1.5s; opacity: 0.3; }
+.item-key-2 { bottom: 15%; left: 28%; animation: floatY 7.5s ease-in-out infinite 0.2s; opacity: 0.18; }
+.item-shield-1 { top: 48%; left: 8%; animation: floatY 6.8s ease-in-out infinite 1.2s; opacity: 0.15; }
+
+/* ─── Layout Scene ─── */
+.scene {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  width: 100%;
+  max-width: 440px;
+  animation: sceneFadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes sceneFadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Premium Milestone Sign ─── */
+.milestone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: 'Rajdhani', sans-serif;
+}
+
+.milestone-post {
+  background: rgba(16, 185, 129, 0.08);
+  color: var(--highway-yellow);
+  border-radius: 999px 999px 8px 8px;
+  width: 110px;
+  height: 110px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--highway-yellow);
+  box-shadow: 
+    0 0 15px rgba(16, 185, 129, 0.35),
+    inset 0 0 15px rgba(16, 185, 129, 0.25);
+  animation: glowPulse 2s ease-in-out infinite alternate;
+}
+
+@keyframes glowPulse {
+  0% { box-shadow: 0 0 10px rgba(16, 185, 129, 0.2), inset 0 0 10px rgba(16, 185, 129, 0.1); }
+  100% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.5), inset 0 0 15px rgba(16, 185, 129, 0.3); }
+}
+
+.milestone-post .km-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #fff;
+  opacity: 0.9;
+}
+
+.milestone-post .km-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  margin-top: 4px;
+  text-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+}
+
+.milestone-caption {
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #10b981;
+}
+
+/* ─── Premium Glassmorphic Card ─── */
+.card {
+  width: 100%;
+  background: var(--paper);
+  border-radius: var(--radius);
+  padding: 40px 36px;
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  position: relative;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.6), transparent);
+}
+
+.card h1 {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #fff;
+  margin: 0 0 6px;
+}
+
+.card .subtitle {
+  font-size: 13.5px;
+  color: #94a3b8;
+  margin: 0 0 28px;
+}
+
+/* ─── Input Fields ─── */
+.field {
+  margin-bottom: 20px;
+}
+
+.field label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  color: #94a3b8;
+}
+
+.field input {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 14.5px;
+  font-family: 'Inter', sans-serif;
+  border: 1.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.6);
+  color: #fff;
+  outline: none;
+  transition: all 0.25s ease;
+}
+
+.field input:focus {
+  border-color: var(--highway-yellow);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.2);
+  background: rgba(15, 23, 42, 0.85);
+}
+
+.field input.otp-input {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 20px;
+  letter-spacing: 0.35em;
+  text-align: center;
+  color: var(--highway-yellow);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+/* ─── Buttons ─── */
+.btn {
+  width: 100%;
+  padding: 14px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #090d16;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.45);
+  filter: brightness(1.1);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+/* ─── Alerts & Status ─── */
+.alert {
+  background: rgba(244, 63, 94, 0.08);
+  border: 1px solid rgba(244, 63, 94, 0.3);
+  color: #fda4af;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 13px;
+  margin-bottom: 20px;
+}
+
+.success {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #a7f3d0;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 13px;
+  margin-bottom: 20px;
+}
+
+/* ─── Footer Links ─── */
+.footer-link {
+  text-align: center;
+  margin-top: 24px;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.footer-link a {
+  color: var(--highway-yellow);
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.footer-link a:hover {
+  color: #34d399;
+  text-decoration: underline;
+}
+
+.otp-hint {
+  font-size: 12px;
+  color: #94a3b8;
+  opacity: 0.8;
+  margin: -8px 0 20px;
+}
+
+@media (max-width: 480px) {
+  .card { padding: 32px 24px; }
+  .scene { gap: 20px; }
+}
