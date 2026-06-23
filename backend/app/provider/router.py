@@ -22,6 +22,7 @@ from app.provider.auth import (
     hash_password, verify_password,
     create_provider_token, get_current_provider,
 )
+from app.core.auth import get_current_user
 
 router = APIRouter()
 
@@ -630,5 +631,60 @@ def update_vehicle_location(vehicle_id: int, data: LocationUpdateSchema, db: Ses
         b.driver_lon = data.lon
     db.commit()
     return {"status": "success"}
+
+
+# ── Traveler Provider Bookings API ──────────────────────────────────────────
+
+@router.get("/bookings/user", response_model=list[ProviderBookingOut])
+def list_user_provider_bookings(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    bookings = db.query(ProviderBooking).filter(
+        ProviderBooking.user_id == int(current_user["user_id"])
+    ).order_by(ProviderBooking.created_at.desc()).all()
+    return bookings
+
+
+@router.post("/bookings/{booking_id}/cancel")
+def cancel_user_provider_booking(
+    booking_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    booking = db.query(ProviderBooking).filter(
+        ProviderBooking.id == booking_id,
+        ProviderBooking.user_id == int(current_user["user_id"])
+    ).first()
+
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    if booking.status == "cancelled":
+        raise HTTPException(status_code=400, detail="Already cancelled")
+
+    booking.status = "cancelled"
+    
+    # Release seats
+    vehicle = booking.vehicle
+    if vehicle:
+        if vehicle.destination == "Private":
+            vehicle.seats_booked = 0
+        else:
+            vehicle.seats_booked = max(vehicle.seats_booked - booking.num_seats, 0)
+
+    db.commit()
+    return {"status": "success", "message": "Booking cancelled"}
+
+
+@router.get("/bookings/unread-check")
+def check_unread_provider_bookings(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    count = db.query(ProviderBooking).filter(
+        ProviderBooking.user_id == int(current_user["user_id"]),
+        ProviderBooking.message_unread == True
+    ).count()
+    return {"has_unread": count > 0}
 
 

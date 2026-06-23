@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Register — RoadBuddy{% endblock %}
+{% block km %}0{% endblock %}
+{% block caption %}Start of the trip{% endblock %}
+
+{% block content %}
+  <h1>Create your account</h1>
+  <p class="subtitle">Every road trip starts somewhere. This is yours.</p>
+
+  {% if error %}
+    <div class="alert">{{ error }}</div>
+  {% endif %}
+
+  <form method="post" action="/register">
+    <div class="field">
+      <label for="name">Full name</label>
+      <input type="text" id="name" name="name" required autocomplete="name">
+    </div>
+    <div class="field">
+      <label for="email">Email</label>
+      <input type="email" id="email" name="email" required autocomplete="email">
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" required autocomplete="new-password" minlength="8">
+    </div>
+    <button type="submit" class="btn">Hit the road</button>
+  </form>
+
+  <div class="footer-link">
+    Already have an account? <a href="/login">Log in</a>
+  </div>
+{% endblock %}

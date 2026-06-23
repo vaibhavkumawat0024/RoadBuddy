@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}RoadBuddy{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <div class="floating-bg">
+    <div class="float-item glow-orb-1"></div>
+    <div class="float-item glow-orb-2"></div>
+    <div class="float-item item-key-1">🔑</div>
+    <div class="float-item item-lock-1">🔒</div>
+    <div class="float-item item-pin-1">📍</div>
+    <div class="float-item item-car-1">🚗</div>
+    <div class="float-item item-spark-1">✨</div>
+    <div class="float-item item-key-2">🔑</div>
+    <div class="float-item item-shield-1">🛡️</div>
+  </div>
+  
+  <div class="scene">
+    <div class="milestone">
+      <div class="milestone-post">
+        <span class="km-label">RoadBuddy</span>
+        <span class="km-value">{% block km %}0{% endblock %}</span>
+      </div>
+      <div class="milestone-caption">{% block caption %}Plan smarter, travel better{% endblock %}</div>
+    </div>
+    <div class="card">
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+</body>
+</html>

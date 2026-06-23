@@ -1,0 +1,488 @@
+{% extends "dashboard_base.html" %}
+{% set active_page = 'bookings' %}
+{% block title %}Book Travel & Hotels — RoadBuddy{% endblock %}
+
+{% block extra_head %}
+<style>
+  .booking-tab-btn.active {
+    background-color: var(--primary);
+    color: #fff;
+  }
+  .modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  .modal-backdrop.active {
+    opacity: 1;
+    pointer-events: all;
+  }
+  .modal-card {
+    background: #fff;
+    border-radius: 12px;
+    max-width: 400px;
+    width: 90%;
+    padding: 20px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    border: 1px solid #e2e8f0;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6 animate-fade-in-up">
+  <!-- Heading -->
+  <div class="relative bg-slate-900 rounded-2xl overflow-hidden shadow-lg p-8 flex flex-col justify-between min-h-[160px] border border-white/5" style="background: linear-gradient(rgba(24, 29, 24, 0.45), rgba(24, 29, 24, 0.85)), url('/static/images/booking_banner.png'); background-size: cover; background-position: center;">
+    <div class="max-w-xl z-10">
+      <h2 class="text-white text-3xl font-extrabold tracking-tight mb-2">Travel Booking Hub</h2>
+      <p class="text-slate-300 text-sm leading-relaxed">Search and book hotels, trains, buses, and flights for your upcoming journey directly from one place.</p>
+    </div>
+  </div>
+
+  <!-- Tabs Selector -->
+  <div class="flex border-b border-slate-200 gap-1 bg-white p-1 rounded-xl border border-outline-variant">
+    <button class="booking-tab-btn active px-4 py-2 text-xs font-semibold text-slate-500 rounded-lg transition-colors flex-1" data-tab="hotels">🏨 Hotels</button>
+    <button class="booking-tab-btn px-4 py-2 text-xs font-semibold text-slate-500 rounded-lg transition-colors flex-1" data-tab="transport">🚌 Transit Options</button>
+    <button class="booking-tab-btn px-4 py-2 text-xs font-semibold text-slate-500 rounded-lg transition-colors flex-1" data-tab="my-bookings">🎫 My Bookings</button>
+  </div>
+
+  <!-- HOTELS TAB CONTENT -->
+  <div id="tab-hotels" class="tab-content-panel space-y-6">
+    <section class="bg-white border border-outline-variant rounded-2xl p-6 shadow-sm">
+      <form id="hotel-search-form" class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">City / Location</label>
+          <input type="text" id="hotel-city" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-background focus:ring-1 focus:ring-primary focus:border-primary" placeholder="e.g. Jaipur" required>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Rooms Needed</label>
+          <input type="number" id="hotel-rooms" value="1" min="1" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-background focus:ring-1 focus:ring-primary focus:border-primary" required>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Number of Guests</label>
+          <input type="number" id="hotel-guests" value="1" min="1" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-background focus:ring-1 focus:ring-primary focus:border-primary" required>
+        </div>
+        <div class="md:col-span-3 pt-2">
+          <button type="submit" class="bg-primary hover:bg-primary-container text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition-colors w-full md:w-auto">Search Hotels</button>
+        </div>
+      </form>
+    </section>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="hotel-results">
+      <!-- Hotel search results grid -->
+    </div>
+  </div>
+
+  <!-- TRANSPORT TAB CONTENT -->
+  <div id="tab-transport" class="tab-content-panel space-y-6" style="display:none;">
+    <section class="bg-white border border-outline-variant rounded-2xl p-6 shadow-sm">
+      <form id="trans-search-form" class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Departure Station / City</label>
+          <input type="text" id="trans-origin" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-background focus:ring-1 focus:ring-primary focus:border-primary" placeholder="e.g. Jaipur" required>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Arrival Station / City</label>
+          <input type="text" id="trans-destination" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-background focus:ring-1 focus:ring-primary focus:border-primary" placeholder="e.g. Delhi" required>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Travel Mode</label>
+          <select id="trans-mode" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-background focus:ring-1 focus:ring-primary focus:border-primary" required>
+            <option value="bus">Bus</option>
+            <option value="train">Train</option>
+            <option value="flight">Flight</option>
+          </select>
+        </div>
+        <div class="md:col-span-3 pt-2">
+          <button type="submit" class="bg-primary hover:bg-primary-container text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition-colors w-full md:w-auto">Search Transport Options</button>
+        </div>
+      </form>
+    </section>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="trans-results">
+      <!-- Transport search results grid -->
+    </div>
+  </div>
+
+  <!-- MY BOOKINGS TAB CONTENT -->
+  <div id="tab-my-bookings" class="tab-content-panel space-y-4" style="display:none;">
+    <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+      <h3 class="font-bold text-slate-800 text-lg">My Reservations</h3>
+    </div>
+
+    <div class="space-y-4" id="bookings-list">
+      {% if bookings %}
+        {% for b in bookings %}
+        <div class="bg-white border border-outline-variant rounded-2xl p-5 shadow-sm space-y-4 animate-fade-in-up">
+          <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+            <div class="flex items-center gap-2">
+              <span class="bg-primary/10 text-primary text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">{{ b.mode or 'hotel' }}</span>
+              <h4 class="font-bold text-slate-800 text-sm">
+                {% if b.mode %}
+                  {{ b.transport_option_operator or b.transport_option_name }}
+                {% else %}
+                  {{ b.hotel_name }}
+                {% endif %}
+              </h4>
+            </div>
+            <span class="text-[10px] text-slate-400 font-mono">Ref: {{ b.id }}</span>
+          </div>
+
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+            <div>
+              <span class="text-slate-400 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Details</span>
+              <span class="font-semibold text-slate-700">
+                {% if b.mode %}
+                  {{ b.origin }} → {{ b.destination }}
+                {% else %}
+                  {{ b.hotel_city }}
+                {% endif %}
+              </span>
+            </div>
+            <div>
+              <span class="text-slate-400 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Date</span>
+              <span class="font-semibold text-slate-700">
+                {% if b.mode %}
+                  {{ b.travel_date }}
+                {% else %}
+                  Checkin: {{ b.check_in_date }}
+                {% endif %}
+              </span>
+            </div>
+            <div>
+              <span class="text-slate-400 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Passenger/Guests</span>
+              <span class="font-semibold text-slate-700">
+                {% if b.mode %}
+                  {{ b.passenger_name }}
+                {% else %}
+                  {{ b.num_guests }} guest(s) / {{ b.num_rooms }} room(s)
+                </span>
+                {% endif %}
+            </div>
+            <div>
+              <span class="text-slate-400 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Price Paid</span>
+              <span class="font-bold text-primary">₹{{ "%.0f"|format(b.total_fare_inr or b.total_price_inr or 0) }}</span>
+            </div>
+          </div>
+
+          <div class="flex justify-between items-center pt-2 border-t border-slate-100 text-xs">
+            <span class="text-emerald-600 font-semibold flex items-center gap-0.5">
+              <span class="material-symbols-outlined text-sm">check_circle</span>
+              Confirmed Reservation
+            </span>
+            <button class="cancel-btn text-red-500 hover:text-red-700 font-semibold" data-booking-id="{{ b.id }}">Cancel Booking</button>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="bg-white border border-slate-200 rounded-2xl p-8 text-center">
+          <p class="text-slate-400 text-xs italic">No bookings found. Search tabs above to create your first reservation!</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Hotel Booking Modal -->
+<div class="modal-backdrop" id="hotel-book-modal">
+  <div class="modal-card">
+    <h2 class="text-base font-bold text-slate-800 mb-4" id="modal-hotel-name">Confirm Hotel Booking</h2>
+    <form id="hotel-book-form" class="space-y-4">
+      <input type="hidden" id="book-hotel-id">
+      <div>
+        <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Check-in Date</label>
+        <input type="date" id="book-checkin" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-background focus:ring-1 focus:ring-primary focus:border-primary" required>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Check-out Date</label>
+        <input type="date" id="book-checkout" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-background focus:ring-1 focus:ring-primary focus:border-primary" required>
+      </div>
+      <div class="flex justify-between gap-3 pt-2">
+        <button type="button" class="bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold px-4 py-2 rounded-lg transition-colors flex-1" id="close-hotel-modal">Cancel</button>
+        <button type="submit" class="bg-primary hover:bg-primary-container text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors flex-1">Confirm & Pay</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Transport Booking Modal -->
+<div class="modal-backdrop" id="trans-book-modal">
+  <div class="modal-card">
+    <h2 class="text-base font-bold text-slate-800 mb-4" id="modal-trans-title">Confirm Ticket Booking</h2>
+    <form id="trans-book-form" class="space-y-4">
+      <input type="hidden" id="book-trans-id">
+      <div>
+        <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Passenger Name</label>
+        <input type="text" id="book-trans-name" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-background focus:ring-1 focus:ring-primary focus:border-primary" placeholder="e.g. John Doe" required>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Travel Date</label>
+        <input type="date" id="book-trans-date" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-background focus:ring-1 focus:ring-primary focus:border-primary" required>
+      </div>
+      <div class="flex items-center gap-2 pt-1">
+        <input type="checkbox" id="book-trans-return" class="w-4.5 h-4.5 rounded border-slate-200 text-primary focus:ring-primary accent-primary cursor-pointer">
+        <label for="book-trans-return" class="text-xs font-semibold text-slate-600 cursor-pointer">Include Return Ticket</label>
+      </div>
+      <div id="return-date-field" style="display:none;">
+        <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Return Date</label>
+        <input type="date" id="book-trans-ret-date" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-background focus:ring-1 focus:ring-primary focus:border-primary">
+      </div>
+      <div class="flex justify-between gap-3 pt-2">
+        <button type="button" class="bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold px-4 py-2 rounded-lg transition-colors flex-1" id="close-trans-modal">Cancel</button>
+        <button type="submit" class="bg-primary hover:bg-primary-container text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors flex-1">Book Ticket</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function money(n) {
+    return "₹" + Number(n).toLocaleString("en-IN", { maximumFractionDigits: 0 });
+  }
+
+  // Set today's date as default for search date fields
+  const today = new Date().toISOString().split('T')[0];
+  const checkin = document.getElementById("book-checkin");
+  const checkout = document.getElementById("book-checkout");
+  const transDate = document.getElementById("book-trans-date");
+  if (checkin) checkin.value = today;
+  if (transDate) transDate.value = today;
+
+  // Tabs switching
+  document.querySelectorAll(".booking-tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".booking-tab-btn").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".tab-content-panel").forEach(p => p.style.display = "none");
+      
+      btn.classList.add("active");
+      const tab = btn.dataset.tab;
+      document.getElementById(`tab-${tab}`).style.display = "block";
+    });
+  });
+
+  // ── HOTELS SEARCH & BOOK ──
+  document.getElementById("hotel-search-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    
+    const city = document.getElementById("hotel-city").value.trim();
+    const num_rooms = parseInt(document.getElementById("hotel-rooms").value);
+    const num_guests = parseInt(document.getElementById("hotel-guests").value);
+    const resultsContainer = document.getElementById("hotel-results");
+    
+    resultsContainer.innerHTML = `<div class="col-span-full text-center py-6 text-slate-400 text-xs italic"><p>Searching available rooms...</p></div>`;
+    
+    try {
+      const res = await fetch("/bookings/hotels/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ city, num_rooms, num_guests })
+      });
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.detail || "Search failed");
+      
+      if (data.length === 0) {
+        resultsContainer.innerHTML = `<p class="col-span-full text-center py-6 text-slate-400 text-xs italic">No hotels found with required availability in "${city}".</p>`;
+        return;
+      }
+      
+      resultsContainer.innerHTML = data.map(h => `
+        <div class="bg-white border border-outline-variant rounded-2xl p-5 shadow-sm flex flex-col justify-between space-y-4 animate-fade-in-up">
+          <div class="flex justify-between items-start border-b border-slate-100 pb-2">
+            <div>
+              <h4 class="font-bold text-slate-800 text-sm line-clamp-1">${h.name}</h4>
+              <p class="text-[10px] text-slate-400">📍 ${h.address}, ${h.city}</p>
+            </div>
+            <div class="text-right">
+              <span class="font-extrabold text-primary text-sm block">${money(h.price_per_night_inr)}</span>
+              <span class="text-[9px] text-slate-400 block font-medium">/ night</span>
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-1 text-[9px] font-bold">
+            <span class="bg-amber-500/10 text-amber-600 px-2 py-0.5 rounded">★ ${h.star_rating} Stars</span>
+            <span class="bg-primary/10 text-primary px-2 py-0.5 rounded">🛏️ ${h.rooms_available} rooms left</span>
+            ${(h.amenities || '').split(',').map(a => `<span class="bg-slate-100 text-slate-500 px-2 py-0.5 rounded">${a.trim()}</span>`).join('')}
+          </div>
+          <button class="bg-primary hover:bg-primary-container text-white text-xs font-semibold py-2 rounded-lg transition-colors" onclick="openHotelBooking('${h.id}', '${h.name.replace(/'/g, "\\'")}')">Reserve Room</button>
+        </div>
+      `).join('');
+    } catch (err) {
+      resultsContainer.innerHTML = `<p class="col-span-full text-red-500 text-xs text-center py-4">Error: ${err.message}</p>`;
+    }
+  });
+
+  function openHotelBooking(hotelId, hotelName) {
+    document.getElementById("book-hotel-id").value = hotelId;
+    document.getElementById("modal-hotel-name").textContent = `Book: ${hotelName}`;
+    
+    const modal = document.getElementById("hotel-book-modal");
+    modal.classList.add("active");
+  }
+
+  document.getElementById("close-hotel-modal").addEventListener("click", () => {
+    document.getElementById("hotel-book-modal").classList.remove("active");
+  });
+
+  document.getElementById("hotel-book-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    
+    const hotel_id = parseInt(document.getElementById("book-hotel-id").value);
+    const check_in_date = document.getElementById("book-checkin").value;
+    const check_out_date = document.getElementById("book-checkout").value;
+    const num_rooms = parseInt(document.getElementById("hotel-rooms").value);
+    const num_guests = parseInt(document.getElementById("hotel-guests").value);
+    
+    try {
+      const res = await fetch("/bookings/hotels/book", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hotel_id, check_in_date, check_out_date, num_rooms, num_guests })
+      });
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.detail || "Booking failed");
+      
+      alert(`Hotel room booked successfully!\nTotal Price: ${money(data.total_price_inr)}`);
+      document.getElementById("hotel-book-modal").classList.remove("active");
+      
+      // Refresh listings
+      document.getElementById("hotel-search-form").dispatchEvent(new Event("submit"));
+    } catch (err) {
+      alert(err.message);
+    }
+  });
+
+
+  // ── TRANSPORT OPTIONS SEARCH & BOOK ──
+  document.getElementById("trans-search-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    
+    const origin = document.getElementById("trans-origin").value.trim();
+    const destination = document.getElementById("trans-destination").value.trim();
+    const mode = document.getElementById("trans-mode").value;
+    const resultsContainer = document.getElementById("trans-results");
+    
+    resultsContainer.innerHTML = `<div class="col-span-full text-center py-6 text-slate-400 text-xs italic"><p>Searching travel options...</p></div>`;
+    
+    try {
+      const res = await fetch("/bookings/transport/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ origin, destination, mode })
+      });
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.detail || "Search failed");
+      
+      if (data.length === 0) {
+        resultsContainer.innerHTML = `<p class="col-span-full text-center py-6 text-slate-400 text-xs italic">No ${mode} options available between "${origin}" and "${destination}".</p>`;
+        return;
+      }
+      
+      resultsContainer.innerHTML = data.map(t => `
+        <div class="bg-white border border-outline-variant rounded-2xl p-5 shadow-sm flex flex-col justify-between space-y-4 animate-fade-in-up">
+          <div class="flex justify-between items-start border-b border-slate-100 pb-2">
+            <div>
+              <h4 class="font-bold text-slate-800 text-sm line-clamp-1">${t.operator_name || t.airline || t.name}</h4>
+              <p class="text-[10px] text-slate-400">🕒 Departs: ${t.departure_time} · Arrives: ${t.arrival_time}</p>
+            </div>
+            <div class="text-right">
+              <span class="font-extrabold text-primary text-sm block">${money(t.fare_inr)}</span>
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-1 text-[9px] font-bold">
+            <span class="bg-slate-100 text-slate-500 px-2 py-0.5 rounded">⏱️ Duration: ${t.duration_hrs} hrs</span>
+            <span class="bg-slate-100 text-slate-500 px-2 py-0.5 rounded">✈️ Class: ${t.travel_class || 'Standard'}</span>
+            <span class="bg-slate-100 text-slate-500 px-2 py-0.5 rounded">ID: ${t.id}</span>
+          </div>
+          <button class="bg-primary hover:bg-primary-container text-white text-xs font-semibold py-2 rounded-lg transition-colors" onclick="openTransBooking('${t.id}', '${(t.operator_name || t.airline || t.name).replace(/'/g, "\\'")}')">Book Ticket</button>
+        </div>
+      `).join('');
+    } catch (err) {
+      resultsContainer.innerHTML = `<p class="col-span-full text-red-500 text-xs text-center py-4">Error: ${err.message}</p>`;
+    }
+  });
+
+  function openTransBooking(optionId, title) {
+    document.getElementById("book-trans-id").value = optionId;
+    document.getElementById("modal-trans-title").textContent = `Book: ${title}`;
+    
+    const modal = document.getElementById("trans-book-modal");
+    modal.classList.add("active");
+  }
+
+  document.getElementById("close-trans-modal").addEventListener("click", () => {
+    document.getElementById("trans-book-modal").classList.remove("active");
+  });
+
+  // Handle return date toggle
+  document.getElementById("book-trans-return").addEventListener("change", (e) => {
+    const field = document.getElementById("return-date-field");
+    field.style.display = e.target.checked ? "block" : "none";
+  });
+
+  document.getElementById("trans-book-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    
+    const transport_option_id = document.getElementById("book-trans-id").value;
+    const passenger_name = document.getElementById("book-trans-name").value.trim();
+    const travel_date = document.getElementById("book-trans-date").value;
+    const include_return = document.getElementById("book-trans-return").checked;
+    const return_date = include_return ? document.getElementById("book-trans-ret-date").value : null;
+    
+    if (include_return && !return_date) {
+      alert("Please specify a return date!");
+      return;
+    }
+
+    try {
+      const res = await fetch("/bookings/transport/book", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transport_option_id, passenger_name, travel_date, include_return, return_date })
+      });
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.detail || "Booking failed");
+      
+      alert(`Ticket booked successfully!\nBooking Reference ID: ${data.id}\nTotal Fare: ${money(data.total_fare_inr)}`);
+      document.getElementById("trans-book-modal").classList.remove("active");
+      
+      location.reload();
+    } catch (err) {
+      alert(err.message);
+    }
+  });
+
+  // ── CANCEL BOOKING ──
+  document.querySelectorAll(".cancel-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const bookingId = btn.dataset.bookingId;
+      if (!confirm("Are you sure you want to cancel this booking?")) return;
+      try {
+        const res = await fetch(`/bookings/transport/${bookingId}/cancel`, { method: "PATCH" });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Cancellation failed");
+        
+        alert("Booking cancelled successfully!");
+        location.reload();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+  });
+</script>
+{% endblock %}

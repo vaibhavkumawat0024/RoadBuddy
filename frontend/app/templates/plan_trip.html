@@ -1,0 +1,241 @@
+{% extends "dashboard_base.html" %}
+{% set active_page = 'plan-trip' %}
+{% block title %}Plan a New Journey — RoadBuddy{% endblock %}
+
+{% block content %}
+<div class="space-y-6 animate-fade-in-up">
+  <!-- Heading -->
+  <div class="relative bg-slate-900 rounded-2xl overflow-hidden shadow-lg p-8 flex flex-col justify-between min-h-[160px] border border-white/5" style="background: linear-gradient(rgba(24, 29, 24, 0.45), rgba(24, 29, 24, 0.85)), url('/static/images/roadbuddy_hero.png'); background-size: cover; background-position: center;">
+    <div class="max-w-xl z-10">
+      <h2 class="text-white text-3xl font-extrabold tracking-tight mb-2">Plan a New Journey</h2>
+      <p class="text-slate-300 text-sm leading-relaxed">Let RoadBuddy's AI build a customized day-by-day itinerary, calculate fuel costs, and estimate tolls for your vehicle.</p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 gap-6">
+    <!-- Planning Card -->
+    <section class="bg-white border border-outline-variant rounded-2xl p-6 shadow-sm space-y-4">
+      <div class="flex items-center gap-2 border-b border-slate-100 pb-2">
+        <span class="text-xs bg-slate-100 px-2 py-0.5 rounded font-mono font-bold text-primary">KM</span>
+        <h3 class="font-bold text-slate-800 text-base">Journey Parameters</h3>
+      </div>
+      
+      <form id="trip-form" class="space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Origin City</label>
+            <input type="text" id="origin" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-background focus:ring-1 focus:ring-primary focus:border-primary" placeholder="e.g. Jaipur" required>
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Destination City</label>
+            <input type="text" id="destination" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-background focus:ring-1 focus:ring-primary focus:border-primary" placeholder="e.g. Udaipur" required>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Start Date</label>
+            <input type="date" id="start_date" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-background focus:ring-1 focus:ring-primary focus:border-primary" required>
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">End Date</label>
+            <input type="date" id="end_date" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-background focus:ring-1 focus:ring-primary focus:border-primary" required>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Budget (₹)</label>
+            <input type="number" id="budget_inr" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-background focus:ring-1 focus:ring-primary focus:border-primary" placeholder="e.g. 15000" required>
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Number of Travelers</label>
+            <input type="number" id="num_people" value="2" min="1" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-background focus:ring-1 focus:ring-primary focus:border-primary" required>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Travel Mode</label>
+            <select id="travel_mode" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-background focus:ring-1 focus:ring-primary focus:border-primary" required>
+              <option value="own_vehicle">Own vehicle</option>
+              <option value="cab_service">Cab service</option>
+              <option value="bus">Bus</option>
+              <option value="train">Train</option>
+              <option value="flight">Flight</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Group Type</label>
+            <select id="group_type" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-background focus:ring-1 focus:ring-primary focus:border-primary" required>
+              <option value="solo">Solo</option>
+              <option value="couple">Couple</option>
+              <option value="family">Family</option>
+              <option value="friends" selected>Friends</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="vehicle-row" class="grid grid-cols-1 gap-4">
+          <div>
+            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Vehicle Selection</label>
+            {% if vehicles %}
+            <select id="vehicle_id" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-background focus:ring-1 focus:ring-primary focus:border-primary">
+              {% for v in vehicles %}
+              <option value="{{ v.id }}">{{ v.name }} ({{ v.category }}, {{ v.fuel_type }})</option>
+              {% endfor %}
+            </select>
+            {% else %}
+            <div class="p-3 bg-orange-50 border border-orange-200 rounded-lg text-xs text-orange-700">
+              No vehicles found on your profile. Change travel mode to transit options or 
+              <a href="/vehicles" class="font-bold underline text-primary">add a vehicle first</a>.
+            </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <button type="submit" class="bg-primary hover:bg-primary-container text-white text-xs font-semibold px-5 py-2.5 rounded-lg transition-colors active:scale-95 duration-150">Generate Itinerary</button>
+      </form>
+    </section>
+
+    <!-- Results Panel -->
+    <section class="bg-white border border-outline-variant rounded-2xl p-6 shadow-sm space-y-4" id="result-card" style="display:none;">
+      <div class="flex items-center gap-2 border-b border-slate-100 pb-2">
+        <span class="text-xs bg-slate-100 px-2 py-0.5 rounded font-mono font-bold text-primary">AI</span>
+        <h3 class="font-bold text-slate-800 text-base">Your AI Itinerary</h3>
+      </div>
+      <div id="result-content" class="space-y-4"></div>
+    </section>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const vehicleRow = document.getElementById("vehicle-row");
+  const travelModeSelect = document.getElementById("travel_mode");
+
+  function toggleVehicleRow() {
+    vehicleRow.style.display = travelModeSelect.value === "own_vehicle" ? "" : "none";
+  }
+  travelModeSelect.addEventListener("change", toggleVehicleRow);
+  toggleVehicleRow();
+
+  function money(n) {
+    if (n === undefined || n === null) return "—";
+    return "₹" + Number(n).toLocaleString("en-IN");
+  }
+
+  function renderResult(data) {
+    const card = document.getElementById("result-card");
+    const content = document.getElementById("result-content");
+    card.style.display = "";
+
+    let stopsHtml = "";
+    if (data.stops && data.stops.length) {
+      const byDay = {};
+      data.stops.forEach(s => {
+        byDay[s.day] = byDay[s.day] || [];
+        byDay[s.day].push(s);
+      });
+      for (const day of Object.keys(byDay).sort((a,b)=>a-b)) {
+        stopsHtml += `
+          <div class="border-t border-slate-100 pt-4 space-y-3">
+            <h4 class="font-bold text-slate-800 text-sm">Day ${day}</h4>
+            <div class="relative border-l border-slate-200 ml-3 pl-5 space-y-4">
+        `;
+        byDay[day].forEach(s => {
+          stopsHtml += `
+            <div class="relative">
+              <span class="absolute -left-[26px] top-1 bg-white border-2 border-primary w-3 h-3 rounded-full"></span>
+              <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                  <span class="bg-primary/10 text-primary text-[9px] font-bold px-1.5 py-0.5 rounded uppercase">${s.time_slot}</span>
+                  <strong class="text-xs text-slate-700">${s.place_name}</strong>
+                  <span class="text-[10px] text-slate-400 capitalize">(${s.place_type})</span>
+                </div>
+                ${s.description ? `<p class="text-[11px] text-slate-500 pl-1">${s.description}</p>` : ""}
+              </div>
+            </div>
+          `;
+        });
+        stopsHtml += `</div></div>`;
+      }
+    }
+
+    const originVal = document.getElementById("origin").value.trim();
+    const destinationVal = document.getElementById("destination").value.trim();
+    const startTripUrl = `/start-trip?origin=${encodeURIComponent(originVal)}&destination=${encodeURIComponent(destinationVal)}`;
+
+    content.innerHTML = `
+      <div class="grid grid-cols-2 md:grid-cols-6 gap-3">
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-100"><span class="block text-[10px] font-bold text-slate-400 uppercase">Fuel</span><strong class="text-sm text-slate-700">${money(data.fuel_cost_inr)}</strong></div>
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-100"><span class="block text-[10px] font-bold text-slate-400 uppercase">Toll</span><strong class="text-sm text-slate-700">${money(data.toll_cost_inr)}</strong></div>
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-100"><span class="block text-[10px] font-bold text-slate-400 uppercase">Transport</span><strong class="text-sm text-slate-700">${money(data.transport_fare_inr)}</strong></div>
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-100"><span class="block text-[10px] font-bold text-slate-400 uppercase">Hotel</span><strong class="text-sm text-slate-700">${money(data.hotel_cost_inr)}</strong></div>
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-100"><span class="block text-[10px] font-bold text-slate-400 uppercase">Food</span><strong class="text-sm text-slate-700">${money(data.food_cost_inr)}</strong></div>
+        <div class="bg-primary-container/10 p-3 rounded-xl border border-primary-container/20"><span class="block text-[10px] font-bold text-primary uppercase">Total</span><strong class="text-sm text-primary font-bold">${money(data.total_estimated_cost_inr)}</strong></div>
+      </div>
+      
+      ${data.ai_summary ? `
+        <div class="bg-primary/5 p-4 rounded-xl border border-primary/10">
+          <p class="text-slate-600 text-xs leading-relaxed italic">💡 ${data.ai_summary}</p>
+        </div>
+      ` : ""}
+      
+      <div class="space-y-4">
+        ${stopsHtml}
+      </div>
+
+      <div class="flex flex-wrap gap-2 pt-4 border-t border-slate-100">
+        <a href="${startTripUrl}" class="bg-primary hover:bg-primary-container text-white text-xs font-semibold px-4 py-2 rounded-lg transition-all active:scale-95 duration-100 inline-flex items-center gap-1">
+          <span class="material-symbols-outlined text-sm">navigation</span>
+          Start Map Navigation
+        </a>
+        ${data.id ? `
+          <a href="/journal/${data.id}" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-all active:scale-95 duration-100 inline-flex items-center gap-1">
+            <span class="material-symbols-outlined text-sm">auto_stories</span>
+            Trip Journal Log
+          </a>
+        ` : ""}
+      </div>
+    `;
+    card.scrollIntoView({ behavior: "smooth" });
+  }
+
+  document.getElementById("trip-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const vehicleSelect = document.getElementById("vehicle_id");
+    const payload = {
+      origin: document.getElementById("origin").value,
+      destination: document.getElementById("destination").value,
+      start_date: document.getElementById("start_date").value,
+      end_date: document.getElementById("end_date").value,
+      budget_inr: parseFloat(document.getElementById("budget_inr").value),
+      travel_mode: travelModeSelect.value,
+      vehicle_id: (travelModeSelect.value === "own_vehicle" && vehicleSelect) ? vehicleSelect.value : null,
+      group_type: document.getElementById("group_type").value,
+      num_people: parseInt(document.getElementById("num_people").value),
+    };
+
+    const card = document.getElementById("result-card");
+    const content = document.getElementById("result-content");
+    card.style.display = "";
+    content.innerHTML = `<div class="text-center py-8"><p class="text-xs text-slate-400 italic">Generating AI itinerary and calculating costs...</p></div>`;
+    card.scrollIntoView({ behavior: "smooth" });
+
+    try {
+      const res = await fetch("/plan-trip/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Something went wrong");
+      renderResult(data);
+    } catch (err) {
+      content.innerHTML = `<p class="text-red-500 font-semibold text-xs text-center py-4">✗ Error: ${err.message}</p>`;
+    }
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,150 @@
+{% extends "dashboard_base.html" %}
+{% set active_page = 'my-bookings' %}
+{% block title %}My Cab Bookings — RoadBuddy{% endblock %}
+
+{% block content %}
+<div class="space-y-6 animate-fade-in-up">
+  <!-- Heading -->
+  <div class="relative bg-slate-900 rounded-2xl overflow-hidden shadow-lg p-8 flex flex-col justify-between min-h-[160px] border border-white/5" style="background: linear-gradient(rgba(24, 29, 24, 0.45), rgba(24, 29, 24, 0.85)), url('/static/images/booking_banner.png'); background-size: cover; background-position: center;">
+    <div class="max-w-xl z-10">
+      <h2 class="text-white text-3xl font-extrabold tracking-tight mb-2">My Cab Bookings</h2>
+      <p class="text-slate-300 text-sm leading-relaxed">Manage your active cab reservations, track your drivers in real-time, and check ride status updates.</p>
+    </div>
+  </div>
+
+  <div class="flex justify-between items-center border-b border-slate-200 pb-2">
+    <h3 class="font-bold text-slate-800 text-lg">Your Cab Reservations</h3>
+    <span class="bg-primary/10 text-primary text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">{{ bookings|length }} Bookings</span>
+  </div>
+
+  <div class="space-y-6">
+    {% if bookings %}
+      {% for b in bookings %}
+      <div class="bg-white border border-outline-variant rounded-2xl p-6 shadow-sm space-y-4 hover:shadow-md transition-shadow relative {% if b.status == 'cancelled' %}border-l-4 border-l-red-500{% else %}border-l-4 border-l-primary{% endif %}">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-4">
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h4 class="font-bold text-slate-800 text-lg">{{ b.vehicle.vehicle_name }}</h4>
+              {% if b.vehicle.destination == 'Private' %}
+                <span class="bg-blue-50 text-blue-700 text-[10px] font-bold px-2.5 py-0.5 rounded-md border border-blue-100">Private Cab</span>
+              {% else %}
+                <span class="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2.5 py-0.5 rounded-md border border-emerald-100">Seat Booking</span>
+              {% endif %}
+            </div>
+            <p class="text-xs text-slate-400 mt-1 flex items-center gap-1">
+              <span class="material-symbols-outlined text-sm">schedule</span> Booked on: {{ b.travel_date }}
+            </p>
+          </div>
+
+          <div class="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+            <div>
+              <span class="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">Status</span>
+              <span class="text-xs font-bold uppercase tracking-wide {% if b.status == 'cancelled' %}text-red-500{% else %}text-primary{% endif %}">
+                {{ b.status }}
+              </span>
+            </div>
+            {% if b.status != 'cancelled' %}
+            <form method="POST" action="/cancel-booking/{{ b.id }}" onsubmit="return confirm('Are you sure you want to cancel this booking?')">
+              <button type="submit" class="bg-red-50 hover:bg-red-100 text-red-600 text-xs font-semibold px-3 py-1.5 rounded-lg border border-red-100 transition-colors">
+                Cancel Cab
+              </button>
+            </form>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+          <!-- Journey Details -->
+          <div class="bg-slate-50 rounded-xl p-4 border border-slate-100 space-y-3">
+            <h5 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1">
+              <span class="material-symbols-outlined text-sm">route</span> Journey Details
+            </h5>
+            <div class="space-y-2 text-xs text-slate-600">
+              <div class="flex justify-between">
+                <span>Route:</span>
+                <strong class="text-slate-800">{{ b.vehicle.origin }} &rarr; {{ b.vehicle.destination }}</strong>
+              </div>
+              <div class="flex justify-between">
+                <span>Seats Booked:</span>
+                <strong class="text-slate-800">{{ b.num_seats }} {% if b.selected_seats %}({{ b.selected_seats }}){% endif %}</strong>
+              </div>
+              {% if b.pickup_location %}
+              <div class="border-t border-slate-100 pt-2 flex flex-col gap-0.5">
+                <span class="text-[10px] uppercase text-slate-400 font-bold">Pickup Point:</span>
+                <span class="text-slate-800 font-semibold">{{ b.pickup_location.split('|||')[0] }}</span>
+              </div>
+              {% endif %}
+              {% if b.dropoff_location %}
+              <div class="border-t border-slate-100 pt-2 flex flex-col gap-0.5">
+                <span class="text-[10px] uppercase text-slate-400 font-bold">Drop-off Point:</span>
+                <span class="text-slate-800 font-semibold">{{ b.dropoff_location.split('|||')[0] }}</span>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Passenger & Fare Info -->
+          <div class="bg-slate-50 rounded-xl p-4 border border-slate-100 space-y-3">
+            <h5 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1">
+              <span class="material-symbols-outlined text-sm">badge</span> Passenger Info
+            </h5>
+            <div class="space-y-2 text-xs text-slate-600">
+              <div class="flex justify-between">
+                <span>Passenger:</span>
+                <strong class="text-slate-800">{{ b.passenger_name }}</strong>
+              </div>
+              <div class="flex justify-between">
+                <span>Contact:</span>
+                <strong class="text-slate-800">{{ b.passenger_phone or 'N/A' }}</strong>
+              </div>
+              <div class="flex justify-between">
+                <span>Email:</span>
+                <strong class="text-slate-800">{{ b.passenger_email or 'N/A' }}</strong>
+              </div>
+              <div class="flex justify-between border-t border-slate-100 pt-2 items-center">
+                <span>Total Fare:</span>
+                <strong class="text-sm font-bold text-primary">₹{{ "%.0f"|format(b.total_fare_inr) }}</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Tracking Banner -->
+        {% if (b.navigation_status == 'enroute' or b.navigation_status == 'trip_started') and b.status != 'cancelled' %}
+        <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mt-4 animate-pulse">
+          <div class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-emerald-600 text-2xl">local_taxi</span>
+            <div>
+              <p class="text-xs font-bold text-emerald-800">
+                {% if b.navigation_status == 'trip_started' %}
+                  Your trip has started! View route details on the tracking map.
+                {% else %}
+                  Your driver is enroute to the pickup point!
+                {% endif %}
+              </p>
+              <p class="text-[10px] text-emerald-600 mt-0.5">Real-time driver location updates are active.</p>
+            </div>
+          </div>
+          <button class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm active:scale-95 transition-transform"
+                  onclick="openTrackingModal('{{ b.id }}')">
+            <span class="material-symbols-outlined text-sm">location_searching</span> Track Cab
+          </button>
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="bg-white border border-slate-200 rounded-2xl p-12 text-center flex flex-col items-center justify-center space-y-4 shadow-sm">
+        <span class="material-symbols-outlined text-slate-300 text-6xl">directions_car</span>
+        <div class="space-y-1">
+          <h4 class="text-base font-bold text-slate-800">No cab bookings found</h4>
+          <p class="text-xs text-slate-400 max-w-sm">You haven't reserved any cab rides or passenger seats yet. Use our planner tool to secure your ride.</p>
+        </div>
+        <a href="/plan-trip" class="bg-primary hover:bg-primary-container text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm inline-block">
+          Book Cab Now
+        </a>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

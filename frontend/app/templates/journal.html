@@ -1,0 +1,285 @@
+{% extends "dashboard_base.html" %}
+{% set active_page = 'my-trips' %}
+{% block title %}Trip Journal — RoadBuddy{% endblock %}
+
+{% block content %}
+<div class="space-y-6 animate-fade-in-up">
+  <!-- Heading / Trip Details -->
+  <div class="relative bg-slate-900 rounded-2xl overflow-hidden shadow-lg p-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border border-white/5" style="background: linear-gradient(rgba(24, 29, 24, 0.45), rgba(24, 29, 24, 0.85)), url('/static/images/roadbuddy_hero.png'); background-size: cover; background-position: center;">
+    <div class="max-w-xl z-10">
+      <h2 class="text-white text-3xl font-extrabold tracking-tight mb-2">📔 Trip Journal</h2>
+      {% if trip %}
+      <p class="text-slate-300 text-sm">Documenting stops and tracking expenses for: <strong class="text-white font-bold">{{ trip.origin }} → {{ trip.destination }}</strong></p>
+      {% else %}
+      <p class="text-slate-300 text-sm">Log stops, record expenses, and generate AI trip summaries.</p>
+      {% endif %}
+    </div>
+    <div class="z-10">
+      <button class="bg-primary hover:bg-primary-container text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors" id="publish-journal-btn" {% if journal and journal.is_public %}disabled{% endif %}>
+        {% if journal and journal.is_public %}📢 Published Publicly{% else %}📢 Make Journal Public{% endif %}
+      </button>
+    </div>
+  </div>
+
+  {% if error %}
+  <div class="bg-red-50 border border-red-200 text-red-700 text-xs p-4 rounded-xl">
+    ✗ {{ error }}
+  </div>
+  {% endif %}
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Left side: Log Form + Timeline -->
+    <div class="lg:col-span-2 space-y-6">
+      <!-- Add Entry Form -->
+      <section class="bg-white border border-outline-variant rounded-2xl p-6 shadow-sm space-y-4">
+        <div class="flex items-center gap-2 border-b border-slate-100 pb-2">
+          <span class="text-xs bg-slate-100 px-2 py-0.5 rounded font-mono font-bold text-primary">ADD</span>
+          <h3 class="font-bold text-slate-800 text-base">Log a Stop / Expense</h3>
+        </div>
+        
+        <form id="add-entry-form" class="space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Stop / Location Name</label>
+              <input type="text" id="entry-stop" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-background focus:ring-1 focus:ring-primary focus:border-primary" placeholder="e.g. Shiva Dhaba, Murthal" required>
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Expense (₹) — Optional</label>
+              <input type="number" id="entry-expense" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-background focus:ring-1 focus:ring-primary focus:border-primary" placeholder="e.g. 850" step="1">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Notes / Experience</label>
+            <textarea id="entry-notes" rows="3" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-background focus:ring-1 focus:ring-primary focus:border-primary" placeholder="Describe what you ate, scenery, road condition, or key details..."></textarea>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Latitude (Optional)</label>
+              <input type="number" id="entry-lat" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-background focus:ring-1 focus:ring-primary focus:border-primary" placeholder="e.g. 28.61" step="0.000001">
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Longitude (Optional)</label>
+              <input type="number" id="entry-lng" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-background focus:ring-1 focus:ring-primary focus:border-primary" placeholder="e.g. 77.23" step="0.000001">
+            </div>
+          </div>
+
+          <button type="submit" class="bg-primary hover:bg-primary-container text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition-colors">Save Journal Entry</button>
+        </form>
+      </section>
+
+      <!-- Logs Timeline -->
+      <section class="bg-white border border-outline-variant rounded-2xl p-6 shadow-sm space-y-4">
+        <div class="flex items-center gap-2 border-b border-slate-100 pb-2">
+          <span class="text-xs bg-slate-100 px-2 py-0.5 rounded font-mono font-bold text-primary">LOGS</span>
+          <h3 class="font-bold text-slate-800 text-base">Trip Logs Timeline</h3>
+        </div>
+
+        <div class="relative border-l-2 border-slate-200 ml-4 pl-6 space-y-6" id="journal-timeline">
+          {% if journal and journal.entries %}
+            {% for e in journal.entries %}
+            <div class="relative timeline-item">
+              <span class="absolute -left-[31px] top-1 bg-primary border-4 border-white w-4 h-4 rounded-full shadow-sm ring-1 ring-slate-200"></span>
+              <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2 shadow-sm timeline-card">
+                <h4 class="font-bold text-slate-800 text-xs flex justify-between items-center">
+                  <span>📍 {{ e.stop_name }}</span>
+                  {% if e.expense_inr %}
+                  <span class="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded timeline-expense">₹{{ "%.0f"|format(e.expense_inr) }}</span>
+                  {% endif %}
+                </h4>
+                <p class="text-xs text-slate-500 leading-relaxed">{{ e.notes or 'No notes logged.' }}</p>
+                {% if e.lat and e.lng %}
+                <span class="block text-[9px] text-slate-400 font-mono">GPS: {{ e.lat }}, {{ e.lng }}</span>
+                {% endif %}
+              </div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <p class="text-slate-400 text-xs italic pl-2" id="no-logs-text">No stops logged yet for this trip journal.</p>
+          {% endif %}
+        </div>
+      </section>
+    </div>
+
+    <!-- Right side: Expense Breakdown & Storyteller -->
+    <div class="space-y-6">
+      <!-- Expense Breakdown -->
+      <section class="bg-white border border-outline-variant rounded-2xl p-6 shadow-sm space-y-4">
+        <div class="flex items-center gap-2 border-b border-slate-100 pb-2">
+          <span class="text-xs bg-slate-100 px-2 py-0.5 rounded font-mono font-bold text-primary">₹</span>
+          <h3 class="font-bold text-slate-800 text-base">Expense Breakdown</h3>
+        </div>
+        
+        <div class="space-y-3" id="expense-summary-container">
+          {% if summary and summary.stops %}
+            {% for s in summary.stops %}
+            <div class="flex justify-between items-center border-b border-slate-100 pb-1.5 text-xs">
+              <span class="text-slate-400 font-medium">{{ s.name }}</span>
+              <span class="font-bold text-slate-700">₹{{ "%.0f"|format(s.expense_inr) }}</span>
+            </div>
+            {% endfor %}
+            <div class="flex justify-between items-center pt-2 text-xs">
+              <span class="text-slate-500 font-bold">Total Spent</span>
+              <strong class="text-primary text-base font-extrabold">₹{{ "%.0f"|format(summary.total_expense_inr) }}</strong>
+            </div>
+          {% else %}
+            <p class="text-slate-400 text-xs italic" id="no-expenses-text">No expenses tracked yet.</p>
+          {% endif %}
+        </div>
+      </section>
+
+      <!-- AI Storyteller -->
+      <section class="rounded-2xl p-5 text-white shadow-sm space-y-4 relative overflow-hidden" style="background: linear-gradient(rgba(30, 27, 75, 0.75), rgba(49, 16, 66, 0.95)), url('/static/images/roadbuddy_hero.png'); background-size: cover; background-position: center;">
+        <div>
+          <h4 class="font-bold text-base">✨ AI Trip Storyteller</h4>
+          <p class="text-[10px] text-slate-300">Generate a beautiful AI summary story based on your stops.</p>
+        </div>
+
+        <form id="ai-summarizer-form" class="space-y-3">
+          <div>
+            <label class="block text-[9px] font-bold text-slate-300 uppercase tracking-wider mb-1">Travel Group Type</label>
+            <select id="ai-group-type" class="w-full text-xs border border-white/10 rounded-lg p-2.5 bg-white/5 focus:ring-1 focus:ring-primary focus:border-primary text-white">
+              <option value="friends" class="bg-indigo-950 text-white">Friends</option>
+              <option value="couple" class="bg-indigo-950 text-white">Couple</option>
+              <option value="family" class="bg-indigo-950 text-white">Family</option>
+              <option value="solo" class="bg-indigo-950 text-white">Solo</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[9px] font-bold text-slate-300 uppercase tracking-wider mb-1">Number of People</label>
+            <input type="number" id="ai-people" value="2" min="1" class="w-full text-xs border border-white/10 rounded-lg p-2.5 bg-white/5 focus:ring-1 focus:ring-primary focus:border-primary text-white">
+          </div>
+          <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 rounded-lg transition-colors">Write Trip Story</button>
+        </form>
+
+        <div id="ai-summary-result" class="text-xs pt-3 border-t border-white/10 space-y-2 max-h-56 overflow-y-auto no-scrollbar" style="display:none;"></div>
+      </section>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const tripId = "{{ trip_id }}";
+
+  function money(n) {
+    return "₹" + Number(n).toLocaleString("en-IN", { maximumFractionDigits: 0 });
+  }
+
+  // Add Journal Entry
+  document.getElementById("add-entry-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    
+    const stop_name = document.getElementById("entry-stop").value.trim();
+    const expense = document.getElementById("entry-expense").value;
+    const notes = document.getElementById("entry-notes").value.trim();
+    const latVal = document.getElementById("entry-lat").value;
+    const lngVal = document.getElementById("entry-lng").value;
+    
+    const payload = {
+      trip_id: tripId,
+      stop_name,
+      notes: notes || null,
+      expense_inr: expense ? parseFloat(expense) : 0.0,
+      lat: latVal ? parseFloat(latVal) : null,
+      lng: lngVal ? parseFloat(lngVal) : null
+    };
+
+    try {
+      const res = await fetch("/journal/entry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.detail || "Failed to add entry");
+      
+      alert("Journal entry saved!");
+      document.getElementById("add-entry-form").reset();
+      location.reload();
+    } catch (err) {
+      alert(err.message);
+    }
+  });
+
+  // Make Journal Public
+  document.getElementById("publish-journal-btn").addEventListener("click", async () => {
+    if (!confirm("Make this journal public so others in the community can view it?")) return;
+    try {
+      const res = await fetch(`/journal/${tripId}/publish`, { method: "PATCH" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Failed to publish journal");
+      
+      alert("Journal is now public!");
+      const btn = document.getElementById("publish-journal-btn");
+      btn.textContent = "📢 Published Publicly";
+      btn.disabled = true;
+    } catch (err) {
+      alert(err.message);
+    }
+  });
+
+  // AI Storyteller
+  document.getElementById("ai-summarizer-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    
+    const resultBox = document.getElementById("ai-summary-result");
+    resultBox.style.display = "block";
+    resultBox.innerHTML = `<p class="text-slate-400 italic">AI Storyteller is weaving your road trip story...</p>`;
+    
+    const cards = document.querySelectorAll(".timeline-card");
+    if (cards.length === 0) {
+      resultBox.innerHTML = `<p class="text-red-400">Please log at least one stop before generating a story!</p>`;
+      return;
+    }
+    
+    const entries = [];
+    cards.forEach((card, index) => {
+      const stopName = card.querySelector("h4 span").textContent.replace("📍", "").trim();
+      const expenseEl = card.querySelector(".timeline-expense");
+      const expense = expenseEl ? parseFloat(expenseEl.textContent.replace("₹", "")) : 0.0;
+      const notes = card.querySelector("p").textContent;
+      
+      entries.push({
+        day: index + 1,
+        location: stopName,
+        text: notes,
+        expenses_inr: expense
+      });
+    });
+    
+    const totalCost = entries.reduce((acc, curr) => acc + curr.expenses_inr, 0.0);
+
+    const payload = {
+      origin: "{{ trip.origin if trip else 'Start' }}",
+      destination: "{{ trip.destination if trip else 'End' }}",
+      entries,
+      total_days: entries.length,
+      total_cost_inr: totalCost,
+      group_type: document.getElementById("ai-group-type").value,
+      num_people: parseInt(document.getElementById("ai-people").value)
+    };
+
+    try {
+      const res = await fetch("/journal/summarize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.detail || "AI Story generation failed");
+      
+      resultBox.innerHTML = `
+        <p class="font-bold text-emerald-400 mb-1">📖 ${data.title || 'Our Journey'}</p>
+        <p class="text-slate-200 leading-relaxed text-[11px]">${data.summary || data.story || JSON.stringify(data)}</p>
+      `;
+    } catch (err) {
+      resultBox.innerHTML = `<p class="text-red-400 font-semibold">Storyteller error: ${err.message}</p>`;
+    }
+  });
+</script>
+{% endblock %}
