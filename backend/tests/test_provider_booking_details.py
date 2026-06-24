@@ -1,15 +1,8 @@
+"""Tests for the /api/provider/vehicles/<id>/booking-details endpoint."""
 import pytest
 from app.models.models import Provider, ProviderVehicle, ProviderBooking, User
 from app.provider.auth import create_provider_token, hash_password
-from tests.conftest import TestingSessionLocal
 
-@pytest.fixture
-def db_session():
-    session = TestingSessionLocal()
-    try:
-        yield session
-    finally:
-        session.close()
 
 def test_booking_details_endpoint(client, db_session):
     # 1. Create a test provider
@@ -164,13 +157,3 @@ def test_booking_details_endpoint(client, db_session):
     assert len(details["passengers"]) == 1
     assert details["passengers"][0]["name"] == "Bob Brown"
     assert details["passengers"][0]["destination"] == "Jaipur Hotel"
-
-    # Cleanup
-    db_session.delete(booking_public)
-    db_session.delete(booking_private)
-    db_session.delete(public_vehicle)
-    db_session.delete(private_vehicle)
-    db_session.delete(provider)
-    db_session.delete(other_provider)
-    db_session.delete(user)
-    db_session.commit()

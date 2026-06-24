@@ -1,60 +1,47 @@
-from fastapi.testclient import TestClient
-from app.main import app
+"""Tests for the /api/users endpoints."""
+from tests.conftest import create_test_user
 
-client = TestClient(app)
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# ── Register (OTP flow — only sends OTP, does NOT create user) ───────────────
 
-def register_user(email="test@roadbuddy.com", password="Test123", name="Test User", home_city="Jaipur"):
-    return client.post("/api/users/register", json={
-        "email": email,
-        "password": password,
-        "name": name,
-        "home_city": home_city,
+def test_register_returns_otp_sent(client):
+    response = client.post("/api/users/register", json={
+        "email": "newuser@roadbuddy.com",
+        "password": "Test123",
+        "name": "New User",
     })
-
-
-def login_user(email="test@roadbuddy.com", password="Test123"):
-    return client.post("/api/users/login", data={
-        "username": email,
-        "password": password,
-    })
-
-
-def get_token():
-    register_user()
-    response = login_user()
-    return response.json()["access_token"]
-
-
-# ── Register ──────────────────────────────────────────────────────────────────
-
-def test_register_success():
-    import time
-    unique_email = f"newuser_{int(time.time())}@roadbuddy.com"
-    response = register_user(email=unique_email)
     assert response.status_code == 201
-    assert response.json()["email"] == unique_email
+    data = response.json()
+    assert data["message"] == "OTP sent"
+    assert data["email"] == "newuser@roadbuddy.com"
 
 
-def test_register_duplicate_email():
-    register_user(email="duplicate@roadbuddy.com")
-    response = register_user(email="duplicate@roadbuddy.com")
+def test_register_duplicate_email(client):
+    """If the email already exists in DB, register should return 400."""
+    create_test_user(email="duplicate@roadbuddy.com")
+    response = client.post("/api/users/register", json={
+        "email": "duplicate@roadbuddy.com",
+        "password": "Test123",
+        "name": "Dup User",
+    })
     assert response.status_code == 400
     assert "already registered" in response.json()["detail"]
 
 
 # ── Login ─────────────────────────────────────────────────────────────────────
 
-def test_login_success():
-    register_user(email="logintest@roadbuddy.com")
-    response = login_user(email="logintest@roadbuddy.com")
+def test_login_success(client):
+    create_test_user(email="logintest@roadbuddy.com", password="Test123")
+    response = client.post("/api/users/login", data={
+        "username": "logintest@roadbuddy.com",
+        "password": "Test123",
+    })
     assert response.status_code == 200
     assert "access_token" in response.json()
 
 
-def test_login_wrong_password():
-    register_user(email="wrongpass@roadbuddy.com")
+def test_login_wrong_password(client):
+    create_test_user(email="wrongpass@roadbuddy.com", password="CorrectPass")
     response = client.post("/api/users/login", data={
         "username": "wrongpass@roadbuddy.com",
         "password": "WrongPassword",
@@ -62,7 +49,7 @@ def test_login_wrong_password():
     assert response.status_code == 401
 
 
-def test_login_nonexistent_user():
+def test_login_nonexistent_user(client):
     response = client.post("/api/users/login", data={
         "username": "ghost@roadbuddy.com",
         "password": "Test123",
@@ -72,41 +59,41 @@ def test_login_nonexistent_user():
 
 # ── Profile ───────────────────────────────────────────────────────────────────
 
-def test_get_profile():
-    register_user(email="profile@roadbuddy.com")
-    token = get_token()
-    response = client.get("/api/users/me", headers={"Authorization": f"Bearer {token}"})
+def test_get_profile(client):
+    info = create_test_user(email="profile@roadbuddy.com")
+    response = client.get(
+        "/api/users/me",
+        headers={"Authorization": f"Bearer {info['token']}"},
+    )
     assert response.status_code == 200
+    assert response.json()["email"] == "profile@roadbuddy.com"
 
 
-def test_get_profile_without_token():
+def test_get_profile_without_token(client):
     response = client.get("/api/users/me")
-    assert response.status_code == 401 or response.status_code == 403
+    assert response.status_code in (401, 403)
 
 
 # ── Vehicles ──────────────────────────────────────────────────────────────────
 
-def test_add_vehicle():
-    register_user(email="vehicle@roadbuddy.com")
-    response = login_user(email="vehicle@roadbuddy.com")
-    token = response.json()["access_token"]
-
+def test_add_vehicle(client):
+    info = create_test_user(email="vehicle@roadbuddy.com")
     response = client.post("/api/users/vehicles", json={
         "name": "My Car",
         "fuel_type": "petrol",
         "mileage_kmpl": 15.0,
         "category": "car",
         "tank_capacity_litres": 45.0,
-    }, headers={"Authorization": f"Bearer {token}"})
+    }, headers={"Authorization": f"Bearer {info['token']}"})
     assert response.status_code == 201
     assert response.json()["fuel_type"] == "petrol"
 
 
-def test_list_vehicles():
-    register_user(email="listvehicle@roadbuddy.com")
-    response = login_user(email="listvehicle@roadbuddy.com")
-    token = response.json()["access_token"]
-
-    response = client.get("/api/users/vehicles", headers={"Authorization": f"Bearer {token}"})
+def test_list_vehicles(client):
+    info = create_test_user(email="listvehicle@roadbuddy.com")
+    response = client.get(
+        "/api/users/vehicles",
+        headers={"Authorization": f"Bearer {info['token']}"},
+    )
     assert response.status_code == 200
     assert isinstance(response.json(), list)

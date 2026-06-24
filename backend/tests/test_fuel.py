@@ -1,24 +1,13 @@
-from fastapi.testclient import TestClient
-from app.main import app
-
-client = TestClient(app)
+"""Tests for the /api/fuel endpoints."""
+from tests.conftest import create_test_user
 
 
 def get_token():
-    client.post("/api/users/register", json={
-        "email": "fueltest@roadbuddy.com",
-        "password": "Test123",
-        "name": "Fuel Tester",
-        "home_city": "Delhi",
-    })
-    response = client.post("/api/users/login", data={
-        "username": "fueltest@roadbuddy.com",
-        "password": "Test123",
-    })
-    return response.json()["access_token"]
+    info = create_test_user(email="fueltest@roadbuddy.com", name="Fuel Tester")
+    return info["token"]
 
 
-def get_vehicle_id(token):
+def get_vehicle_id(client, token):
     response = client.post("/api/users/vehicles", json={
         "name": "Test Car",
         "fuel_type": "petrol",
@@ -29,7 +18,7 @@ def get_vehicle_id(token):
 
 # ── Fuel Prices ───────────────────────────────────────────────────────────────
 
-def test_get_fuel_prices():
+def test_get_fuel_prices(client):
     response = client.get("/api/fuel/fuel-prices")
     assert response.status_code == 200
     data = response.json()
@@ -40,7 +29,7 @@ def test_get_fuel_prices():
 
 # ── Toll Estimate ─────────────────────────────────────────────────────────────
 
-def test_toll_estimate():
+def test_toll_estimate(client):
     response = client.get("/api/fuel/toll-estimate", params={
         "origin": "Delhi",
         "destination": "Jaipur",
@@ -54,9 +43,9 @@ def test_toll_estimate():
 
 # ── Calculate Trip Cost ───────────────────────────────────────────────────────
 
-def test_calculate_trip_cost():
+def test_calculate_trip_cost(client):
     token = get_token()
-    vehicle_id = get_vehicle_id(token)
+    vehicle_id = get_vehicle_id(client, token)
     response = client.post("/api/fuel/calculate", json={
         "vehicle_id": vehicle_id,
         "origin": "Delhi",
@@ -69,9 +58,9 @@ def test_calculate_trip_cost():
     assert "toll_cost_inr" in data
 
 
-def test_calculate_trip_cost_with_return():
+def test_calculate_trip_cost_with_return(client):
     token = get_token()
-    vehicle_id = get_vehicle_id(token)
+    vehicle_id = get_vehicle_id(client, token)
     response = client.post("/api/fuel/calculate", json={
         "vehicle_id": vehicle_id,
         "origin": "Mumbai",
@@ -81,14 +70,11 @@ def test_calculate_trip_cost_with_return():
     assert response.status_code == 200
 
 
-
-
-
-def test_calculate_without_token():
+def test_calculate_without_token(client):
     response = client.post("/api/fuel/calculate", json={
         "vehicle_id": "v_test",
         "origin": "Delhi",
         "destination": "Agra",
         "include_return": False,
     })
-    assert response.status_code == 401 or response.status_code == 403
+    assert response.status_code in (401, 403)

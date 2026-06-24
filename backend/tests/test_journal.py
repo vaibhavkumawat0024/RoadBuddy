@@ -1,24 +1,13 @@
-from fastapi.testclient import TestClient
-from app.main import app
-
-client = TestClient(app)
+"""Tests for the /api/journal endpoints."""
+from tests.conftest import create_test_user
 
 
 def get_token(email="journal@roadbuddy.com"):
-    client.post("/api/users/register", json={
-        "email": email,
-        "password": "Test123",
-        "name": "Journal Tester",
-        "home_city": "Bangalore",
-    })
-    response = client.post("/api/users/login", data={
-        "username": email,
-        "password": "Test123",
-    })
-    return response.json()["access_token"]
+    info = create_test_user(email=email, name="Journal Tester")
+    return info["token"]
 
 
-def add_entry(token, trip_id="trip_j_001"):
+def add_entry(client, token, trip_id="trip_j_001"):
     return client.post("/api/journal/entry", json={
         "trip_id": trip_id,
         "stop_name": "Amber Fort",
@@ -31,14 +20,14 @@ def add_entry(token, trip_id="trip_j_001"):
 
 # ── Add Entry ─────────────────────────────────────────────────────────────────
 
-def test_add_journal_entry():
+def test_add_journal_entry(client):
     token = get_token(email="addentry@roadbuddy.com")
-    response = add_entry(token)
+    response = add_entry(client, token)
     assert response.status_code == 201
     assert response.json()["entry"]["stop_name"] == "Amber Fort"
 
 
-def test_add_entry_without_token():
+def test_add_entry_without_token(client):
     response = client.post("/api/journal/entry", json={
         "trip_id": "trip_001",
         "stop_name": "Hawa Mahal",
@@ -47,14 +36,14 @@ def test_add_entry_without_token():
         "lat": 26.9239,
         "lng": 75.8267,
     })
-    assert response.status_code == 401 or response.status_code == 403
+    assert response.status_code in (401, 403)
 
 
 # ── Get Journal ───────────────────────────────────────────────────────────────
 
-def test_get_journal():
+def test_get_journal(client):
     token = get_token(email="getjournal@roadbuddy.com")
-    add_entry(token, trip_id="trip_j_002")
+    add_entry(client, token, trip_id="trip_j_002")
 
     response = client.get("/api/journal/trip_j_002",
                           headers={"Authorization": f"Bearer {token}"})
@@ -62,7 +51,7 @@ def test_get_journal():
     assert response.json()["trip_id"] == "trip_j_002"
 
 
-def test_get_nonexistent_journal():
+def test_get_nonexistent_journal(client):
     token = get_token(email="nojournal@roadbuddy.com")
     response = client.get("/api/journal/fake_trip_999",
                           headers={"Authorization": f"Bearer {token}"})
@@ -71,9 +60,9 @@ def test_get_nonexistent_journal():
 
 # ── Publish Journal ───────────────────────────────────────────────────────────
 
-def test_publish_journal():
+def test_publish_journal(client):
     token = get_token(email="publishjournal@roadbuddy.com")
-    add_entry(token, trip_id="trip_j_003")
+    add_entry(client, token, trip_id="trip_j_003")
 
     response = client.patch("/api/journal/trip_j_003/publish",
                             headers={"Authorization": f"Bearer {token}"})
@@ -83,9 +72,9 @@ def test_publish_journal():
 
 # ── Expense Summary ───────────────────────────────────────────────────────────
 
-def test_expense_summary():
+def test_expense_summary(client):
     token = get_token(email="summary@roadbuddy.com")
-    add_entry(token, trip_id="trip_j_004")
+    add_entry(client, token, trip_id="trip_j_004")
 
     response = client.get("/api/journal/trip_j_004/summary",
                           headers={"Authorization": f"Bearer {token}"})
