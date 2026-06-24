@@ -5,6 +5,7 @@
 
 /* ── Provider base overrides ── */
 .provider-nav {
+  position: relative;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -12,6 +13,7 @@
   background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
   border-bottom: 1px solid rgba(255,255,255,0.06);
   backdrop-filter: blur(10px);
+  z-index: 100;
 }
 .provider-nav .brand {
   font-weight: 700;
@@ -33,6 +35,10 @@
   letter-spacing: 0.5px;
   text-transform: uppercase;
 }
+.provider-nav-menu {
+  display: flex;
+  align-items: center;
+}
 .provider-nav a {
   margin-left: 18px;
   text-decoration: none;
@@ -43,6 +49,53 @@
   font-family: 'Inter', system-ui, sans-serif;
 }
 .provider-nav a:hover { color: #FF6B35; }
+
+/* Hamburger Menu Toggle Button */
+.provider-nav-toggle {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+}
+.provider-nav-toggle:focus {
+  outline: none;
+}
+.provider-nav-toggle .hamburger {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: #fff;
+  position: relative;
+  transition: background 0.2s;
+}
+.provider-nav-toggle .hamburger::before,
+.provider-nav-toggle .hamburger::after {
+  content: '';
+  position: absolute;
+  width: 22px;
+  height: 2px;
+  background: #fff;
+  left: 0;
+  transition: transform 0.2s;
+}
+.provider-nav-toggle .hamburger::before {
+  top: -6px;
+}
+.provider-nav-toggle .hamburger::after {
+  bottom: -6px;
+}
+.provider-nav-toggle.open-active .hamburger {
+  background: transparent;
+}
+.provider-nav-toggle.open-active .hamburger::before {
+  transform: rotate(45deg);
+  top: 0;
+}
+.provider-nav-toggle.open-active .hamburger::after {
+  transform: rotate(-45deg);
+  bottom: 0;
+}
 
 
 /* ═══ Provider Auth Card — Premium Dark ═══ */
@@ -773,6 +826,54 @@ body:has(.provider-nav) main {
 /* ═══ Responsive ═══ */
 
 @media (max-width: 768px) {
+  .provider-nav {
+    position: relative;
+    padding: 12px 18px;
+    z-index: 1000;
+  }
+  .provider-nav-toggle {
+    display: block;
+  }
+  .provider-nav-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    background: #111122;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    flex-direction: column;
+    padding: 8px 0;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    z-index: 999;
+    align-items: stretch;
+  }
+  .provider-nav-menu.show {
+    display: flex;
+  }
+  .provider-nav a {
+    margin: 0 !important;
+    padding: 12px 20px;
+    font-size: 14.5px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    display: block;
+  }
+  .provider-nav a:last-child {
+    border-bottom: none;
+  }
+
+  /* Prevent unread dot breakage on mobile list */
+  #nav-provider-bookings-link {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  #nav-provider-bookings-link .unread-dot {
+    position: static !important;
+    margin-left: 8px;
+    display: inline-block;
+  }
+
   .stats-row { grid-template-columns: repeat(2, 1fr); }
   .setup-row { grid-template-columns: 1fr; }
   .service-type-options { grid-template-columns: 1fr; }

@@ -27,6 +27,19 @@ router = APIRouter(prefix="/provider")
 templates = Jinja2Templates(directory="templates")
 
 
+def check_provider_unread_bookings(provider, db: Session) -> bool:
+    if not provider:
+        return False
+    vehicles = db.query(ProviderVehicle).filter(ProviderVehicle.provider_id == provider.id).all()
+    vehicle_ids = [v.id for v in vehicles]
+    if not vehicle_ids:
+        return False
+    return db.query(ProviderBooking).filter(
+        ProviderBooking.vehicle_id.in_(vehicle_ids),
+        ProviderBooking.provider_unread == True
+    ).count() > 0
+
+
 # ── Register ───────────────────────────────────────────────────────────────
 
 @router.get("/register", response_class=HTMLResponse)
@@ -157,6 +170,7 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
         "total_seats_booked": total_seats_booked,
         "total_revenue": total_revenue,
         "show_setup": show_setup,
+        "has_unread_bookings": check_provider_unread_bookings(provider, db),
     })
 
 
@@ -186,6 +200,7 @@ def vehicles_page(request: Request, db: Session = Depends(get_db)):
         "vehicles": vehicles,
         "vehicle_assets": vehicle_assets,
         "success": success,
+        "has_unread_bookings": check_provider_unread_bookings(provider, db),
     })
 
 
@@ -342,6 +357,13 @@ def bookings_page(request: Request, db: Session = Depends(get_db)):
     ).all()
     vehicle_ids = [v.id for v in vehicles]
 
+    if vehicle_ids:
+        db.query(ProviderBooking).filter(
+            ProviderBooking.vehicle_id.in_(vehicle_ids),
+            ProviderBooking.provider_unread == True
+        ).update({ProviderBooking.provider_unread: False}, synchronize_session=False)
+        db.commit()
+
     bookings = db.query(ProviderBooking).filter(
         ProviderBooking.vehicle_id.in_(vehicle_ids)
     ).order_by(ProviderBooking.created_at.desc()).all() if vehicle_ids else []
@@ -350,6 +372,7 @@ def bookings_page(request: Request, db: Session = Depends(get_db)):
         "provider": provider,
         "bookings": bookings,
         "vehicles": vehicles,
+        "has_unread_bookings": False,
     })
 
 
@@ -367,6 +390,7 @@ def settings_page(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse(request, "provider_settings.html", {
         "provider": provider,
         "success": success,
+        "has_unread_bookings": check_provider_unread_bookings(provider, db),
     })
 
 

@@ -442,12 +442,24 @@ class ProviderBooking(Base):
     navigation_status = Column(String, nullable=True)
     driver_lat      = Column(Float, nullable=True)
     driver_lon      = Column(Float, nullable=True)
+    passenger_details = Column(String, nullable=True)
     message_unread  = Column(Boolean, default=False)
+    provider_unread = Column(Boolean, default=True)
     created_at      = Column(DateTime, server_default=func.now())
  
     vehicle = relationship("ProviderVehicle", back_populates="bookings")
     user    = relationship("User")
-
+ 
     @property
     def vehicle_name(self):
-        return self.vehicle.vehicle_name if self.vehicle else "Vehicle"
+        return self.vehicle.vehicle_name if self.vehicle else "Vehicle"
+ 
+    @property
+    def passenger_details_parsed(self):
+        if self.passenger_details:
+            import json
+            try:
+                return json.loads(self.passenger_details)
+            except Exception:
+                pass
+        return []

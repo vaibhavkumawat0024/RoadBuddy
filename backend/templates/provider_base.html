@@ -14,12 +14,20 @@
 <body>
   <nav class="provider-nav">
     <a href="/provider/dashboard" class="brand">🚐 RoadBuddy <span class="partner-badge">Partner</span></a>
-    <div>
+    <button class="provider-nav-toggle" id="provider-nav-toggle" aria-label="Toggle navigation">
+      <span class="hamburger"></span>
+    </button>
+    <div class="provider-nav-menu" id="provider-nav-menu">
       {% if provider %}
       <a href="/provider/dashboard">Dashboard</a>
       {% if provider.company_name %}
       <a href="/provider/vehicles">My Vehicles</a>
-      <a href="/provider/bookings">Bookings</a>
+      <a href="/provider/bookings" style="position: relative;" id="nav-provider-bookings-link">
+        Bookings
+        {% if has_unread_bookings %}
+        <span class="unread-dot" style="position: absolute; top: -3px; right: -8px; width: 8px; height: 8px; background: #ff4d4f; border-radius: 50%;"></span>
+        {% endif %}
+      </a>
       <a href="/provider/settings">Settings</a>
       {% endif %}
       <a href="/provider/logout">Logout</a>
@@ -47,6 +55,19 @@
     width: calc(100% - 48px);
     pointer-events: none;
   "></div>
+
+  <!-- Interactive Booking Details Modal -->
+  <div class="provider-modal-overlay" id="provider-detail-modal-overlay">
+    <div class="provider-modal-card">
+      <div class="provider-modal-header">
+        <h3 id="provider-detail-modal-title">🚍 Vehicle Booking Details</h3>
+        <button type="button" class="provider-modal-close" onclick="closeProviderDetailModal()">&times;</button>
+      </div>
+      <div class="provider-modal-body" id="provider-detail-modal-body">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </div>
 
   <style>
     .provider-toast {
@@ -116,6 +137,167 @@
     .provider-toast-value {
       font-weight: 600;
       color: #0f172a;
+    }
+
+    /* ═══ VEHICLE DETAILS MODAL STYLE ═══ */
+    .provider-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 10, 22, 0.75);
+      backdrop-filter: blur(12px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 99999;
+      opacity: 0;
+      transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      padding: 16px;
+    }
+    .provider-modal-overlay.show {
+      display: flex;
+      opacity: 1;
+    }
+    .provider-modal-card {
+      background: linear-gradient(145deg, #15152c, #1e1e3a);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 580px;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      transform: scale(0.95);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .provider-modal-overlay.show .provider-modal-card {
+      transform: scale(1);
+      opacity: 1;
+    }
+    .provider-modal-header {
+      padding: 18px 24px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.01);
+    }
+    .provider-modal-header h3 {
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .provider-modal-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      color: #7878a0;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0;
+      transition: color 0.2s;
+    }
+    .provider-modal-close:hover {
+      color: #fff;
+    }
+    .provider-modal-body {
+      padding: 24px;
+      overflow-y: auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .provider-modal-subtitle {
+      font-size: 13px;
+      color: #7878a0;
+      margin-top: -15px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding-bottom: 12px;
+    }
+    .provider-layout-wrapper {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 16px;
+      width: 100%;
+      max-width: 320px;
+      align-self: center;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+      margin: 8px 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .provider-seats-grid {
+      display: grid;
+      gap: 8px;
+      width: 100%;
+      justify-content: center;
+    }
+    .provider-seat-block {
+      width: 38px;
+      height: 38px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1.5px solid #1DB954;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: #1DB954;
+      user-select: none;
+    }
+    .provider-seat-block.booked {
+      background: rgba(255, 107, 53, 0.08);
+      border-color: #ff6b6b;
+      color: #ff6b6b;
+    }
+    .passenger-list-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .passenger-row-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      border-radius: 10px;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .passenger-row-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .passenger-row-name {
+      font-weight: 600;
+      color: #fff;
+      font-size: 13.5px;
+    }
+    .passenger-row-seats {
+      font-size: 11px;
+      padding: 2px 8px;
+      background: rgba(29, 185, 84, 0.12);
+      color: #1DB954;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+    .passenger-row-meta {
+      font-size: 12px;
+      color: #a0a0c0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
     }
   </style>
 
@@ -246,6 +428,182 @@
         }
       }
 
+      // Close provider vehicle details modal
+      window.closeProviderDetailModal = function() {
+        const overlay = document.getElementById("provider-detail-modal-overlay");
+        if (overlay) {
+          overlay.classList.remove("show");
+        }
+      }
+
+      // Build seat map html dynamically
+      function buildProviderSeatMapHTML(vehicleType, totalSeats, bookedSeatsList) {
+        const use4Cols = totalSeats <= 15;
+        const gridCols = use4Cols ? 4 : 5;
+        
+        let gridHTML = `<div class="provider-seats-grid" style="grid-template-columns: repeat(${gridCols}, 1fr);">`;
+        
+        // Steering wheel and front row
+        if (use4Cols) {
+          gridHTML += `<div class="provider-seat-block ${bookedSeatsList.includes('1') ? 'booked' : ''}">1</div>`;
+          gridHTML += `<div></div><div></div>`;
+          gridHTML += `<div style="display:flex;align-items:center;justify-content:center;font-size:18px;">🛞</div>`;
+        } else {
+          gridHTML += `<div class="provider-seat-block ${bookedSeatsList.includes('1') ? 'booked' : ''}">1</div>`;
+          gridHTML += `<div class="provider-seat-block ${bookedSeatsList.includes('2') ? 'booked' : ''}">2</div>`;
+          gridHTML += `<div></div><div></div>`;
+          gridHTML += `<div style="display:flex;align-items:center;justify-content:center;font-size:18px;">🛞</div>`;
+        }
+
+        let seatNum = use4Cols ? 2 : 3;
+        const rowCount = Math.ceil((totalSeats - 1) / (gridCols - 1));
+
+        for (let r = 1; r <= rowCount; r++) {
+          if (use4Cols) {
+            // 2 + Aisle + 1
+            if (seatNum <= totalSeats) {
+              gridHTML += `<div class="provider-seat-block ${bookedSeatsList.includes(seatNum.toString()) ? 'booked' : ''}">${seatNum}</div>`;
+              seatNum++;
+            } else { gridHTML += `<div></div>`; }
+            
+            if (seatNum <= totalSeats) {
+              gridHTML += `<div class="provider-seat-block ${bookedSeatsList.includes(seatNum.toString()) ? 'booked' : ''}">${seatNum}</div>`;
+              seatNum++;
+            } else { gridHTML += `<div></div>`; }
+
+            // Aisle
+            gridHTML += `<div></div>`;
+
+            if (seatNum <= totalSeats) {
+              gridHTML += `<div class="provider-seat-block ${bookedSeatsList.includes(seatNum.toString()) ? 'booked' : ''}">${seatNum}</div>`;
+              seatNum++;
+            } else { gridHTML += `<div></div>`; }
+          } else {
+            // 2 + Aisle + 2
+            if (seatNum <= totalSeats) {
+              gridHTML += `<div class="provider-seat-block ${bookedSeatsList.includes(seatNum.toString()) ? 'booked' : ''}">${seatNum}</div>`;
+              seatNum++;
+            } else { gridHTML += `<div></div>`; }
+            if (seatNum <= totalSeats) {
+              gridHTML += `<div class="provider-seat-block ${bookedSeatsList.includes(seatNum.toString()) ? 'booked' : ''}">${seatNum}</div>`;
+              seatNum++;
+            } else { gridHTML += `<div></div>`; }
+
+            // Aisle
+            gridHTML += `<div></div>`;
+
+            if (seatNum <= totalSeats) {
+              gridHTML += `<div class="provider-seat-block ${bookedSeatsList.includes(seatNum.toString()) ? 'booked' : ''}">${seatNum}</div>`;
+              seatNum++;
+            } else { gridHTML += `<div></div>`; }
+            if (seatNum <= totalSeats) {
+              gridHTML += `<div class="provider-seat-block ${bookedSeatsList.includes(seatNum.toString()) ? 'booked' : ''}">${seatNum}</div>`;
+              seatNum++;
+            } else { gridHTML += `<div></div>`; }
+          }
+        }
+        gridHTML += `</div>`;
+        return gridHTML;
+      }
+
+      // Fetch and open provider booking details
+      async function openProviderVehicleDetails(vehicleId) {
+        const overlay = document.getElementById("provider-detail-modal-overlay");
+        const title = document.getElementById("provider-detail-modal-title");
+        const body = document.getElementById("provider-detail-modal-body");
+        
+        if (!overlay || !body) return;
+
+        title.textContent = "Loading vehicle details...";
+        body.innerHTML = `
+          <div style="display:flex;justify-content:center;padding:40px 0;">
+            <div class="spinner-sm" style="border-top-color:#1DB954;width:28px;height:28px;"></div>
+          </div>
+        `;
+        overlay.classList.add("show");
+
+        try {
+          const res = await fetch(`/api/provider/vehicles/${vehicleId}/booking-details`);
+          if (!res.ok) throw new Error("Failed to load details");
+          const data = await res.json();
+          
+          title.textContent = (data.is_public ? "🚌 Route: " : "🚙 Private: ") + data.vehicle_name;
+          
+          let html = "";
+          
+          html += `
+            <div class="provider-modal-subtitle">
+              <strong>Route:</strong> ${data.origin} → ${data.destination} <br/>
+              <strong>Type:</strong> ${data.vehicle_type.toUpperCase()} · 
+              <strong>Seats:</strong> ${data.total_seats - data.seats_available} booked, ${data.seats_available} remaining (total ${data.total_seats})
+            </div>
+          `;
+
+          if (data.is_public) {
+            html += `
+              <div style="font-weight:600;font-size:13px;color:#fff;margin-bottom:8px;">💺 Seat Map (Red = Booked, Green = Available)</div>
+              <div class="provider-layout-wrapper">
+                ${buildProviderSeatMapHTML(data.vehicle_type, data.total_seats, data.booked_seats)}
+              </div>
+            `;
+          }
+
+          html += `<div style="font-weight:600;font-size:13px;color:#fff;margin-top:12px;margin-bottom:8px;">📋 Passenger Directory (${data.passengers.length})</div>`;
+          if (data.passengers.length > 0) {
+            html += `<div class="passenger-list-container">`;
+            data.passengers.forEach(p => {
+              const seatsText = p.seats.length > 0 ? p.seats.join(", ") : "Whole Vehicle";
+              const destText = p.destination ? `<br/><strong>Destination Stop:</strong> ${p.destination}` : "";
+              html += `
+                <div class="passenger-row-card">
+                  <div class="passenger-row-header">
+                    <span class="passenger-row-name">👤 ${p.name} ${p.age ? `(Age: ${p.age})` : ''}</span>
+                    <span class="passenger-row-seats">Seat(s): ${seatsText}</span>
+                  </div>
+                  <div class="passenger-row-meta">
+                    <span>📞 <strong>Phone:</strong> ${p.phone || 'N/A'} &nbsp;·&nbsp; ✉️ <strong>Email:</strong> ${p.email || 'N/A'}</span>
+                    <span>📅 <strong>Travel Date:</strong> ${p.travel_date} &nbsp;·&nbsp; 🏷️ <strong>Status:</strong> ${p.status.toUpperCase()}</span>
+                    ${destText}
+                  </div>
+                </div>
+              `;
+            });
+            html += `</div>`;
+          } else {
+            html += `<div style="font-size:12.5px;color:#a0a0c0;text-align:center;padding:12px 0;">No active bookings found for this listing.</div>`;
+          }
+
+          body.innerHTML = html;
+
+        } catch (err) {
+          console.error(err);
+          title.textContent = "Error";
+          body.innerHTML = `<div style="color:#ff6b6b;font-size:13px;text-align:center;padding:20px 0;">⚠️ Could not fetch booking details. Please try again.</div>`;
+        }
+      }
+
+      // Close modal on clicking overlay background
+      document.getElementById("provider-detail-modal-overlay").addEventListener("click", function(e) {
+        if (e.target === this) {
+          closeProviderDetailModal();
+        }
+      });
+
+      // Delegated click listener to trigger details modal
+      document.addEventListener("click", function(e) {
+        if (e.target.closest("button") || e.target.closest("form") || e.target.closest("a") || e.target.closest("input") || e.target.closest("select")) {
+          return;
+        }
+        
+        const card = e.target.closest("[data-vehicle-id]");
+        if (card) {
+          const vehicleId = card.getAttribute("data-vehicle-id");
+          if (vehicleId) {
+            openProviderVehicleDetails(vehicleId);
+          }
+        }
+      });
+
       // Initialize
       async function initRealTimeNotifications() {
         await loadVehicles();
@@ -259,5 +617,25 @@
     })();
   </script>
   {% endif %}
+  <script>
+    // Provider navigation toggle logic
+    document.addEventListener("DOMContentLoaded", () => {
+      const toggleBtn = document.getElementById("provider-nav-toggle");
+      const navMenu = document.getElementById("provider-nav-menu");
+      if (toggleBtn && navMenu) {
+        toggleBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          toggleBtn.classList.toggle("open-active");
+          navMenu.classList.toggle("show");
+        });
+        document.addEventListener("click", (e) => {
+          if (!navMenu.contains(e.target) && !toggleBtn.contains(e.target)) {
+            toggleBtn.classList.remove("open-active");
+            navMenu.classList.remove("show");
+          }
+        });
+      }
+    });
+  </script>
 </body>
 </html>

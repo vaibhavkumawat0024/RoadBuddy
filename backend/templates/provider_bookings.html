@@ -153,7 +153,7 @@
     {% endfor %}
     {% set effective_pickups = v.pickup_points if v.pickup_points else bp|join('; ') %}
     {% set effective_dropoffs = v.dropoff_points if v.dropoff_points else bd|join('; ') %}
-    <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 12px; display: flex; justify-content: space-between; align-items: center;">
+    <div data-vehicle-id="{{ v.id }}" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
       <div style="flex: 1; min-width: 0; padding-right: 12px;">
         <div style="font-weight: 600; color: #fff; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ v.vehicle_name }}</div>
         <div style="font-size: 11px; color: #a0a0c0; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">📍 Route: {{ v.origin }} → {{ v.destination }}</div>
@@ -188,6 +188,16 @@
       {% endif %}
       {% if b.dropoff_location %}
       <div class="booking-pickup" style="color: #4b88ff; margin-top: 2px;">🏁 Destination: {{ b.dropoff_location.split('|||')[0] if b.dropoff_location else '' }}</div>
+      {% endif %}
+      {% if b.passenger_details_parsed %}
+      <div style="margin-top: 8px; padding: 8px 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); border-radius: 6px; text-align: left;">
+        <span style="font-size: 11px; color: #a0a0c0; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 4px;">Occupants:</span>
+        <div style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #fff;">
+          {% for p in b.passenger_details_parsed %}
+            <div>• Seat {{ p.seat }}: <strong>{{ p.name }}</strong> (Age: {{ p.age }})</div>
+          {% endfor %}
+        </div>
+      </div>
       {% endif %}
     </div>
     

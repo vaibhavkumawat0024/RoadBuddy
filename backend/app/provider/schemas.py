@@ -193,6 +193,7 @@ class ProviderBookingCreate(BaseModel):
     user_id: Optional[int] = None
     passenger_phone: Optional[str] = None
     passenger_email: Optional[str] = None
+    passenger_details: Optional[str] = None
 
 
 class ProviderBookingOut(BaseModel):
@@ -213,6 +214,35 @@ class ProviderBookingOut(BaseModel):
     driver_lon: Optional[float] = None
     message_unread: Optional[bool] = None
     vehicle_name: Optional[str] = None
+    passenger_details: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ProviderPassengerDetail(BaseModel):
+    name: str
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    seats: list[str]
+    travel_date: str
+    status: str
+    destination: Optional[str] = None
+    age: Optional[int] = None
+
+
+class ProviderVehicleBookingDetails(BaseModel):
+    id: int
+    vehicle_name: str
+    vehicle_type: str
+    destination: str
+    origin: str
+    seats_booked: int
+    seats_available: int
+    total_seats: int
+    is_public: bool
+    booked_seats: list[str]
+    passengers: list[ProviderPassengerDetail]
 
     class Config:
         from_attributes = True

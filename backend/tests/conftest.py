@@ -17,6 +17,7 @@ if TEST_DATABASE_URL.startswith("sqlite"):
 
 engine = create_engine(TEST_DATABASE_URL, connect_args=connect_args)
 
+from app.models import models
 Base.metadata.create_all(bind=engine)
 
 TestingSessionLocal = sessionmaker(

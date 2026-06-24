@@ -17,6 +17,7 @@ from app.provider.schemas import (
     ProviderBookingCreate, ProviderBookingOut,
     CabServiceResult,
     VehicleAssetCreate, VehicleAssetOut,
+    ProviderPassengerDetail, ProviderVehicleBookingDetails,
 )
 from app.provider.auth import (
     hash_password, verify_password,
@@ -462,6 +463,7 @@ def book_vehicle(
         passenger_name=data.passenger_name,
         passenger_phone=data.passenger_phone,
         passenger_email=data.passenger_email,
+        passenger_details=data.passenger_details,
         travel_date=data.travel_date,
         num_seats=data.num_seats,
         pickup_location=data.pickup_location,
@@ -503,6 +505,89 @@ def get_booked_seats(
             booked_seats.extend(seats)
             
     return {"booked_seats": list(set(booked_seats))}
+
+
+@router.get("/vehicles/{vehicle_id}/booking-details", response_model=ProviderVehicleBookingDetails)
+def get_vehicle_booking_details(
+    vehicle_id: int,
+    provider: Provider = Depends(get_current_provider),
+    db: Session = Depends(get_db)
+):
+    vehicle = db.query(ProviderVehicle).filter(
+        ProviderVehicle.id == vehicle_id,
+        ProviderVehicle.provider_id == provider.id
+    ).first()
+    if not vehicle:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+
+    bookings = db.query(ProviderBooking).filter(
+        ProviderBooking.vehicle_id == vehicle_id,
+        ProviderBooking.status != "cancelled"
+    ).all()
+
+    is_public = (vehicle.destination != "Private" and vehicle.driver_included)
+
+    booked_seats = []
+    passengers = []
+    
+    for b in bookings:
+        seats_list = []
+        if b.selected_seats:
+            seats_list = [s.strip() for s in b.selected_seats.split(",") if s.strip()]
+            if is_public:
+                booked_seats.extend(seats_list)
+
+        dest_val = b.dropoff_location.split("|||")[0] if b.dropoff_location else None
+
+        parsed_details = []
+        if b.passenger_details:
+            import json
+            try:
+                parsed_details = json.loads(b.passenger_details)
+            except Exception:
+                pass
+
+        if parsed_details:
+            for item in parsed_details:
+                try:
+                    age_val = int(item["age"]) if item.get("age") is not None and str(item["age"]).strip().isdigit() else None
+                except Exception:
+                    age_val = None
+                passengers.append(ProviderPassengerDetail(
+                    name=item.get("name") or "Passenger",
+                    age=age_val,
+                    phone=b.passenger_phone,
+                    email=b.passenger_email,
+                    seats=[str(item.get("seat"))] if item.get("seat") else [],
+                    travel_date=b.travel_date,
+                    status=b.status,
+                    destination=dest_val
+                ))
+        else:
+            passengers.append(ProviderPassengerDetail(
+                name=b.passenger_name,
+                age=None,
+                phone=b.passenger_phone,
+                email=b.passenger_email,
+                seats=seats_list,
+                travel_date=b.travel_date,
+                status=b.status,
+                destination=dest_val
+            ))
+
+    return ProviderVehicleBookingDetails(
+        id=vehicle.id,
+        vehicle_name=vehicle.vehicle_name,
+        vehicle_type=vehicle.vehicle_type,
+        destination=vehicle.destination,
+        origin=vehicle.origin,
+        seats_booked=vehicle.seats_booked,
+        seats_available=vehicle.seats_available,
+        total_seats=vehicle.total_seats,
+        is_public=is_public,
+        booked_seats=list(set(booked_seats)),
+        passengers=passengers
+    )
 
 
 def _to_vehicle_out(v: ProviderVehicle) -> VehicleOut:

@@ -28,7 +28,10 @@
 
   <nav>
     <a href="/" class="brand">🚗 RoadBuddy</a>
-    <div>
+    <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation">
+      <span class="hamburger"></span>
+    </button>
+    <div class="nav-menu" id="nav-menu">
       {% if user %}
       <a href="/dashboard">Dashboard</a>
       <a href="/my-trips">My Trips</a>
@@ -89,6 +92,25 @@
   </div>
 
   <script>
+    // Navigation toggle logic
+    document.addEventListener("DOMContentLoaded", () => {
+      const navToggle = document.getElementById("nav-toggle");
+      const navMenu = document.getElementById("nav-menu");
+      if (navToggle && navMenu) {
+        navToggle.addEventListener("click", (e) => {
+          e.stopPropagation();
+          navToggle.classList.toggle("open-active");
+          navMenu.classList.toggle("show");
+        });
+        document.addEventListener("click", (e) => {
+          if (!navMenu.contains(e.target) && !navToggle.contains(e.target)) {
+            navToggle.classList.remove("open-active");
+            navMenu.classList.remove("show");
+          }
+        });
+      }
+    });
+
     let trackingMap = null;
     let trackingRoutingControl = null;
     let trackingDestRoutingControl = null;

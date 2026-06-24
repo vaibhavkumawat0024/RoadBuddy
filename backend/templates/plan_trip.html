@@ -99,10 +99,26 @@
     flex-direction: column;
     z-index: 5;
     box-shadow: 4px 0 10px rgba(0,0,0,0.01);
+    overflow-y: auto;
+  }
+  .left-panel.form-collapsed {
+    overflow-y: hidden;
   }
   .panel-section {
     padding: 20px;
     border-bottom: 1px solid #f1f5f9;
+    max-height: 800px;
+    overflow: hidden;
+    flex-shrink: 0;
+    transition: max-height 0.35s cubic-bezier(0.16, 1, 0.3, 1), padding 0.35s ease, border 0.35s ease;
+  }
+  .panel-section.collapsed {
+    max-height: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    border-bottom: none !important;
+    border-bottom-width: 0 !important;
+    overflow: hidden !important;
   }
   .panel-label {
     font-size: 11px;
@@ -194,9 +210,12 @@
   /* ─── DIRECTIONS LIST ─── */
   .directions-wrap {
     flex: 1;
-    overflow-y: auto;
+    overflow-y: visible;
     background: #fdfdfd;
     -webkit-overflow-scrolling: touch;
+  }
+  .left-panel.form-collapsed .directions-wrap {
+    overflow-y: auto;
   }
   .dir-header {
     padding: 14px 20px;
@@ -387,6 +406,7 @@
   @media (max-width: 768px) {
     .topbar { height: 50px; padding: 0 16px; }
     .topbar-subtitle { display: none; }
+    .btn-text { display: none; }
     .transport-bar { height: 48px; padding: 0 12px; gap: 6px; }
     .transport-tab { padding: 6px 12px; font-size: 12px; border-radius: 6px; }
     
@@ -431,9 +451,9 @@
     <span class="topbar-subtitle">Smart Route Map</span>
   </div>
   <div style="display: flex; gap: 12px; align-items: center;">
-    <a href="/dashboard" style="text-decoration: none; color: var(--text-muted); font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--surface); transition: all 0.2s ease;" onmouseover="this.style.borderColor='var(--primary)'; this.style.color='var(--primary)';" onmouseout="this.style.borderColor='var(--border-color)'; this.style.color='var(--text-muted)';">🏠 Dashboard</a>
+    <a href="/dashboard" style="text-decoration: none; color: var(--text-muted); font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--surface); transition: all 0.2s ease;" onmouseover="this.style.borderColor='var(--primary)'; this.style.color='var(--primary)';" onmouseout="this.style.borderColor='var(--border-color)'; this.style.color='var(--text-muted)';">🏠 <span class="btn-text">Dashboard</span></a>
     <a href="/my-bookings" style="text-decoration: none; color: var(--text-muted); font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--surface); transition: all 0.2s ease; position: relative;" onmouseover="this.style.borderColor='var(--primary)'; this.style.color='var(--primary)';" onmouseout="this.style.borderColor='var(--border-color)'; this.style.color='var(--text-muted)';">
-      📅 My Bookings
+      📅 <span class="btn-text">My Bookings</span>
       {% if has_unread_bookings %}
       <span style="position: absolute; top: -2px; right: -2px; width: 10px; height: 10px; background: #ff4d4f; border-radius: 50%; border: 2px solid #fff;"></span>
       {% endif %}
@@ -468,7 +488,18 @@
       <span id="gps-status-text" style="color:#64748b;">GPS not started</span>
     </div>
 
-    <div class="panel-section">
+    <!-- Search Summary Bar (visible when form is collapsed) -->
+    <div id="search-summary-bar" style="display: none; align-items: center; justify-content: space-between; padding: 12px 16px; background: #f8fafc; border-bottom: 1px solid var(--border-color); cursor: pointer;" onclick="expandSearchForm()">
+      <div style="display: flex; flex-direction: column; text-align: left;">
+        <span id="summary-bar-route" style="font-size: 13.5px; font-weight: 700; color: var(--text-dark);">-</span>
+        <span id="summary-bar-date" style="font-size: 11.5px; color: #64748b; margin-top: 2px;">-</span>
+      </div>
+      <button type="button" style="background: none; border: none; color: var(--primary); font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 4px 8px;">
+        ✏️ Edit
+      </button>
+    </div>
+
+    <div class="panel-section" id="search-form-section">
       <div id="mode-badge" class="mode-badge mode-gps">🛰️ GPS Mode — Own Vehicle</div>
 
       <div class="panel-label">From</div>
@@ -600,7 +631,50 @@
 
     resetDirections(true);
     checkEnableRouteBtn();
+    expandSearchForm();
     setTimeout(() => { leafletMap.invalidateSize(); }, 200);
+  }
+
+  function collapseSearchForm(originName, destName) {
+    const sidebar = document.getElementById('sidebar-panel');
+    const form = document.getElementById('search-form-section');
+    const summary = document.getElementById('search-summary-bar');
+    if (!form || !summary) return;
+
+    document.getElementById('summary-bar-route').textContent = `${originName} → ${destName}`;
+    const dateInput = document.getElementById('travel-date-input');
+    document.getElementById('summary-bar-date').textContent = dateInput ? dateInput.value : '';
+
+    form.classList.add('collapsed');
+    if (sidebar) {
+      sidebar.classList.add('form-collapsed');
+      sidebar.scrollTop = 0;
+    }
+    summary.style.display = 'flex';
+
+    // Scroll directions wrap to top
+    const wrap = document.getElementById('directions-wrap');
+    if (wrap) {
+      wrap.scrollTop = 0;
+    }
+  }
+
+  function expandSearchForm() {
+    const sidebar = document.getElementById('sidebar-panel');
+    const form = document.getElementById('search-form-section');
+    const summary = document.getElementById('search-summary-bar');
+    if (!form || !summary) return;
+
+    form.classList.remove('collapsed');
+    if (sidebar) {
+      sidebar.classList.remove('form-collapsed');
+      sidebar.scrollTop = 0;
+    }
+    summary.style.display = 'none';
+
+    // Clear old map routes and connection list when editing
+    clearRouting();
+    resetDirections(true);
   }
 
   // ─── GPS DETECT ──────────────────────────────────────────
@@ -903,6 +977,7 @@
       }
       hideLoading();
       drawCarRoute(gpsCoords, destCoords, destVal);
+      collapseSearchForm('My Location', destVal);
     } else {
       const originInput = document.getElementById('origin-manual');
       const originVal = originInput.value.trim();
@@ -933,6 +1008,7 @@
       } else {
         drawTransitOptions(currentMode, originCoords, destCoords, originVal, destVal);
       }
+      collapseSearchForm(originVal, destVal);
     }
   }
 
@@ -1054,6 +1130,14 @@
       }).join('')}
     `;
     wrap.appendChild(list);
+
+    // Smoothly scroll down to the cabs list header
+    setTimeout(() => {
+      const cabsHeader = list.querySelector('.dir-header');
+      if (cabsHeader) {
+        cabsHeader.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 150);
   }
 
   let selectedSeats = [];
@@ -1333,9 +1417,10 @@
     const seatsDisplay = document.getElementById("selected-seats-list");
     const totalDisplay = document.getElementById("selected-seats-total");
 
-    const name = document.getElementById("passenger-name-input").value.trim();
     const phone = document.getElementById("passenger-phone-input").value.trim();
     const email = document.getElementById("passenger-email-input").value.trim();
+    const nameInput = document.getElementById("passenger-name-input");
+    const container = document.getElementById("per-seat-passenger-inputs");
 
     if (!isPrivateBooking) {
       countDisplay.textContent = selectedSeats.length;
@@ -1344,10 +1429,67 @@
       const totalPrice = selectedSeats.length * seatPricePerSeat;
       totalDisplay.textContent = "₹" + totalPrice;
 
-      // Enable if all fields are filled AND at least one seat is selected
-      btn.disabled = !(name && phone && email && selectedSeats.length > 0);
+      nameInput.style.display = "none";
+      container.style.display = "flex";
+
+      // Check if current rendered seat inputs match selectedSeats list
+      const currentRenderedSeats = Array.from(container.querySelectorAll("[data-seat-id]")).map(el => el.getAttribute("data-seat-id"));
+      const isMatch = (currentRenderedSeats.length === selectedSeats.length) && 
+                      selectedSeats.every(s => currentRenderedSeats.includes(s));
+
+      if (!isMatch) {
+        // Save values of inputs that are still selected
+        const preserved = {};
+        currentRenderedSeats.forEach(s => {
+          if (selectedSeats.includes(s)) {
+            const nameEl = document.getElementById(`passenger-name-seat-${s}`);
+            const ageEl = document.getElementById(`passenger-age-seat-${s}`);
+            preserved[s] = {
+              name: nameEl ? nameEl.value : "",
+              age: ageEl ? ageEl.value : ""
+            };
+          }
+        });
+
+        // Generate fields for each selected seat
+        let html = "";
+        selectedSeats.forEach(seat => {
+          const valName = preserved[seat] ? preserved[seat].name : "";
+          const valAge = preserved[seat] ? preserved[seat].age : "";
+          html += `
+            <div data-seat-id="${seat}" style="display: flex; gap: 8px; width: 100%; align-items: center; margin-top: 4px;">
+              <span style="font-size: 12px; font-weight: 700; color: #1d9e75; min-width: 55px;">Seat ${seat}:</span>
+              <input type="text" id="passenger-name-seat-${seat}" placeholder="Passenger Name..." value="${valName}" oninput="updateSeatSummary()"
+                     style="flex: 2; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; outline: none; background: #ffffff; color: #0f172a;" />
+              <input type="number" id="passenger-age-seat-${seat}" placeholder="Age..." value="${valAge}" min="1" max="120" oninput="updateSeatSummary()"
+                     style="flex: 1; min-width: 60px; max-width: 80px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; outline: none; background: #ffffff; color: #0f172a;" />
+            </div>
+          `;
+        });
+        container.innerHTML = html;
+      }
+
+      // Check validation
+      let allSeatsFilled = true;
+      if (selectedSeats.length === 0) {
+        allSeatsFilled = false;
+      } else {
+        selectedSeats.forEach(seat => {
+          const nameEl = document.getElementById(`passenger-name-seat-${seat}`);
+          const ageEl = document.getElementById(`passenger-age-seat-${seat}`);
+          if (!nameEl || !nameEl.value.trim() || !ageEl || !ageEl.value.trim()) {
+            allSeatsFilled = false;
+          }
+        });
+      }
+
+      btn.disabled = !(phone && email && allSeatsFilled);
     } else {
-      // Private booking: no seat selection needed, just details
+      nameInput.style.display = "block";
+      container.style.display = "none";
+      container.innerHTML = "";
+
+      const name = nameInput.value.trim();
       btn.disabled = !(name && phone && email);
     }
   }
@@ -1357,7 +1499,6 @@
     const seatsText = isPrivateBooking ? "Whole Vehicle (Private Cab)" : selectedSeats.join(", ");
     const fareText = document.getElementById("selected-seats-total").textContent;
     
-    const name = document.getElementById("passenger-name-input").value.trim();
     const phone = document.getElementById("passenger-phone-input").value.trim();
     const email = document.getElementById("passenger-email-input").value.trim();
 
@@ -1365,9 +1506,30 @@
     document.getElementById("summary-vehicle-name").textContent = vehicleTitle;
     document.getElementById("summary-seats").textContent = seatsText;
     document.getElementById("summary-fare").textContent = fareText;
-    document.getElementById("summary-name").textContent = name;
     document.getElementById("summary-phone").textContent = phone;
     document.getElementById("summary-email").textContent = email;
+
+    const summaryNameRow = document.getElementById("summary-name").parentNode;
+    const passengersListRow = document.getElementById("summary-passengers-list-row");
+    const passengersList = document.getElementById("summary-passengers-list");
+
+    if (!isPrivateBooking) {
+      summaryNameRow.style.display = "none";
+      passengersListRow.style.display = "flex";
+      
+      let html = "";
+      selectedSeats.forEach(seat => {
+        const nameVal = document.getElementById(`passenger-name-seat-${seat}`).value.trim();
+        const ageVal = document.getElementById(`passenger-age-seat-${seat}`).value.trim();
+        html += `<div>• Seat ${seat}: <strong>${nameVal}</strong> (Age: ${ageVal})</div>`;
+      });
+      passengersList.innerHTML = html;
+    } else {
+      summaryNameRow.style.display = "flex";
+      passengersListRow.style.display = "none";
+      const name = document.getElementById("passenger-name-input").value.trim();
+      document.getElementById("summary-name").textContent = name;
+    }
 
     // Populate route stops summaries
     const pickupSelect = document.getElementById("booking-pickup-select");
@@ -1400,17 +1562,50 @@
   }
 
   async function submitSeatBooking() {
-    const passengerName = document.getElementById("passenger-name-input").value.trim();
     const passengerPhone = document.getElementById("passenger-phone-input").value.trim();
     const passengerEmail = document.getElementById("passenger-email-input").value.trim();
 
-    if (!passengerName || !passengerPhone || !passengerEmail) {
-      alert("Please enter passenger Name, Phone, and Email.");
+    if (!passengerPhone || !passengerEmail) {
+      alert("Please enter passenger Phone and Email.");
       return;
     }
-    if (!isPrivateBooking && selectedSeats.length === 0) {
-      alert("Please select at least one seat.");
-      return;
+
+    let passengerName = "";
+    let passengerDetails = null;
+
+    if (!isPrivateBooking) {
+      if (selectedSeats.length === 0) {
+        alert("Please select at least one seat.");
+        return;
+      }
+      const details = [];
+      const names = [];
+      let missingInput = false;
+      selectedSeats.forEach(seat => {
+        const nameVal = document.getElementById(`passenger-name-seat-${seat}`).value.trim();
+        const ageVal = document.getElementById(`passenger-age-seat-${seat}`).value.trim();
+        if (!nameVal || !ageVal) {
+          missingInput = true;
+        }
+        details.push({
+          seat: seat,
+          name: nameVal,
+          age: ageVal ? parseInt(ageVal, 10) : null
+        });
+        names.push(nameVal);
+      });
+      if (missingInput) {
+        alert("Please enter Name and Age for all selected seats.");
+        return;
+      }
+      passengerName = names.join(", ");
+      passengerDetails = JSON.stringify(details);
+    } else {
+      passengerName = document.getElementById("passenger-name-input").value.trim();
+      if (!passengerName) {
+        alert("Please enter passenger Name.");
+        return;
+      }
     }
 
     // Check for predefined pickup stop
@@ -1454,6 +1649,7 @@
       passenger_name: passengerName,
       passenger_phone: passengerPhone,
       passenger_email: passengerEmail,
+      passenger_details: passengerDetails,
       travel_date: document.getElementById('travel-date-input')?.value || new Date().toISOString().slice(0, 10),
       num_seats: isPrivateBooking ? 1 : selectedSeats.length,
       pickup_location: finalPickupLocation,
@@ -1547,6 +1743,14 @@
         </div>
       `).join('')}
     `;
+
+    // Smoothly scroll to the directions header
+    setTimeout(() => {
+      const header = wrap.querySelector('.dir-header');
+      if (header) {
+        header.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 150);
   }
 
   // ─── TRANSIT ROUTING ─────────────────────────────────────
@@ -1593,7 +1797,13 @@
         </div>
       </div>
     `;
-    setTimeout(() => leafletMap.invalidateSize(), 100);
+    setTimeout(() => {
+      leafletMap.invalidateSize();
+      const card = wrap.querySelector('.transit-route-card');
+      if (card) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 150);
   }
 
   // ─── UTILITIES & HELPERS ─────────────────────────────────
@@ -1943,6 +2153,7 @@
           <div style="font-size: 11px; font-weight: 700; color: #64748b; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px; align-self: flex-start;">Passenger Details</div>
           <input type="text" id="passenger-name-input" placeholder="Enter passenger name..." 
                  style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; outline: none; background: #ffffff;" />
+          <div id="per-seat-passenger-inputs" style="display: none; flex-direction: column; gap: 8px; width: 100%;"></div>
           <input type="tel" id="passenger-phone-input" placeholder="Enter phone number..." 
                  style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; outline: none; background: #ffffff;" />
           <input type="email" id="passenger-email-input" placeholder="Enter email address..." 
@@ -1983,6 +2194,10 @@
             <div style="border-top: 1px dashed #e2e8f0; margin: 4px 0;"></div>
             
             <div style="display: flex; justify-content: space-between;"><span style="font-weight: 500;">Passenger:</span><span id="summary-name" style="font-weight: 600; color: #0f172a;">-</span></div>
+            <div id="summary-passengers-list-row" style="display: none; flex-direction: column; gap: 4px; background: rgba(0,0,0,0.02); padding: 8px; border-radius: 6px; margin-top: 4px;">
+              <span style="font-weight: 600; font-size: 11px; color: #64748b; text-transform: uppercase; text-align: left;">Occupants</span>
+              <div id="summary-passengers-list" style="font-size: 12.5px; color: #0f172a; display: flex; flex-direction: column; gap: 2px; text-align: left;"></div>
+            </div>
             <div style="display: flex; justify-content: space-between;"><span style="font-weight: 500;">Phone:</span><span id="summary-phone" style="font-weight: 600; color: #0f172a;">-</span></div>
             <div style="display: flex; justify-content: space-between;"><span style="font-weight: 500;">Email:</span><span id="summary-email" style="font-weight: 600; color: #0f172a;">-</span></div>
           </div>

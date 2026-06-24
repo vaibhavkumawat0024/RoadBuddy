@@ -7,16 +7,69 @@ body {
 }
 
 nav {
+  position: relative;
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 14px 24px;
   background: #fff;
   border-bottom: 1px solid #e5e5e5;
+  z-index: 100;
 }
 nav .brand { font-weight: 600; font-size: 18px; text-decoration: none; color: #1a1a1a; }
+.nav-menu {
+  display: flex;
+  align-items: center;
+}
 nav a { margin-left: 16px; text-decoration: none; color: #555; font-size: 14px; }
 nav a:hover { color: #1D9E75; }
+
+/* Hamburger Menu Toggle Button */
+.nav-toggle {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+}
+.nav-toggle:focus {
+  outline: none;
+}
+.nav-toggle .hamburger {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: #333;
+  position: relative;
+  transition: background 0.2s;
+}
+.nav-toggle .hamburger::before,
+.nav-toggle .hamburger::after {
+  content: '';
+  position: absolute;
+  width: 22px;
+  height: 2px;
+  background: #333;
+  left: 0;
+  transition: transform 0.2s;
+}
+.nav-toggle .hamburger::before {
+  top: -6px;
+}
+.nav-toggle .hamburger::after {
+  bottom: -6px;
+}
+.nav-toggle.open-active .hamburger {
+  background: transparent;
+}
+.nav-toggle.open-active .hamburger::before {
+  transform: rotate(45deg);
+  top: 0;
+}
+.nav-toggle.open-active .hamburger::after {
+  transform: rotate(-45deg);
+  bottom: 0;
+}
 
 main { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
 
@@ -954,4 +1007,61 @@ margin:15px 0;
   font-size: 16px;
   font-weight: 700;
   color: #1D9E75;
+}
+
+/* Mobile responsiveness adjustments */
+@media (max-width: 768px) {
+  .nav-toggle {
+    display: block;
+  }
+  .nav-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    background: #fff;
+    border-bottom: 1px solid #e5e5e5;
+    flex-direction: column;
+    padding: 8px 0;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+    z-index: 999;
+    align-items: stretch;
+  }
+  .nav-menu.show {
+    display: flex;
+  }
+  nav a {
+    margin: 0 !important;
+    padding: 12px 20px;
+    font-size: 15px;
+    border-bottom: 1px solid #f1f1f1;
+    display: block;
+  }
+  nav a:last-child {
+    border-bottom: none;
+  }
+  
+  /* Prevent unread dot breakage on mobile list */
+  #nav-my-bookings-link {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  #nav-my-bookings-link .unread-dot {
+    position: static !important;
+    margin-left: 8px;
+    display: inline-block;
+  }
+
+  /* Dashboard Header Mobile Adjustments */
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .dashboard-header div {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }

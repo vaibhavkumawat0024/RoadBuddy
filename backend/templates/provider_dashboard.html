@@ -57,7 +57,7 @@
 {% if vehicles %}
 <div class="vehicle-list">
   {% for v in vehicles %}
-  <div class="vehicle-card">
+  <div class="vehicle-card" data-vehicle-id="{{ v.id }}" style="cursor: pointer;">
     <div class="vehicle-icon">
       {% if 'bus' in v.vehicle_type %}🚌
       {% elif v.vehicle_type == 'suv' %}🚙
