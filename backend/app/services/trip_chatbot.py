@@ -66,7 +66,11 @@ async def chat_with_roadbuddy(message: str, history: list[dict] = None) -> dict:
         
         messages = truncated_history + [{"role": "user", "content": message}]
         if settings.groq_api_key:
-            response_text = await call_groq_chat(messages)
+            try:
+                response_text = await call_groq_chat(messages)
+            except Exception as e:
+                print(f"Groq chat failed: {e}. Falling back to mock chat response.")
+                response_text = mock_chat_response(message)
         else:
             response_text = mock_chat_response(message)
         updated_history = messages + [{"role": "assistant", "content": response_text}]

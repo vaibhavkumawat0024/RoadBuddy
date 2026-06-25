@@ -126,4 +126,5 @@ def root():
 
 @app.get("/health", tags=["Health"])
 def health_check():
+    # Trigger uvicorn reload to pick up new env variables
     return {"status": "ok"}
