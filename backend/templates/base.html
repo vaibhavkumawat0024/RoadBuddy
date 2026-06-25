@@ -4,7 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}RoadBuddy{% endblock %}</title>
-  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/style.css?v=2.5">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
   
   <!-- Leaflet Maps CSS & JS Imports -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -26,31 +27,108 @@
 </head>
 <body>
 
+  <!-- Sidebar Backdrop Overlay -->
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+  <!-- Page level overlays (e.g. backgrounds) -->
+  {% block page_overlay %}{% endblock %}
+
+  <!-- Sliding Sidebar Drawer -->
+  <div class="sidebar-menu" id="sidebar-menu">
+    <div class="sidebar-header">
+      <h3>Menu</h3>
+      <button class="sidebar-close" id="sidebar-close" aria-label="Close sidebar">&times;</button>
+    </div>
+    <div class="sidebar-links">
+      {% if user %}
+      <a href="/dashboard" class="sidebar-link">
+        <span class="material-symbols-outlined">dashboard</span>
+        <span>Dashboard</span>
+      </a>
+      <a href="/my-trips" class="sidebar-link">
+        <span class="material-symbols-outlined">map</span>
+        <span>My Trips</span>
+      </a>
+      <a href="/my-bookings" class="sidebar-link" id="nav-my-bookings-link" style="position: relative;">
+        <span class="material-symbols-outlined">confirmation_number</span>
+        <span>My Bookings</span>
+        {% if has_unread_bookings %}
+        <span class="unread-dot"></span>
+        {% endif %}
+      </a>
+      <a href="/add-vehicle" class="sidebar-link">
+        <span class="material-symbols-outlined">directions_car</span>
+        <span>My Vehicles</span>
+      </a>
+      <a href="/community" class="sidebar-link">
+        <span class="material-symbols-outlined">forum</span>
+        <span>Community</span>
+      </a>
+      <a href="/profile" class="sidebar-link">
+        <span class="material-symbols-outlined">person</span>
+        <span>Profile</span>
+      </a>
+      <div class="sidebar-divider"></div>
+      <a href="/logout" class="sidebar-link logout-link">
+        <span class="material-symbols-outlined">logout</span>
+        <span>Logout</span>
+      </a>
+      {% else %}
+      <a href="/login" class="sidebar-link">
+        <span class="material-symbols-outlined">login</span>
+        <span>Login</span>
+      </a>
+      <a href="/register" class="sidebar-link">
+        <span class="material-symbols-outlined">person_add</span>
+        <span>Register</span>
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if user %}
+  <!-- Floating Action Button for Chatbot -->
+  <button class="chatbot-fab" id="chatbot-fab" aria-label="Open AI Chatbot">
+    <span class="material-symbols-outlined">smart_toy</span>
+  </button>
+
+  <!-- Floating Chatbot Widget Panel -->
+  <div class="floating-chatbot-card" id="floating-chatbot-card">
+    <div class="floating-chatbot-header">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="material-symbols-outlined" style="color: var(--primary); font-size: 20px;">smart_toy</span>
+        <div style="text-align: left;">
+          <div style="font-weight: 700; font-size: 14px; color: var(--text-main); line-height: 1.2;">RoadBuddy AI</div>
+          <div style="font-size: 11px; color: var(--text-muted); line-height: 1.2;">Your trip assistant</div>
+        </div>
+      </div>
+      <button class="floating-chatbot-close" id="floating-chatbot-close" aria-label="Minimize chatbot">&times;</button>
+    </div>
+    <div class="chat-messages" id="chat-messages">
+      <div class="chat-msg ai-msg">🚗 Hi! I'm RoadBuddy AI. Ask me to plan a trip, suggest routes, or estimate costs!</div>
+    </div>
+    <div class="chat-input-row" style="padding: 12px 16px; border-top: 1px solid var(--border-color); background: var(--surface);">
+      <input type="text" id="chat-input" placeholder="Plan a trip from Jaipur to Udaipur..." style="flex: 1; padding: 10px 14px; border: 1.5px solid var(--border-color); border-radius: var(--radius-md); font-size: 13px;" />
+      <button id="chat-send-btn" onclick="sendChat()" style="background: var(--primary); color: #fff; border: none; border-radius: var(--radius-md); padding: 0 16px; cursor: pointer; transition: var(--transition); display: flex; align-items: center; justify-content: center;">
+        <span class="material-symbols-outlined" style="font-size: 18px;">send</span>
+      </button>
+    </div>
+  </div>
+  {% endif %}
+
   <nav>
-    <a href="/" class="brand">🚗 RoadBuddy</a>
-    <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation">
-      <span class="hamburger"></span>
-    </button>
-    <div class="nav-menu" id="nav-menu">
+    <a href="/dashboard" class="brand">🚗 RoadBuddy</a>
+    <div class="nav-menu" id="nav-menu" style="display: flex; align-items: center; gap: 8px; margin-left: auto;">
       {% block navbar_menu %}
       {% if user %}
       <a href="/dashboard">Dashboard</a>
-      <a href="/my-trips">My Trips</a>
-      <a href="/my-bookings" style="position: relative;" id="nav-my-bookings-link">
-        My Bookings
-        {% if has_unread_bookings %}
-        <span class="unread-dot" style="position: absolute; top: -3px; right: -8px; width: 8px; height: 8px; background: #ff4d4f; border-radius: 50%;"></span>
-        {% endif %}
-      </a>
-      <a href="/add-vehicle">My Vehicles</a>
-      <a href="/community">🌍 Community</a>
-      <a href="/profile">👤 Profile</a>
-      <a href="/logout">Logout</a>
-      {% else %}
-      <a href="/login">Login</a>
-      <a href="/register">Register</a>
       {% endif %}
       {% endblock %}
+      
+      <!-- Hamburger Toggle Button -->
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle navigation menu">
+        <span class="material-symbols-outlined">menu</span>
+      </button>
     </div>
   </nav>
 
@@ -94,24 +172,171 @@
   </div>
 
   <script>
-    // Navigation toggle logic
+    // Sidebar toggle logic
     document.addEventListener("DOMContentLoaded", () => {
-      const navToggle = document.getElementById("nav-toggle");
-      const navMenu = document.getElementById("nav-menu");
-      if (navToggle && navMenu) {
-        navToggle.addEventListener("click", (e) => {
+      const toggleBtn = document.getElementById("sidebar-toggle");
+      const closeBtn = document.getElementById("sidebar-close");
+      const sidebarMenu = document.getElementById("sidebar-menu");
+      const backdrop = document.getElementById("sidebar-backdrop");
+
+      function openSidebar() {
+        sidebarMenu.classList.add("active");
+        backdrop.classList.add("active");
+        document.body.style.overflow = "hidden";
+      }
+
+      function closeSidebar() {
+        sidebarMenu.classList.remove("active");
+        backdrop.classList.remove("active");
+        document.body.style.overflow = "";
+      }
+
+      if (toggleBtn && sidebarMenu && backdrop) {
+        toggleBtn.addEventListener("click", (e) => {
           e.stopPropagation();
-          navToggle.classList.toggle("open-active");
-          navMenu.classList.toggle("show");
+          openSidebar();
         });
+      }
+
+      if (closeBtn) {
+        closeBtn.addEventListener("click", closeSidebar);
+      }
+
+      if (backdrop) {
+        backdrop.addEventListener("click", closeSidebar);
+      }
+
+      // Highlight active sidebar link
+      const currentPath = window.location.pathname;
+      const sidebarLinks = document.querySelectorAll(".sidebar-link");
+      sidebarLinks.forEach(link => {
+        if (link.getAttribute("href") === currentPath) {
+          link.classList.add("active");
+        }
+      });
+    });
+
+    {% if user %}
+    // Floating Chatbot Widget Toggle and API handlers
+    document.addEventListener("DOMContentLoaded", () => {
+      const chatbotFab = document.getElementById("chatbot-fab");
+      const chatbotCard = document.getElementById("floating-chatbot-card");
+      const chatbotClose = document.getElementById("floating-chatbot-close");
+
+      if (chatbotFab && chatbotCard && chatbotClose) {
+        chatbotFab.addEventListener("click", (e) => {
+          e.stopPropagation();
+          chatbotCard.classList.toggle("active");
+        });
+
+        chatbotClose.addEventListener("click", () => {
+          chatbotCard.classList.remove("active");
+        });
+
         document.addEventListener("click", (e) => {
-          if (!navMenu.contains(e.target) && !navToggle.contains(e.target)) {
-            navToggle.classList.remove("open-active");
-            navMenu.classList.remove("show");
+          if (!chatbotCard.contains(e.target) && !chatbotFab.contains(e.target)) {
+            chatbotCard.classList.remove("active");
           }
         });
       }
+
+      // Input Enter key press listener
+      const chatInput = document.getElementById('chat-input');
+      if (chatInput) {
+        chatInput.addEventListener('keypress', function(e) {
+          if (e.key === 'Enter') sendChat();
+        });
+      }
     });
+
+    const API = '';
+    let chatHistory = [];
+
+    function escapeHTML(str) {
+      if (str === null || str === undefined) return '';
+      return String(str).replace(/[&<>'"]/g, 
+        tag => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          "'": '&#39;',
+          '"': '&quot;'
+        }[tag] || tag)
+      );
+    }
+
+    function setButtonState(btnId, disabled, loadingText) {
+      const btn = document.getElementById(btnId);
+      if (!btn) return;
+      btn.disabled = disabled;
+      if (disabled) {
+        btn.dataset.originalText = btn.textContent;
+        btn.textContent = loadingText || 'Loading...';
+      } else if (btn.dataset.originalText) {
+        btn.textContent = btn.dataset.originalText;
+      }
+    }
+
+    function parseMarkdown(text) {
+      if (!text) return '';
+      let html = escapeHTML(text);
+      html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+      html = html.replace(/(?:^|\r?\n)\s*-\s+(.*?)(?=\r?\n|$)/g, '<div style="margin-left: 12px; padding-top: 2px;">• $1</div>');
+      html = html.replace(/\r?\n/g, '<br>');
+      return html;
+    }
+
+    async function sendChat() {
+      const input = document.getElementById('chat-input');
+      const msg = input.value.trim();
+      if (!msg) return;
+
+      appendMsg(msg, 'user');
+      input.value = '';
+      appendMsg('Thinking...', 'ai', 'thinking');
+      setButtonState('chat-send-btn', true, 'Sending...');
+
+      try {
+        const res = await fetch(`${API}/api/trips/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: msg, history: chatHistory })
+        });
+        if (!res.ok) {
+          throw new Error('Chat API returned error status');
+        }
+        const data = await res.json();
+        removeThinking();
+        appendMsg(data.response, 'ai');
+        chatHistory = data.history;
+      } catch (e) {
+        removeThinking();
+        appendMsg('Sorry, something went wrong. Please try again.', 'ai');
+      } finally {
+        setButtonState('chat-send-btn', false);
+      }
+    }
+
+    function appendMsg(text, role, id) {
+      const box = document.getElementById('chat-messages');
+      const div = document.createElement('div');
+      div.className = `chat-msg ${role === 'user' ? 'user-msg' : 'ai-msg'}`;
+      if (id) div.id = id;
+      if (role === 'ai') {
+        div.innerHTML = parseMarkdown(text);
+      } else {
+        div.textContent = text;
+      }
+      box.appendChild(div);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function removeThinking() {
+      const t = document.getElementById('thinking');
+      if (t) t.remove();
+    }
+    {% endif %}
 
     let trackingMap = null;
     let trackingRoutingControl = null;
@@ -235,7 +460,7 @@
           if (!dot) {
             dot = document.createElement("span");
             dot.className = "unread-dot";
-            dot.style.cssText = "position: absolute; top: -3px; right: -8px; width: 8px; height: 8px; background: #ff4d4f; border-radius: 50%;";
+            dot.style.cssText = "position: absolute; top: 50%; right: 16px; transform: translateY(-50%); width: 8px; height: 8px; background: #ff4d4f; border-radius: 50%;";
             document.getElementById("nav-my-bookings-link").appendChild(dot);
           }
 
