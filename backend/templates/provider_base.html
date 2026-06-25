@@ -13,7 +13,23 @@
 </head>
 <body>
   <nav class="provider-nav">
-    <a href="/provider/dashboard" class="brand">🚐 RoadBuddy <span class="partner-badge">Partner</span></a>
+    <a href="/provider/dashboard" class="provider-brand-logo" style="text-decoration: none; display: flex; align-items: center; gap: 10px;">
+      <div class="provider-logo-icon-container" style="position: relative; display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(135deg, #FF6B35, #FF8F5E); box-shadow: 0 4px 10px rgba(255, 107, 53, 0.2); transition: var(--transition);">
+        <div style="position: absolute; inset: 2px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.2);"></div>
+        <svg style="width: 16px; height: 16px; color: #fff; margin: auto; transition: var(--transition);" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2L2 22L12 18L22 22L12 2Z" fill="currentColor" stroke="currentColor" stroke-dashoffset="0" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div style="display: flex; flex-direction: column;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 800; color: #ffffff; line-height: 1.1;">
+            Road<span style="color: #FF6B35;">Buddy</span>
+          </span>
+          <span class="partner-badge" style="font-size: 8px; padding: 2px 6px; border-radius: 6px;">Partner</span>
+        </div>
+        <span style="font-size: 8px; font-weight: 700; color: #9090b0; text-transform: uppercase; letter-spacing: 0.1em; line-height: 1;">Fleet Manager</span>
+      </div>
+    </a>
     <button class="provider-nav-toggle" id="provider-nav-toggle" aria-label="Toggle navigation">
       <span class="hamburger"></span>
     </button>

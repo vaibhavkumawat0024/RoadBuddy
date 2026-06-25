@@ -100,19 +100,26 @@ nav {
   box-shadow: var(--shadow-sm);
 }
 
-nav .brand {
-  font-weight: 800;
-  font-size: 22px;
+/* Brand Logo styling */
+.brand-logo {
   text-decoration: none;
-  color: var(--text-main);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   transition: var(--transition);
 }
 
-nav .brand:hover {
-  transform: scale(1.02);
+.brand-logo:hover {
+  transform: translateY(-1px);
+}
+
+.brand-logo:hover .logo-icon-container {
+  transform: scale(1.05) rotate(3deg);
+  box-shadow: 0 6px 14px rgba(16, 185, 129, 0.35) !important;
+}
+
+.brand-logo:hover svg {
+  transform: translate(2px, -2px);
 }
 
 .nav-menu {
