@@ -731,6 +731,18 @@
     color: #166534;
     text-align: left;
   }
+  .transit-route-card {
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    cursor: pointer;
+  }
+  .transit-route-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  }
+  .transit-route-card.selected {
+    box-shadow: 0 0 0 2px var(--primary) !important;
+    background-color: #f0fdf4 !important;
+  }
 </style>
 </head>
 <body>
@@ -938,6 +950,16 @@
   const currentUserId = parseInt("{{ user.id }}");
   const prefillOrigin = "{{ origin|default('') }}";
   const prefillDestination = "{{ destination|default('') }}";
+  let loadedTransitOptions = [];
+  let stopMarkers = [];
+  let transitRoutePolyline = null;
+  let bookingMode = 'cab'; // 'cab' or 'transit'
+  let activeTransitOptionId = null;
+  let activeTransitOperator = null;
+  let activeTransitMode = null;
+  let activeTransitFare = 0;
+  let activeTransitOrigin = "";
+  let activeTransitDestination = "";
   let currentMode = 'car';
   let leafletMap = null;
   let routingControl = null;
@@ -1472,6 +1494,9 @@
       if (currentMode === 'cab') {
         drawTransitOptions(currentMode, originCoords, destCoords, originVal, destVal);
         loadCabServices(originVal, destVal);
+      } else if (currentMode === 'bus' || currentMode === 'train' || currentMode === 'flight') {
+        drawTransitOptions(currentMode, originCoords, destCoords, originVal, destVal);
+        loadTransitOptions(currentMode, originVal, destVal);
       } else {
         drawTransitOptions(currentMode, originCoords, destCoords, originVal, destVal);
       }
@@ -1606,6 +1631,238 @@
       }
     }, 150);
   }
+    // ─── TRANSIT SERVICES (seeded database options) ───────────────
+  async function loadTransitOptions(mode, originVal, destVal) {
+    const wrap = document.getElementById('directions-wrap');
+    const loadingCard = document.createElement('div');
+    loadingCard.id = 'transit-loading-card';
+    loadingCard.style.cssText = 'padding:14px;font-size:13px;color:#64748b;';
+    loadingCard.textContent = `Loading available ${mode}s...`;
+    wrap.appendChild(loadingCard);
+
+    let travelDate = "";
+    const dateInput = document.getElementById("travel-date-input");
+    if (dateInput && dateInput.value) {
+      travelDate = dateInput.value;
+    } else {
+      travelDate = new Date().toISOString().slice(0, 10);
+    }
+
+    let options = [];
+    try {
+      const res = await fetch(`/api/transport/search`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer {{ token }}'
+        },
+        body: JSON.stringify({ origin: originVal, destination: destVal, mode: mode, travel_date: travelDate })
+      });
+      if (res.ok) {
+        options = await res.json();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        console.warn('Transit options search failed:', err.detail || res.status);
+      }
+    } catch (e) {
+      console.warn('Transit options fetch failed', e);
+    }
+
+    const loadCard = document.getElementById('transit-loading-card');
+    if (loadCard) loadCard.remove();
+
+    renderTransitOptions(mode, options, originVal, destVal);
+  }
+
+  function renderTransitOptions(mode, options, originVal, destVal) {
+    const wrap = document.getElementById('directions-wrap');
+    const modeLabels = { bus: '🚌 Bus', train: '🚂 Train', flight: '✈️ Flight' };
+    const modeColors = { bus: '#f59e0b', train: '#6366f1', flight: '#0ea5e9' };
+    const themeColor = modeColors[mode] || '#1d9e75';
+
+    loadedTransitOptions = options;
+
+    if (!options.length) {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'padding:20px;font-size:13px;color:#64748b;text-align:center;background:#f8fafc;border-radius:12px;border:1px dashed #cbd5e1;margin-top:10px;';
+      empty.innerHTML = `<div>🔍 No scheduled ${mode}s found for this route today.</div>`;
+      wrap.appendChild(empty);
+      return;
+    }
+
+    const list = document.createElement('div');
+    list.id = 'transit-options-list';
+    list.style.cssText = 'display:flex;flex-direction:column;gap:12px;margin-top:10px;';
+    list.innerHTML = `
+      <div class="dir-header" style="margin-top:10px;">
+        <span class="dir-header-title">Scheduled ${modeLabels[mode]}s (${options.length})</span>
+      </div>
+      ${options.map(opt => {
+        const isFullyBooked = opt.seats_available <= 0;
+        const priceDisplay = `₹${opt.fare_inr}`;
+        const availabilityChip = isFullyBooked
+          ? `<span class="trc-chip" style="background:#fee2e2;color:#ef4444;border-color:#fca5a5;">Fully Booked</span>`
+          : `<span class="trc-chip" style="background:#ecfdf5;color:#10b981;border-color:#a7f3d0;">${opt.seats_available} seat(s) available</span>`;
+
+        const actionButton = isFullyBooked
+          ? `<button class="get-routes-btn" style="margin-top:8px;background:#cbd5e1;color:#94a3b8;border-color:#cbd5e1;cursor:not-allowed;" disabled>Fully Booked</button>`
+          : `<button class="get-routes-btn" style="margin-top:8px;background:${themeColor};border-color:${themeColor};" 
+                    onclick="event.stopPropagation(); bookTransitFromMap('${opt.id}', '${opt.operator}', '${mode}', ${opt.fare_inr})">
+                Book Ticket
+              </button>`;
+
+        return `
+        <div class="transit-route-card" style="border-left:4px solid ${themeColor};" onclick="selectTransitOptionCard(this, '${opt.id}')">
+          <div class="trc-header">
+            <div class="trc-mode" style="font-weight:700;color:#0f172a;">${opt.operator}</div>
+            <div class="trc-price" style="color:${themeColor};font-weight:800;">${priceDisplay}</div>
+          </div>
+          <div class="trc-meta" style="margin:6px 0;">
+            <span class="trc-chip chip-time">⏱️ ${opt.duration_hrs} hrs</span>
+            ${availabilityChip}
+          </div>
+          <div class="trc-stops" style="margin-top:10px;padding:8px;background:#f8fafc;border-radius:8px;">
+            <div class="stop-line" style="font-size:12px;color:#475569;margin-bottom:4px;">
+              <span style="font-weight:600;color:${themeColor};">Departs:</span> ${opt.departure_time} from ${opt.origin}
+            </div>
+            ${opt.intermediate_stops && opt.intermediate_stops.length > 0 ? `
+              <div style="font-size:11px;color:#475569;margin:6px 0;padding-left:8px;border-left:2px dashed #cbd5e1;">
+                <strong>Stops:</strong>
+                ${opt.intermediate_stops.map(st => `
+                  <div style="margin-top:2px;">📍 ${st.name} (${st.duration_mins} mins stop)</div>
+                `).join('')}
+              </div>
+            ` : ''}
+            <div class="stop-line" style="font-size:12px;color:#475569;">
+              <span style="font-weight:600;color:#ef4444;">Arrives:</span> ${opt.arrival_time} at ${opt.destination}
+            </div>
+          </div>
+          ${opt.complimentary_items && opt.complimentary_items.length > 0 ? `
+            <div style="margin-top:8px;margin-bottom:4px;font-size:11px;color:#0d9488;display:flex;flex-wrap:wrap;gap:4px;">
+              ${opt.complimentary_items.map(item => `<span style="background:#f0fdfa;border:1px solid #99f6e4;padding:2px 6px;border-radius:4px;">🎁 ${item}</span>`).join('')}
+            </div>
+          ` : ''}
+          ${actionButton}
+        </div>`;
+      }).join('')}
+    `;
+    wrap.appendChild(list);
+
+    if (options.length > 0) {
+      setTimeout(() => {
+        const firstCard = list.querySelector('.transit-route-card');
+        if (firstCard) {
+          selectTransitOptionCard(firstCard, options[0].id);
+        }
+      }, 200);
+    }
+  }
+
+  function selectTransitOptionCard(cardElement, optionId) {
+    document.querySelectorAll('.transit-route-card').forEach(c => c.classList.remove('selected'));
+    cardElement.classList.add('selected');
+
+    const opt = loadedTransitOptions.find(o => o.id === optionId);
+    if (!opt) return;
+
+    stopMarkers.forEach(m => leafletMap.removeLayer(m));
+    stopMarkers = [];
+
+    if (opt.intermediate_stops && opt.intermediate_stops.length > 0) {
+      opt.intermediate_stops.forEach(stop => {
+        const stopIcon = L.divIcon({
+          html: `<div style="background:#f59e0b;color:#fff;border:2px solid #fff;border-radius:50%;width:20px;height:20px;box-shadow:0 2px 4px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;">🛑</div>`,
+          className: '',
+          iconSize: [20, 20],
+          iconAnchor: [10, 10]
+        });
+
+        const marker = L.marker([stop.lat, stop.lon], { icon: stopIcon })
+          .addTo(leafletMap)
+          .bindPopup(`<strong>🛑 ${stop.name} Stop</strong><br/>Pauses for ${stop.duration_mins} mins`);
+        
+        marker.bindTooltip(`${stop.name} (${stop.duration_mins} mins)`, { permanent: false, direction: 'top' });
+        stopMarkers.push(marker);
+      });
+    }
+
+    if (opt.intermediate_stops && opt.intermediate_stops.length > 0) {
+      const originInput = document.getElementById('origin-manual');
+      const destInput = document.getElementById('destination-input');
+      if (originInput && originInput.dataset.lat && originInput.dataset.lon && destInput && destInput.dataset.lat && destInput.dataset.lon) {
+        const points = [
+          L.latLng(parseFloat(originInput.dataset.lat), parseFloat(originInput.dataset.lon)),
+          L.latLng(parseFloat(destInput.dataset.lat), parseFloat(destInput.dataset.lon))
+        ];
+        opt.intermediate_stops.forEach(st => {
+          points.push(L.latLng(st.lat, st.lon));
+        });
+        leafletMap.fitBounds(L.latLngBounds(points), { padding: [50, 50] });
+      }
+    }
+  }
+
+  function bookTransitFromMap(optionId, operator, mode, fare) {
+    bookingMode = 'transit';
+    activeTransitOptionId = optionId;
+    activeTransitOperator = operator;
+    activeTransitMode = mode;
+    activeTransitFare = fare;
+    
+    // Get current origin/destination names from inputs
+    activeTransitOrigin = document.getElementById('origin-manual').value.trim();
+    activeTransitDestination = document.getElementById('destination-input').value.trim();
+
+    // Reset inputs and modal steps
+    document.getElementById("passenger-name-input").value = "";
+    document.getElementById("passenger-phone-input").value = "";
+    document.getElementById("passenger-email-input").value = "";
+    
+    const returnCheckbox = document.getElementById("booking-include-return-checkbox");
+    if (returnCheckbox) returnCheckbox.checked = false;
+    
+    const returnDateInput = document.getElementById("booking-return-date-input");
+    if (returnDateInput) returnDateInput.value = "";
+    
+    const returnWrap = document.getElementById("booking-return-date-wrap");
+    if (returnWrap) returnWrap.style.display = "none";
+
+    document.getElementById("seat-step-1").style.display = "flex";
+    document.getElementById("seat-step-2").style.display = "none";
+
+    // Show modal
+    const modal = document.getElementById("seat-select-overlay");
+    modal.classList.add("show");
+
+    // Title
+    const modeNames = { bus: 'Bus', train: 'Train', flight: 'Flight' };
+    document.getElementById("seat-modal-vehicle-title").textContent = `Book ${modeNames[mode]} — ${operator}`;
+
+    // Hide cab specific elements
+    document.querySelector(".vehicle-layout-container").style.display = "none";
+    document.querySelector(".seat-legend").style.display = "none";
+    document.getElementById("booking-route-stops-container").style.display = "none";
+    document.getElementById("selected-seats-summary-row").style.display = "none";
+
+    // Show return journey options
+    const returnContainer = document.getElementById("booking-return-container");
+    if (returnContainer) returnContainer.style.display = "flex";
+
+    // Clean up notice
+    const existingNotice = document.getElementById("private-cab-notice");
+    if (existingNotice) existingNotice.remove();
+
+    updateSeatSummary();
+  }
+
+  function toggleReturnDateInput() {
+    const chk = document.getElementById("booking-include-return-checkbox");
+    const wrap = document.getElementById("booking-return-date-wrap");
+    if (chk && wrap) {
+      wrap.style.display = chk.checked ? "flex" : "none";
+    }
+    updateSeatSummary();
+  }
 
   let selectedSeats = [];
   let seatPricePerSeat = 0;
@@ -1613,6 +1870,10 @@
   let isPrivateBooking = false;
 
   async function bookCabFromButton(btn) {
+    bookingMode = 'cab';
+    const returnContainer = document.getElementById("booking-return-container");
+    if (returnContainer) returnContainer.style.display = "none";
+
     const vehicleId = parseInt(btn.dataset.id);
     const vehicleType = btn.dataset.vehicleType;
     const vehicleName = btn.dataset.vehicleName;
@@ -1889,7 +2150,24 @@
     const nameInput = document.getElementById("passenger-name-input");
     const container = document.getElementById("per-seat-passenger-inputs");
 
-    if (!isPrivateBooking) {
+    if (bookingMode === 'transit') {
+      nameInput.style.display = "block";
+      container.style.display = "none";
+      container.innerHTML = "";
+
+      const includeReturn = document.getElementById("booking-include-return-checkbox").checked;
+      const returnDate = document.getElementById("booking-return-date-input").value;
+
+      let totalFare = activeTransitFare;
+      if (includeReturn) {
+        totalFare = activeTransitFare * 2;
+      }
+      totalDisplay.textContent = "₹" + totalFare;
+
+      const isReturnValid = !includeReturn || returnDate;
+      const name = nameInput.value.trim();
+      btn.disabled = !(name && phone && email && isReturnValid);
+    } else if (!isPrivateBooking) {
       countDisplay.textContent = selectedSeats.length;
       seatsDisplay.textContent = selectedSeats.length > 0 ? selectedSeats.join(", ") : "None";
       
@@ -1962,60 +2240,83 @@
   }
 
   function goToConfirmationScreen() {
-    const vehicleTitle = document.getElementById("seat-modal-vehicle-title").textContent;
-    const seatsText = isPrivateBooking ? "Whole Vehicle (Private Cab)" : selectedSeats.join(", ");
-    const fareText = document.getElementById("selected-seats-total").textContent;
-    
     const phone = document.getElementById("passenger-phone-input").value.trim();
     const email = document.getElementById("passenger-email-input").value.trim();
-
-    // Populate summary fields
-    document.getElementById("summary-vehicle-name").textContent = vehicleTitle;
-    document.getElementById("summary-seats").textContent = seatsText;
-    document.getElementById("summary-fare").textContent = fareText;
-    document.getElementById("summary-phone").textContent = phone;
-    document.getElementById("summary-email").textContent = email;
 
     const summaryNameRow = document.getElementById("summary-name").parentNode;
     const passengersListRow = document.getElementById("summary-passengers-list-row");
     const passengersList = document.getElementById("summary-passengers-list");
 
-    if (!isPrivateBooking) {
-      summaryNameRow.style.display = "none";
-      passengersListRow.style.display = "flex";
+    const pickupRow = document.getElementById("summary-pickup-row");
+    const dropoffRow = document.getElementById("summary-dropoff-row");
+
+    if (bookingMode === 'transit') {
+      const modeNames = { bus: 'Bus', train: 'Train', flight: 'Flight' };
+      document.getElementById("summary-vehicle-name").textContent = `${activeTransitOperator} (${modeNames[activeTransitMode]})`;
       
-      let html = "";
-      selectedSeats.forEach(seat => {
-        const nameVal = document.getElementById(`passenger-name-seat-${seat}`).value.trim();
-        const ageVal = document.getElementById(`passenger-age-seat-${seat}`).value.trim();
-        html += `<div>• Seat ${seat}: <strong>${nameVal}</strong> (Age: ${ageVal})</div>`;
-      });
-      passengersList.innerHTML = html;
-    } else {
+      const includeReturn = document.getElementById("booking-include-return-checkbox").checked;
+      const returnDate = document.getElementById("booking-return-date-input").value;
+      document.getElementById("summary-seats").textContent = includeReturn ? `One-way + Return Ticket (${returnDate})` : "One-way Ticket";
+      
+      document.getElementById("summary-fare").textContent = document.getElementById("selected-seats-total").textContent;
+      document.getElementById("summary-phone").textContent = phone;
+      document.getElementById("summary-email").textContent = email;
+
       summaryNameRow.style.display = "flex";
       passengersListRow.style.display = "none";
       const name = document.getElementById("passenger-name-input").value.trim();
       document.getElementById("summary-name").textContent = name;
-    }
 
-    // Populate route stops summaries
-    const pickupSelect = document.getElementById("booking-pickup-select");
-    const dropoffSelect = document.getElementById("booking-dropoff-select");
-    const pickupRow = document.getElementById("summary-pickup-row");
-    const dropoffRow = document.getElementById("summary-dropoff-row");
-
-    if (pickupSelect && pickupSelect.options.length > 0) {
       pickupRow.style.display = "flex";
-      document.getElementById("summary-pickup").textContent = pickupSelect.value;
-    } else {
-      pickupRow.style.display = "none";
-    }
+      document.getElementById("summary-pickup").textContent = activeTransitOrigin;
 
-    if (dropoffSelect && dropoffSelect.options.length > 0) {
       dropoffRow.style.display = "flex";
-      document.getElementById("summary-dropoff").textContent = dropoffSelect.value;
+      document.getElementById("summary-dropoff").textContent = activeTransitDestination;
     } else {
-      dropoffRow.style.display = "none";
+      const vehicleTitle = document.getElementById("seat-modal-vehicle-title").textContent;
+      const seatsText = isPrivateBooking ? "Whole Vehicle (Private Cab)" : selectedSeats.join(", ");
+      const fareText = document.getElementById("selected-seats-total").textContent;
+      
+      document.getElementById("summary-vehicle-name").textContent = vehicleTitle;
+      document.getElementById("summary-seats").textContent = seatsText;
+      document.getElementById("summary-fare").textContent = fareText;
+      document.getElementById("summary-phone").textContent = phone;
+      document.getElementById("summary-email").textContent = email;
+
+      if (!isPrivateBooking) {
+        summaryNameRow.style.display = "none";
+        passengersListRow.style.display = "flex";
+        
+        let html = "";
+        selectedSeats.forEach(seat => {
+          const nameVal = document.getElementById(`passenger-name-seat-${seat}`).value.trim();
+          const ageVal = document.getElementById(`passenger-age-seat-${seat}`).value.trim();
+          html += `<div>• Seat ${seat}: <strong>${nameVal}</strong> (Age: ${ageVal})</div>`;
+        });
+        passengersList.innerHTML = html;
+      } else {
+        summaryNameRow.style.display = "flex";
+        passengersListRow.style.display = "none";
+        const name = document.getElementById("passenger-name-input").value.trim();
+        document.getElementById("summary-name").textContent = name;
+      }
+
+      const pickupSelect = document.getElementById("booking-pickup-select");
+      const dropoffSelect = document.getElementById("booking-dropoff-select");
+
+      if (pickupSelect && pickupSelect.options.length > 0) {
+        pickupRow.style.display = "flex";
+        document.getElementById("summary-pickup").textContent = pickupSelect.value;
+      } else {
+        pickupRow.style.display = "none";
+      }
+
+      if (dropoffSelect && dropoffSelect.options.length > 0) {
+        dropoffRow.style.display = "flex";
+        document.getElementById("summary-dropoff").textContent = dropoffSelect.value;
+      } else {
+        dropoffRow.style.display = "none";
+      }
     }
 
     // Toggle steps
@@ -2028,7 +2329,71 @@
     document.getElementById("seat-step-1").style.display = "flex";
   }
 
+  async function submitTransitBooking() {
+    const passengerName = document.getElementById("passenger-name-input").value.trim();
+    if (!passengerName) {
+      alert("Please enter passenger Name.");
+      return;
+    }
+
+    const bookingBtn = document.getElementById("btn-confirm-seats");
+    if (bookingBtn) {
+      bookingBtn.disabled = true;
+      bookingBtn.textContent = "Booking ticket...";
+    }
+
+    const includeReturn = document.getElementById("booking-include-return-checkbox").checked;
+    const returnDate = includeReturn ? document.getElementById("booking-return-date-input").value : null;
+    
+    let travelDate = "";
+    const dateInput = document.getElementById("travel-date-input");
+    if (dateInput && dateInput.value) {
+      travelDate = dateInput.value;
+    } else {
+      travelDate = new Date().toISOString().slice(0, 10);
+    }
+
+    const payload = {
+      transport_option_id: activeTransitOptionId,
+      passenger_name: passengerName,
+      travel_date: travelDate,
+      include_return: includeReturn,
+      return_date: returnDate
+    };
+
+    try {
+      const res = await fetch(`/api/transport/book`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer {{ token }}'
+        },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        alert('Ticket booked successfully!\nBooking Reference ID: ' + data.id);
+        closeSeatModal();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert('Booking failed: ' + (err.detail || res.status));
+      }
+    } catch (e) {
+      alert('Booking failed: network error');
+    } finally {
+      if (bookingBtn) {
+        bookingBtn.disabled = false;
+        bookingBtn.textContent = "Confirm & Book";
+      }
+    }
+  }
+
   async function submitSeatBooking() {
+    if (bookingMode === 'transit') {
+      await submitTransitBooking();
+      return;
+    }
+
     const passengerPhone = document.getElementById("passenger-phone-input").value.trim();
     const passengerEmail = document.getElementById("passenger-email-input").value.trim();
 
@@ -2376,6 +2741,7 @@
       }
     });
     searchMarkers = [];
+    stopMarkers = [];
     document.querySelectorAll('.poi-btn').forEach(b => b.classList.remove('active'));
     currentPoiCategory = null;
   }
@@ -3104,6 +3470,19 @@
           <div style="display: flex; flex-direction: column; gap: 4px; width: 100%;">
             <label style="font-size: 11px; color: #64748b; font-weight: 600; text-align: left; align-self: flex-start;">Select Drop-off Stop *</label>
             <select id="booking-dropoff-select" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; outline: none; background: #ffffff; color: #0f172a;"></select>
+          </div>
+        </div>
+
+        <!-- Return trip options (for bus/train/flight bookings) -->
+        <div id="booking-return-container" style="display: none; flex-direction: column; gap: 10px; margin-top: 12px; width: 100%;">
+          <div style="font-size: 11px; font-weight: 700; color: #64748b; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px; align-self: flex-start;">Return Journey</div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="booking-include-return-checkbox" onchange="toggleReturnDateInput()" style="width: 16px; height: 16px; accent-color: #1d9e75;" />
+            <label for="booking-include-return-checkbox" style="font-size: 13px; color: #475569; font-weight: 600;">Include Return Ticket</label>
+          </div>
+          <div id="booking-return-date-wrap" style="display: none; flex-direction: column; gap: 4px; width: 100%;">
+            <label style="font-size: 11px; color: #64748b; font-weight: 600; text-align: left; align-self: flex-start;">Return Date *</label>
+            <input type="date" id="booking-return-date-input" oninput="updateSeatSummary()" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; outline: none; background: #ffffff; color: #0f172a;" />
           </div>
         </div>
 

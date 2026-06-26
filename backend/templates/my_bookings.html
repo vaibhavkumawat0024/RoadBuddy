@@ -12,6 +12,97 @@
 
 <div class="trips-grid">
   {% for b in bookings %}
+  {% if b.is_transit %}
+  <div class="trip-detail-card" style="position: relative; border-left: 4px solid {% if b.status == 'cancelled' %}#ff6b6b{% elif b.mode == 'bus' %}#f59e0b{% elif b.mode == 'train' %}#6366f1{% elif b.mode == 'flight' %}#0ea5e9{% else %}#1D9E75{% endif %}; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.02); transition: transform 0.2s;">
+    <div class="trip-detail-header">
+      <div>
+        <div class="trip-detail-route" style="color: #1a1a1a;">
+          {{ b.transport_option_operator or (b.mode | capitalize) }}
+          <span style="font-size: 11px; padding: 2px 6px; 
+            {% if b.mode == 'bus' %}
+              background: #fef3c7; color: #d97706;
+            {% elif b.mode == 'train' %}
+              background: #e0e7ff; color: #4f46e5;
+            {% elif b.mode == 'flight' %}
+              background: #e0f2fe; color: #0284c7;
+            {% else %}
+              background: #e0f5ee; color: #0F6E56;
+            {% endif %}
+            border-radius: 4px; font-weight: 600; margin-left: 6px; vertical-align: middle; text-transform: uppercase;">
+            {{ b.mode }} Ticket
+          </span>
+        </div>
+        <div class="trip-detail-meta" style="color: #666; margin-top: 6px; font-size: 12.5px;">
+          📍 Route: <strong>{{ b.origin }} → {{ b.destination }}</strong> &nbsp;·&nbsp;
+          📅 Date: <strong>{{ b.travel_date }}</strong>
+          {% if b.include_return and b.return_date %}
+            &nbsp;·&nbsp; 🔙 Return: <strong>{{ b.return_date }}</strong>
+          {% endif %}
+        </div>
+      </div>
+      
+      <!-- Booking Status & Cancellation -->
+      <div style="text-align: right; min-width: 120px;">
+        <div style="font-size: 13.5px; font-weight: 700; color: {% if b.status == 'cancelled' %}#ff6b6b{% else %}#1D9E75{% endif %}; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px;">
+          {{ b.status | capitalize }}
+        </div>
+        {% if b.status != 'cancelled' %}
+        <form method="POST" action="/cancel-transit-booking/{{ b.id }}" onsubmit="return confirm('Are you sure you want to cancel this ticket?')">
+          <button type="submit" style="background: rgba(255, 107, 53, 0.08); border: 1px solid rgba(255, 107, 53, 0.15); color: #ff6b6b; padding: 5px 12px; border-radius: 6px; font-size: 11.5px; font-weight: 600; cursor: pointer; transition: all 0.2s;">Cancel Ticket</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+    
+    <!-- Booking Details Box -->
+    <div style="background: #fdfdfd; border: 1px solid #eef2f5; border-radius: 8px; padding: 14px 18px; margin-top: 14px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.01);">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; font-size: 13px; color: #444;">
+        <div>👤 <strong>Passenger:</strong> {{ b.passenger_name }}</div>
+        <div style="font-size: 14px; color: #1a1a1a;">💰 <strong>Fare Paid:</strong> <strong style="color: #0F6E56;">₹{{ b.total_fare_inr | int }}</strong></div>
+        {% if b.include_return %}
+          <div style="font-size: 12px; color: #666;">🔄 Includes Round-Trip Ticket</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% elif b.is_hotel %}
+  <div class="trip-detail-card" style="position: relative; border-left: 4px solid {% if b.status == 'cancelled' %}#ff6b6b{% else %}#10b981{% endif %}; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.02); transition: transform 0.2s;">
+    <div class="trip-detail-header">
+      <div>
+        <div class="trip-detail-route" style="color: #1a1a1a; font-weight: 700; font-size: 16px;">
+          🏨 {{ b.hotel_name }}
+          <span style="font-size: 11px; padding: 2px 6px; background: #d1fae5; color: #065f46; border-radius: 4px; font-weight: 600; margin-left: 6px; vertical-align: middle; text-transform: uppercase;">Hotel Booking</span>
+        </div>
+        <div class="trip-detail-meta" style="color: #666; margin-top: 6px; font-size: 12.5px;">
+          📍 City: <strong>{{ b.hotel_city }}</strong> &nbsp;·&nbsp;
+          📅 Check-in: <strong>{{ b.check_in_date }}</strong> &nbsp;·&nbsp;
+          📅 Check-out: <strong>{{ b.check_out_date }}</strong>
+        </div>
+      </div>
+      
+      <!-- Booking Status & Cancellation -->
+      <div style="text-align: right; min-width: 120px;">
+        <div style="font-size: 13.5px; font-weight: 700; color: {% if b.status == 'cancelled' %}#ff6b6b{% else %}#10b981{% endif %}; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px;">
+          {{ b.status | capitalize }}
+        </div>
+        {% if b.status != 'cancelled' %}
+        <form method="POST" action="/cancel-hotel-booking/{{ (b.id|string).replace('hotel_', '') }}" onsubmit="return confirm('Are you sure you want to cancel this hotel booking?')">
+          <button type="submit" style="background: rgba(255, 107, 53, 0.08); border: 1px solid rgba(255, 107, 53, 0.15); color: #ff6b6b; padding: 5px 12px; border-radius: 6px; font-size: 11.5px; font-weight: 600; cursor: pointer; transition: all 0.2s;">Cancel Booking</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+    
+    <!-- Booking Details Box -->
+    <div style="background: #fdfdfd; border: 1px solid #eef2f5; border-radius: 8px; padding: 14px 18px; margin-top: 14px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.01);">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; font-size: 13px; color: #444;">
+        <div>🛏️ <strong>Rooms Booked:</strong> {{ b.num_rooms }}</div>
+        <div>👤 <strong>Guests:</strong> {{ b.num_guests }}</div>
+        <div style="font-size: 14px; color: #1a1a1a;">💰 <strong>Total Price:</strong> <strong style="color: #065f46;">₹{{ b.total_fare_inr | int }}</strong></div>
+      </div>
+    </div>
+  </div>
+  {% else %}
   <div class="trip-detail-card" style="position: relative; border-left: 4px solid {% if b.status == 'cancelled' %}#ff6b6b{% else %}#1D9E75{% endif %}; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.02); transition: transform 0.2s;">
     <div class="trip-detail-header">
       <div>
@@ -81,6 +172,7 @@
     </div>
     {% endif %}
   </div>
+  {% endif %}
   {% endfor %}
 </div>
 

@@ -1,120 +1,195 @@
 """
 Seed Data Script — RoadBuddy
 -------------------------------
-Adds sample hotels, trains, buses, and flights to the database.
+Generates and seeds 100 hotels, 100 trains, 100 buses, and 100 flights in the database.
 Run this once: python seed_data.py
-Save as: backend/seed_data.py
 """
 
-from app.core.database import SessionLocal
+import random
+from app.core.database import SessionLocal, Base, engine
 from app.models.models import Hotel, Train, Bus, Flight
 
+CITIES = ["Delhi", "Mumbai", "Jaipur", "Udaipur", "Goa", "Manali", "Jodhpur", "Agra", "Shimla", "Bangalore", "Kolkata", "Pune", "Chennai", "Hyderabad"]
 
-
-# ── Hotels ─────────────────────────────────────────────────────────────────
-
-hotels = [
-    Hotel(name="Hotel Pearl Palace", city="Jaipur", address="Hari Kishan Somani Marg, Jaipur",
-          star_rating=4.0, price_per_night_inr=2200, total_rooms=20,
-          amenities="WiFi, AC, Restaurant, Pool", image_url=None),
-    Hotel(name="Trident Jaipur", city="Jaipur", address="Amber Fort Road, Jaipur",
-          star_rating=4.5, price_per_night_inr=5500, total_rooms=15,
-          amenities="WiFi, AC, Spa, Pool, Gym", image_url=None),
-    Hotel(name="Zostel Jaipur", city="Jaipur", address="Ajmer Road, Jaipur",
-          star_rating=3.5, price_per_night_inr=900, total_rooms=30,
-          amenities="WiFi, Dorm, Common Area", image_url=None),
-
-    Hotel(name="Hotel Lake Pichola", city="Udaipur", address="Lake Pichola, Udaipur",
-          star_rating=4.2, price_per_night_inr=3200, total_rooms=18,
-          amenities="WiFi, AC, Lake View, Restaurant", image_url=None),
-    Hotel(name="Taj Lake Palace", city="Udaipur", address="Lake Pichola, Udaipur",
-          star_rating=5.0, price_per_night_inr=18000, total_rooms=10,
-          amenities="WiFi, AC, Spa, Pool, Lake View, Butler", image_url=None),
-    Hotel(name="OYO Udaipur Inn", city="Udaipur", address="City Palace Road, Udaipur",
-          star_rating=3.0, price_per_night_inr=1100, total_rooms=25,
-          amenities="WiFi, AC, Parking", image_url=None),
-
-    Hotel(name="The Himalayan Resort", city="Manali", address="Old Manali Road",
-          star_rating=4.3, price_per_night_inr=4200, total_rooms=12,
-          amenities="WiFi, Bonfire, Mountain View, Restaurant", image_url=None),
-    Hotel(name="Zostel Manali", city="Manali", address="Old Manali",
-          star_rating=3.8, price_per_night_inr=1000, total_rooms=22,
-          amenities="WiFi, Dorm, Cafe, Bonfire", image_url=None),
-
-    Hotel(name="Taj Exotica Goa", city="Goa", address="Benaulim Beach, Goa",
-          star_rating=5.0, price_per_night_inr=15000, total_rooms=14,
-          amenities="WiFi, Beach Access, Spa, Pool", image_url=None),
-    Hotel(name="Goa Beach Hostel", city="Goa", address="Anjuna Beach, Goa",
-          star_rating=3.5, price_per_night_inr=800, total_rooms=28,
-          amenities="WiFi, Beach Access, Bar", image_url=None),
+# Explicit popular routes to guarantee search results
+POPULAR_ROUTES = [
+    ("Jaipur", "Udaipur"),
+    ("Udaipur", "Jaipur"),
+    ("Jaipur", "Delhi"),
+    ("Delhi", "Jaipur"),
+    ("Delhi", "Manali"),
+    ("Manali", "Delhi"),
+    ("Mumbai", "Goa"),
+    ("Goa", "Mumbai")
 ]
 
-# ── Trains ─────────────────────────────────────────────────────────────────
+# ── Generating 100 Hotels ─────────────────────────────────────────────────────
+def generate_hotels():
+    hotel_names = ["Taj", "Oberoi", "Zostel", "OYO Townhouse", "Lemon Tree", "Ginger", "Radisson", "Marriott", "Hyatt", "FabHotel", "Treebo", "Grand Vista"]
+    hotel_types = ["Palace", "Resort", "Inn", "Hostel", "Hotel", "Suites", "Homestay", "Heritage"]
+    hotel_amenities = ["WiFi, AC", "WiFi, AC, Pool", "WiFi, Dorm, Common Area", "WiFi, AC, Restaurant", "WiFi, AC, Restaurant, Pool, Gym", "WiFi, AC, Spa, Pool, Gym"]
 
-trains = [
-    Train(train_name="Pink City Express", train_number="12986", origin="Jaipur", destination="Udaipur",
-          departure_time="06:00", arrival_time="13:30", duration_hrs=7.5, fare_inr=450,
-          total_seats=120, travel_class="Sleeper"),
-    Train(train_name="Udaipur AC Express", train_number="19666", origin="Jaipur", destination="Udaipur",
-          departure_time="22:00", arrival_time="05:30", duration_hrs=7.5, fare_inr=1200,
-          total_seats=80, travel_class="AC3"),
+    hotels = []
+    for i in range(100):
+        city = random.choice(CITIES)
+        name = f"{random.choice(hotel_names)} {random.choice(hotel_types)} {i+1}"
+        address = f"Street {random.randint(1, 20)}, near Mall Road, {city}"
+        star_rating = round(random.uniform(3.0, 5.0), 1)
+        price_per_night = random.randint(800, 15000)
+        total_rooms = random.randint(15, 50)
+        amenities = random.choice(hotel_amenities)
+        hotels.append(Hotel(
+            name=name, city=city, address=address, star_rating=star_rating,
+            price_per_night_inr=price_per_night, total_rooms=total_rooms,
+            rooms_booked=0, amenities=amenities, image_url=None
+        ))
+    return hotels
 
-    Train(train_name="Jaipur Delhi Shatabdi", train_number="12016", origin="Jaipur", destination="Delhi",
-          departure_time="05:50", arrival_time="10:40", duration_hrs=4.8, fare_inr=900,
-          total_seats=100, travel_class="AC2"),
-    Train(train_name="Ajmer Shatabdi", train_number="12015", origin="Delhi", destination="Jaipur",
-          departure_time="06:05", arrival_time="11:00", duration_hrs=4.9, fare_inr=950,
-          total_seats=100, travel_class="AC2"),
+# ── Generating 100 Trains ─────────────────────────────────────────────────────
+def generate_trains():
+    train_types = ["Shatabdi Express", "Rajdhani Express", "Vande Bharat", "Duronto Express", "Garib Rath", "Intercity Express", "Express", "Mail"]
+    train_names = ["Pink City", "Mewar", "Chetak", "Golden Temple", "Paschim", "Ashram", "Karnavati", "Deccan Queen"]
 
-    Train(train_name="Goa Express", train_number="12780", origin="Jaipur", destination="Goa",
-          departure_time="14:20", arrival_time="16:00", duration_hrs=25.7, fare_inr=1800,
-          total_seats=90, travel_class="Sleeper"),
-]
+    trains = []
+    # First seed popular routes to guarantee matches
+    for i, (orig, dest) in enumerate(POPULAR_ROUTES * 3): # 24 trains
+        t_type = random.choice(train_types)
+        t_name = f"{random.choice(train_names)} {t_type}"
+        t_num = f"{12000 + i}"
+        dep_time = f"{6 + i % 16:02d}:{random.choice([0, 15, 30, 45]):02d}"
+        dur = round(random.uniform(3.5, 9.0), 1)
+        arr_h = int((int(dep_time.split(":")[0]) + int(dur)) % 24)
+        arr_m = int((int(dep_time.split(":")[1]) + (dur % 1)*60) % 60)
+        arr_time = f"{arr_h:02d}:{arr_m:02d}"
+        fare = random.randint(350, 1800)
+        travel_class = random.choice(["Sleeper", "AC3", "AC2", "AC1"])
+        trains.append(Train(
+            train_name=t_name, train_number=t_num, origin=orig, destination=dest,
+            departure_time=dep_time, arrival_time=arr_time, duration_hrs=dur,
+            fare_inr=fare, total_seats=100, seats_booked=0, travel_class=travel_class
+        ))
 
-# ── Buses ──────────────────────────────────────────────────────────────────
+    # Seed remaining randomly to reach 100
+    for i in range(100 - len(trains)):
+        orig = random.choice(CITIES)
+        dest = random.choice([c for c in CITIES if c != orig])
+        t_type = random.choice(train_types)
+        t_name = f"{random.choice(train_names)} {t_type}"
+        t_num = f"{13000 + i}"
+        dep_time = f"{random.randint(0, 23):02d}:{random.choice([0, 15, 30, 45]):02d}"
+        dur = round(random.uniform(2.0, 18.0), 1)
+        arr_h = int((int(dep_time.split(":")[0]) + int(dur)) % 24)
+        arr_m = int((int(dep_time.split(":")[1]) + (dur % 1)*60) % 60)
+        arr_time = f"{arr_h:02d}:{arr_m:02d}"
+        fare = random.randint(250, 2500)
+        travel_class = random.choice(["Sleeper", "AC3", "AC2", "AC1"])
+        trains.append(Train(
+            train_name=t_name, train_number=t_num, origin=orig, destination=dest,
+            departure_time=dep_time, arrival_time=arr_time, duration_hrs=dur,
+            fare_inr=fare, total_seats=120, seats_booked=0, travel_class=travel_class
+        ))
+    return trains
 
-buses = [
-    Bus(operator_name="RSRTC Volvo", bus_type="AC Seater", origin="Jaipur", destination="Udaipur",
-        departure_time="07:00", arrival_time="14:00", duration_hrs=7.0, fare_inr=650,
-        total_seats=40),
-    Bus(operator_name="Shrinath Travels", bus_type="AC Sleeper", origin="Jaipur", destination="Udaipur",
-        departure_time="22:30", arrival_time="05:30", duration_hrs=7.0, fare_inr=900,
-        total_seats=36),
+# ── Generating 100 Buses ──────────────────────────────────────────────────────
+def generate_buses():
+    bus_operators = ["RSRTC Volvo", "Gujarat Travels", "Orange Travels", "SRS Travels", "VRL Travels", "Intrcity SmartBus", "Zingbus", "Shrinath Travels", "Neeta Travels"]
+    bus_types = ["AC Seater", "AC Sleeper", "Non-AC Seater", "Non-AC Sleeper", "Multi-Axle Volvo AC"]
 
-    Bus(operator_name="Zingbus", bus_type="AC Sleeper", origin="Jaipur", destination="Manali",
-        departure_time="18:00", arrival_time="08:00", duration_hrs=14.0, fare_inr=1500,
-        total_seats=30),
-    Bus(operator_name="HRTC Volvo", bus_type="AC Seater", origin="Delhi", destination="Manali",
-        departure_time="20:00", arrival_time="08:00", duration_hrs=12.0, fare_inr=1200,
-        total_seats=42),
+    buses = []
+    # First seed popular routes to guarantee matches
+    for i, (orig, dest) in enumerate(POPULAR_ROUTES * 3): # 24 buses
+        operator = random.choice(bus_operators)
+        b_type = random.choice(bus_types)
+        dep_time = f"{6 + i % 16:02d}:{random.choice([0, 15, 30, 45]):02d}"
+        dur = round(random.uniform(4.0, 10.0), 1)
+        arr_h = int((int(dep_time.split(":")[0]) + int(dur)) % 24)
+        arr_m = int((int(dep_time.split(":")[1]) + (dur % 1)*60) % 60)
+        arr_time = f"{arr_h:02d}:{arr_m:02d}"
+        fare = random.randint(300, 1500)
+        buses.append(Bus(
+            operator_name=f"{operator} {i+1}", bus_type=b_type, origin=orig, destination=dest,
+            departure_time=dep_time, arrival_time=arr_time, duration_hrs=dur,
+            fare_inr=fare, total_seats=40, seats_booked=0
+        ))
 
-    Bus(operator_name="Paulo Travels", bus_type="AC Sleeper", origin="Jaipur", destination="Goa",
-        departure_time="16:00", arrival_time="14:00", duration_hrs=22.0, fare_inr=2200,
-        total_seats=32),
-]
+    # Seed remaining randomly to reach 100
+    for i in range(100 - len(buses)):
+        orig = random.choice(CITIES)
+        dest = random.choice([c for c in CITIES if c != orig])
+        operator = random.choice(bus_operators)
+        b_type = random.choice(bus_types)
+        dep_time = f"{random.randint(0, 23):02d}:{random.choice([0, 15, 30, 45]):02d}"
+        dur = round(random.uniform(3.0, 12.0), 1)
+        arr_h = int((int(dep_time.split(":")[0]) + int(dur)) % 24)
+        arr_m = int((int(dep_time.split(":")[1]) + (dur % 1)*60) % 60)
+        arr_time = f"{arr_h:02d}:{arr_m:02d}"
+        fare = random.randint(200, 1800)
+        buses.append(Bus(
+            operator_name=f"{operator} {i+25}", bus_type=b_type, origin=orig, destination=dest,
+            departure_time=dep_time, arrival_time=arr_time, duration_hrs=dur,
+            fare_inr=fare, total_seats=42, seats_booked=0
+        ))
+    return buses
 
-# ── Flights ────────────────────────────────────────────────────────────────
+# ── Generating 100 Flights ────────────────────────────────────────────────────
+def generate_flights():
+    airlines = ["IndiGo", "Air India", "SpiceJet", "Vistara", "Akasa Air", "Air India Express"]
+    flight_classes = ["Economy", "Premium Economy", "Business"]
 
-flights = [
-    Flight(airline="IndiGo", flight_number="6E-2341", origin="Jaipur", destination="Udaipur",
-           departure_time="09:15", arrival_time="10:10", duration_hrs=0.9, fare_inr=3200,
-           total_seats=180, travel_class="Economy"),
-    Flight(airline="Air India", flight_number="AI-9847", origin="Jaipur", destination="Delhi",
-           departure_time="11:30", arrival_time="12:35", duration_hrs=1.1, fare_inr=2800,
-           total_seats=150, travel_class="Economy"),
-    Flight(airline="IndiGo", flight_number="6E-5612", origin="Delhi", destination="Manali",
-           departure_time="07:45", arrival_time="08:50", duration_hrs=1.1, fare_inr=4500,
-           total_seats=180, travel_class="Economy"),
-    Flight(airline="SpiceJet", flight_number="SG-8123", origin="Jaipur", destination="Goa",
-           departure_time="13:20", arrival_time="15:40", duration_hrs=2.3, fare_inr=5200,
-           total_seats=189, travel_class="Economy"),
-    Flight(airline="Vistara", flight_number="UK-945", origin="Mumbai", destination="Goa",
-           departure_time="08:00", arrival_time="09:10", duration_hrs=1.2, fare_inr=3800,
-           total_seats=160, travel_class="Economy"),
-]
+    flights = []
+    # First seed popular routes to guarantee matches (excluding Manali since it has no commercial flight airport in major CITIES)
+    FLIGHT_POPULAR_ROUTES = [
+        ("Jaipur", "Delhi"),
+        ("Delhi", "Jaipur"),
+        ("Mumbai", "Goa"),
+        ("Goa", "Mumbai"),
+        ("Delhi", "Mumbai"),
+        ("Mumbai", "Delhi"),
+        ("Delhi", "Goa"),
+        ("Goa", "Delhi")
+    ]
+
+    for i, (orig, dest) in enumerate(FLIGHT_POPULAR_ROUTES * 3): # 24 flights
+        airline = random.choice(airlines)
+        fl_num = f"{airline[:2].upper()}-{200 + i}"
+        dep_time = f"{6 + i % 16:02d}:{random.choice([0, 15, 30, 45]):02d}"
+        dur = round(random.uniform(1.0, 2.5), 1)
+        arr_h = int((int(dep_time.split(":")[0]) + int(dur)) % 24)
+        arr_m = int((int(dep_time.split(":")[1]) + (dur % 1)*60) % 60)
+        arr_time = f"{arr_h:02d}:{arr_m:02d}"
+        fare = random.randint(3000, 8500)
+        travel_class = random.choice(flight_classes)
+        flights.append(Flight(
+            airline=airline, flight_number=fl_num, origin=orig, destination=dest,
+            departure_time=dep_time, arrival_time=arr_time, duration_hrs=dur,
+            fare_inr=fare, total_seats=180, seats_booked=0, travel_class=travel_class
+        ))
+
+    # Seed remaining randomly to reach 100
+    for i in range(100 - len(flights)):
+        orig = random.choice(CITIES)
+        dest = random.choice([c for c in CITIES if c != orig])
+        airline = random.choice(airlines)
+        fl_num = f"{airline[:2].upper()}-{300 + i}"
+        dep_time = f"{random.randint(0, 23):02d}:{random.choice([0, 15, 30, 45]):02d}"
+        dur = round(random.uniform(1.0, 4.0), 1)
+        arr_h = int((int(dep_time.split(":")[0]) + int(dur)) % 24)
+        arr_m = int((int(dep_time.split(":")[1]) + (dur % 1)*60) % 60)
+        arr_time = f"{arr_h:02d}:{arr_m:02d}"
+        fare = random.randint(2500, 12000)
+        travel_class = random.choice(flight_classes)
+        flights.append(Flight(
+            airline=airline, flight_number=fl_num, origin=orig, destination=dest,
+            departure_time=dep_time, arrival_time=arr_time, duration_hrs=dur,
+            fare_inr=fare, total_seats=150, seats_booked=0, travel_class=travel_class
+        ))
+    return flights
 
 
 def seed():
+    # Automatically create tables in SQLite database if they don't exist
+    Base.metadata.create_all(bind=engine)
+    
     db = SessionLocal()
     try:
         has_hotels = db.query(Hotel).first() is not None
@@ -126,15 +201,20 @@ def seed():
             print("Database already contains seeded data. Skipping.")
             return
 
+        hotels = generate_hotels()
+        trains = generate_trains()
+        buses = generate_buses()
+        flights = generate_flights()
+
         db.add_all(hotels)
         db.add_all(trains)
         db.add_all(buses)
         db.add_all(flights)
         db.commit()
-        print(f"✅ Seeded {len(hotels)} hotels, {len(trains)} trains, {len(buses)} buses, {len(flights)} flights!")
+        print(f"[SUCCESS] Seeded {len(hotels)} hotels, {len(trains)} trains, {len(buses)} buses, {len(flights)} flights!")
     except Exception as e:
         db.rollback()
-        print(f"❌ Error seeding database: {e}")
+        print(f"[ERROR] Error seeding database: {e}")
         raise
     finally:
         db.close()

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
 from app.services.trip_chatbot import chat_with_roadbuddy
 from typing import Optional
@@ -287,24 +287,207 @@ async def get_waypoint_suggestions(request: WaypointRequest):
 
 
 
+def get_optional_user(request: Request) -> Optional[dict]:
+    auth_header = request.headers.get("Authorization")
+    token = None
+    if auth_header:
+        if auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+        else:
+            token = auth_header
+    else:
+        token = request.cookies.get("access_token")
+        
+    if not token:
+        return None
+        
+    try:
+        from jose import jwt
+        from app.core.config import settings
+        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+        user_id = payload.get("sub")
+        if user_id:
+            return {"user_id": user_id}
+    except Exception:
+        pass
+    return None
+
+
+def build_user_context(user_id: int, db: Session) -> str:
+    from app.models.models import User, Vehicle, Trip, Booking, HotelBooking, TrainBooking, BusBooking, FlightBooking, ProviderBooking
+    from app.services.transport_service import get_transport_option_by_id, get_transit_stops_and_amenities
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        return ""
+        
+    lines = []
+    lines.append(f"User Name: {user.name}")
+    lines.append(f"User Email: {user.email}")
+    
+    # Vehicles
+    vehicles = db.query(Vehicle).filter(Vehicle.user_id == user_id).all()
+    if vehicles:
+        lines.append("User Vehicles:")
+        for v in vehicles:
+            lines.append(f"- Vehicle: {v.name} ({v.category}, Fuel: {v.fuel_type}, Mileage: {v.mileage_kmpl} kmpl)")
+            
+    # Trips
+    trips = db.query(Trip).filter(Trip.user_id == user_id).all()
+    if trips:
+        lines.append("User Trips:")
+        for t in trips:
+            lines.append(f"- Trip: {t.origin} to {t.destination} ({t.start_date} to {t.end_date or 'N/A'}), Travel Mode: {t.travel_mode}, Budget: INR {t.budget_inr}, Total Estimated Cost: INR {t.total_cost_inr}")
+
+    # Hotel Bookings
+    hotel_bookings = db.query(HotelBooking).filter(HotelBooking.user_id == user_id).all()
+    if hotel_bookings:
+        lines.append("User Hotel Bookings:")
+        for hb in hotel_bookings:
+            hotel_name = hb.hotel.name if (hb.hotel) else "Hotel"
+            hotel_city = hb.hotel.city if (hb.hotel) else "Unknown"
+            hotel_amenities = hb.hotel.amenities if (hb.hotel and hb.hotel.amenities) else "WiFi, AC"
+            comp_list = ["Complimentary Welcome Drink"]
+            if "restaurant" in hotel_amenities.lower() or "breakfast" in hotel_amenities.lower() or "pool" in hotel_amenities.lower():
+                comp_list.append("Complimentary Buffet Breakfast")
+            comp_str = ", ".join(comp_list)
+            lines.append(
+                f"- Hotel Booking: {hotel_name} in {hotel_city}. Check-in: {hb.check_in_date}, Check-out: {hb.check_out_date}. Rooms: {hb.num_rooms}, Guests: {hb.num_guests}. Status: {hb.status}. Price: INR {hb.total_price_inr}. Included Amenities: {hotel_amenities}. Complimentary Inclusions: {comp_str}."
+            )
+            
+    # Train Bookings
+    train_bookings = db.query(TrainBooking).filter(TrainBooking.user_id == user_id).all()
+    if train_bookings:
+        lines.append("User Train Bookings:")
+        for tb in train_bookings:
+            train_name = tb.train.train_name if (tb.train) else "Train"
+            train_num = tb.train.train_number if (tb.train) else "N/A"
+            origin = tb.train.origin if (tb.train) else "N/A"
+            destination = tb.train.destination if (tb.train) else "N/A"
+            stops, items = get_transit_stops_and_amenities(origin, destination, "train", train_name)
+            stops_str = ", ".join([f"{s['name']} (stop for {s['duration_mins']} mins)" for s in stops]) if stops else "Direct (no stops)"
+            items_str = ", ".join(items) if items else "Standard amenities"
+            lines.append(
+                f"- Train Booking: {train_name} ({train_num}) from {origin} to {destination}. Travel Date: {tb.travel_date}. Passenger: {tb.passenger_name}, Seats: {tb.num_seats}. Status: {tb.status}. Fare: INR {tb.total_fare_inr}. Intermediate Stops: {stops_str}. Complimentary Inclusions: {items_str}."
+            )
+            
+    # Bus Bookings
+    bus_bookings = db.query(BusBooking).filter(BusBooking.user_id == user_id).all()
+    if bus_bookings:
+        lines.append("User Bus Bookings:")
+        for bb in bus_bookings:
+            operator = bb.bus.operator_name if (bb.bus) else "Bus Operator"
+            bus_type = bb.bus.bus_type if (bb.bus) else "AC"
+            origin = bb.bus.origin if (bb.bus) else "N/A"
+            destination = bb.bus.destination if (bb.bus) else "N/A"
+            stops, items = get_transit_stops_and_amenities(origin, destination, "bus", operator)
+            stops_str = ", ".join([f"{s['name']} (stop for {s['duration_mins']} mins)" for s in stops]) if stops else "Direct (no stops)"
+            items_str = ", ".join(items) if items else "Standard amenities"
+            lines.append(
+                f"- Bus Booking: Bus with {operator} ({bus_type}) from {origin} to {destination}. Travel Date: {bb.travel_date}. Passenger: {bb.passenger_name}, Seats: {bb.num_seats}. Status: {bb.status}. Fare: INR {bb.total_fare_inr}. Intermediate Stops: {stops_str}. Complimentary Inclusions: {items_str}."
+            )
+            
+    # Flight Bookings
+    flight_bookings = db.query(FlightBooking).filter(FlightBooking.user_id == user_id).all()
+    if flight_bookings:
+        lines.append("User Flight Bookings:")
+        for fb in flight_bookings:
+            airline = fb.flight.airline if (fb.flight) else "Airline"
+            flight_num = fb.flight.flight_number if (fb.flight) else "N/A"
+            origin = fb.flight.origin if (fb.flight) else "N/A"
+            destination = fb.flight.destination if (fb.flight) else "N/A"
+            stops, items = get_transit_stops_and_amenities(origin, destination, "flight", airline)
+            stops_str = ", ".join([f"{s['name']} (stop for {s['duration_mins']} mins)" for s in stops]) if stops else "Direct (no stops)"
+            items_str = ", ".join(items) if items else "Standard amenities"
+            lines.append(
+                f"- Flight Booking: {airline} ({flight_num}) from {origin} to {destination}. Travel Date: {fb.travel_date}. Passenger: {fb.passenger_name}, Seats: {fb.num_seats}. Status: {fb.status}. Fare: INR {fb.total_fare_inr}. Intermediate Stops: {stops_str}. Complimentary Inclusions: {items_str}."
+            )
+            
+    # Transit Bookings (generic Booking model)
+    transit_bookings = db.query(Booking).filter(Booking.user_id == user_id).all()
+    if transit_bookings:
+        lines.append("User Transit Bookings:")
+        for b in transit_bookings:
+            opt = get_transport_option_by_id(b.transport_option_id, db)
+            mode = "Transit"
+            operator = "Unknown"
+            origin = "N/A"
+            destination = "N/A"
+            stops_str = "Direct (no stops)"
+            items_str = "Standard amenities"
+            if opt:
+                mode = opt.mode
+                operator = opt.operator
+                origin = opt.origin
+                destination = opt.destination
+                stops, items = get_transit_stops_and_amenities(opt.origin, opt.destination, opt.mode, opt.operator)
+                stops_str = ", ".join([f"{s['name']} (stop for {s['duration_mins']} mins)" for s in stops]) if stops else "Direct (no stops)"
+                items_str = ", ".join(items) if items else "Standard amenities"
+            else:
+                try:
+                    mode = b.transport_option_id.split("_")[0]
+                except Exception:
+                    pass
+            lines.append(
+                f"- Transit Booking: {mode.capitalize()} with {operator} from {origin} to {destination}. Travel Date: {b.travel_date}. Passenger: {b.passenger_name}, Fare: INR {b.total_fare_inr}. Status: {b.status}. Intermediate Stops: {stops_str}. Complimentary Inclusions: {items_str}."
+            )
+
+    # Cab Bookings (ProviderBooking)
+    cab_bookings = db.query(ProviderBooking).filter(ProviderBooking.user_id == user_id).all()
+    if cab_bookings:
+        lines.append("User Cab Bookings:")
+        for cb in cab_bookings:
+            v_name = cb.vehicle.vehicle_name if (cb.vehicle) else "Cab"
+            provider_name = cb.vehicle.provider.company_name if (cb.vehicle and cb.vehicle.provider) else "Cab Provider"
+            p_loc = cb.pickup_location or "N/A"
+            d_loc = cb.dropoff_location or "N/A"
+            p_name = p_loc.split("|||")[0] if "|||" in p_loc else p_loc
+            d_name = d_loc.split("|||")[0] if "|||" in d_loc else d_loc
+            stops, items = get_transit_stops_and_amenities(p_name, d_name, "cab", v_name)
+            stops_str = ", ".join([f"{s['name']} (stop for {s['duration_mins']} mins)" for s in stops]) if stops else "Direct (no stops)"
+            items_str = ", ".join(items) if items else "Standard amenities"
+            lines.append(
+                f"- Cab Booking: {v_name} with {provider_name} from {p_name} to {d_name}. Travel Date: {cb.travel_date}. Passenger: {cb.passenger_name}, Seats: {cb.num_seats}. Status: {cb.status}. Fare: INR {cb.total_fare_inr}. Intermediate Stops: {stops_str}. Complimentary Inclusions: {items_str}."
+            )
+
+    return "\n".join(lines)
+
+
 class ChatMessage(BaseModel):
     message: str
     history: Optional[list[dict]] = []
 
 
 @router.post("/chat")
-async def trip_chat(request: ChatMessage):
+async def trip_chat(
+    request: Request,
+    body: ChatMessage,
+    db: Session = Depends(get_db)
+):
     """
     AI-powered conversational trip planning chatbot.
     Supports multi-turn conversation with history.
     """
     try:
+        print(f"[CHAT DEBUG] Headers: {dict(request.headers)}")
+        print(f"[CHAT DEBUG] Cookies: {dict(request.cookies)}")
+        
+        user_context = None
+        opt_user = get_optional_user(request)
+        print(f"[CHAT DEBUG] Resolved opt_user: {opt_user}")
+        
+        if opt_user:
+            user_context = build_user_context(int(opt_user["user_id"]), db)
+            print(f"[CHAT DEBUG] Compiled context size: {len(user_context)} characters")
+            
         result = await chat_with_roadbuddy(
-            message=request.message,
-            history=request.history,
+            message=body.message,
+            history=body.history,
+            user_context=user_context,
         )
         return result
     except RuntimeError as e:
+        print(f"[CHAT DEBUG] Error in chat: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 class SafetyCheckRequest(BaseModel):
     origin: str

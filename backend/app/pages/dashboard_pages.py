@@ -214,6 +214,22 @@ def trip_itinerary_page(trip_id: int, request: Request, db: Session = Depends(ge
         TripStop.trip_id == trip.id
     ).order_by(TripStop.day, TripStop.time_slot).all()
 
+    from app.models.models import HotelBooking, Hotel
+    booked_hotel = db.query(HotelBooking).join(Hotel).filter(
+        HotelBooking.user_id == user.id,
+        HotelBooking.status == "confirmed",
+        Hotel.city.ilike(f"%{trip.destination}%")
+    ).first()
+
+    booked_hotel_dict = None
+    if booked_hotel:
+        booked_hotel_dict = {
+            "hotel_name": booked_hotel.hotel.name,
+            "check_in_date": booked_hotel.check_in_date,
+            "check_out_date": booked_hotel.check_out_date,
+            "num_rooms": booked_hotel.num_rooms
+        }
+
     token = request.cookies.get("access_token")
     has_unread_bookings = check_unread_bookings(user, db)
     
@@ -221,7 +237,8 @@ def trip_itinerary_page(trip_id: int, request: Request, db: Session = Depends(ge
         "user": user,
         "trip": trip,
         "token": token,
-        "has_unread_bookings": has_unread_bookings
+        "has_unread_bookings": has_unread_bookings,
+        "booked_hotel": booked_hotel_dict
     })
 
 
@@ -359,13 +376,59 @@ def my_bookings_page(request: Request, db: Session = Depends(get_db)):
     if unread:
         db.commit()
 
-    bookings = db.query(ProviderBooking).filter(
+    cab_bookings = db.query(ProviderBooking).filter(
         ProviderBooking.user_id == user.id
-    ).order_by(ProviderBooking.created_at.desc()).all()
+    ).all()
+
+    from app.models.models import Booking
+    from app.services.transport_service import get_transport_option_by_id
+
+    transit_bookings = db.query(Booking).filter(
+        Booking.user_id == user.id
+    ).all()
+
+    for b in transit_bookings:
+        opt = get_transport_option_by_id(b.transport_option_id, db)
+        mode = None
+        operator = None
+        origin = None
+        destination = None
+        if opt:
+            mode = opt.mode
+            operator = opt.operator
+            origin = opt.origin
+            destination = opt.destination
+        else:
+            try:
+                parts = b.transport_option_id.split("_")
+                mode = parts[0]
+            except Exception:
+                pass
+        b.mode = mode
+        b.transport_option_operator = operator
+        b.origin = origin
+        b.destination = destination
+        b.is_transit = True
+
+    from app.models.models import HotelBooking
+    hotel_bookings = db.query(HotelBooking).filter(
+        HotelBooking.user_id == user.id
+    ).all()
+
+    for h in hotel_bookings:
+        h.is_hotel = True
+        h.hotel_name = h.hotel.name
+        h.hotel_city = h.hotel.city
+        h.hotel_address = h.hotel.address
+        h.total_fare_inr = h.total_price_inr
+        h.travel_date = h.check_in_date
+
+    all_bookings = list(cab_bookings) + list(transit_bookings) + list(hotel_bookings)
+    all_bookings.sort(key=lambda x: x.created_at, reverse=True)
 
     return templates.TemplateResponse(request, "my_bookings.html", {
         "user": user,
-        "bookings": bookings,
+        "bookings": all_bookings,
         "has_unread_bookings": False
     })
 
@@ -394,6 +457,74 @@ def cancel_booking(booking_id: int, request: Request, db: Session = Depends(get_
             else:
                 vehicle.seats_booked = max(vehicle.seats_booked - booking.num_seats, 0)
         
+        db.commit()
+
+    return RedirectResponse("/my-bookings", status_code=303)
+
+
+@router.post("/cancel-transit-booking/{booking_id}")
+def cancel_transit_booking(booking_id: int, request: Request, db: Session = Depends(get_db)):
+    user = get_user_from_cookie(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=303)
+
+    from app.models.models import Booking
+    booking = db.query(Booking).filter(
+        Booking.id == booking_id,
+        Booking.user_id == user.id
+    ).first()
+
+    if booking and booking.status != "cancelled":
+        booking.status = "cancelled"
+        
+        # Decrement seat count in the database
+        try:
+            parts = booking.transport_option_id.split("_")
+            mode = parts[0]
+            item_id = int(parts[1])
+            if mode == "bus":
+                from app.models.models import Bus
+                bus = db.query(Bus).filter(Bus.id == item_id).first()
+                if bus:
+                    bus.seats_booked = max(bus.seats_booked - 1, 0)
+            elif mode == "train":
+                from app.models.models import Train
+                train = db.query(Train).filter(Train.id == item_id).first()
+                if train:
+                    train.seats_booked = max(train.seats_booked - 1, 0)
+            elif mode == "flight":
+                from app.models.models import Flight
+                flight = db.query(Flight).filter(Flight.id == item_id).first()
+                if flight:
+                    flight.seats_booked = max(flight.seats_booked - 1, 0)
+        except Exception:
+            pass
+            
+        db.commit()
+
+    return RedirectResponse("/my-bookings", status_code=303)
+
+
+@router.post("/cancel-hotel-booking/{booking_id}")
+def cancel_hotel_booking(booking_id: int, request: Request, db: Session = Depends(get_db)):
+    user = get_user_from_cookie(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=303)
+
+    from app.models.models import HotelBooking, Hotel
+    booking = db.query(HotelBooking).filter(
+        HotelBooking.id == booking_id,
+        HotelBooking.user_id == user.id
+    ).first()
+
+    if booking and booking.status != "cancelled":
+        booking.status = "cancelled"
+        
+        # Decrement rooms booked in the hotel
+        hotel = db.query(Hotel).filter(Hotel.id == booking.hotel_id).first()
+        if hotel:
+            hotel.rooms_booked = max(hotel.rooms_booked - booking.num_rooms, 0)
+            
         db.commit()
 
     return RedirectResponse("/my-bookings", status_code=303)

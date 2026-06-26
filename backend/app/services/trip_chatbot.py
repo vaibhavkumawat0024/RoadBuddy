@@ -19,11 +19,103 @@ Rules:
 - Break down budget (fuel + hotel + food + toll)
 - Keep responses under 300 words
 - Use 1-2 emojis per response
-- Mention real place names only"""
+- Mention real place names only
+- When explaining hotel or transport bookings, always explicitly tell the user what amenities or complimentary items they will get (such as complimentary meals, welcome drinks, WiFi, baggage, charging ports, blankets) and detail the intermediate stops of the transport (where it will stop and for how much time).
+- If the user's message is not relevant to trips, travel, highways, routing, vehicles, dhabas, hotels, or RoadBuddy, you MUST answer EXACTLY: "I am RoadBuddy AI, your road trip assistant. Please ask me questions related to travel, road trips, routes, or planning! 🚗" and nothing else."""
+
+DEFAULT_REJECTION_MESSAGE = "I am RoadBuddy AI, your road trip assistant. Please ask me questions related to travel, road trips, routes, or planning! 🚗"
+
+def is_relevant_query(message: str) -> bool:
+    message_lower = message.lower().strip()
+    
+    # Allow greetings, thanks, and bot/user identity questions
+    allowed_greetings = {"hi", "hello", "hey", "hola", "namaste", "thanks", "thank you", "help", "who are you", "what is your name", "what can you do", "who am i", "my name"}
+    if message_lower in allowed_greetings or any(g in message_lower for g in ["how are you", "who are you", "what can you", "what is your name", "who am i", "my name", "my booking", "my ticket", "my stay", "my profile"]):
+        return True
+        
+    # Travel and RoadBuddy keywords
+    keywords = [
+        "trip", "travel", "road", "route", "highway", "nh-", "nh ", "hotel", "dhaba", "restaurant", "food", 
+        "fuel", "toll", "cost", "budget", "price", "km", "mile", "car", "bike", "vehicle", "cab", "bus", 
+        "train", "flight", "destination", "origin", "map", "navigate", "navigation", "compass", "itinerary", 
+        "pack", "weather", "booking", "tourist", "visit", "attraction", "sightseeing", "driver", "passenger", 
+        "seat", "stay", "room", "city", "state", "india", "ticket", "planner", "buddy", "drive", "ride",
+        "himalay", "goa", "jaipur", "udaipur", "delhi", "mumbai", "manali", "tour", "place", "location", "distance",
+        "gas", "petrol", "diesel", "ev ", "charging"
+    ]
+    return any(kw in message_lower for kw in keywords)
 
 
-def mock_chat_response(message: str) -> str:
+def mock_chat_response(message: str, user_context: str = None) -> str:
     message_lower = message.lower()
+    
+    if user_context and any(word in message_lower for word in ["booking", "bookings", "hotel", "bus", "train", "flight", "cab", "transit", "reservation", "ticket"]):
+        lines = [line.strip() for line in user_context.split("\n") if line.strip()]
+        bookings = [line for line in lines if "booking" in line.lower() or "transit" in line.lower()]
+        
+        # Filter for specific modes if asked
+        for mode in ["hotel", "bus", "train", "flight", "cab", "transit"]:
+            if mode in message_lower:
+                bookings = [b for b in bookings if mode.lower() in b.lower()]
+                
+        if bookings:
+            # Check if specifically asking about stops/duration or complimentary/meals
+            is_stops_query = any(w in message_lower for w in ["stop", "stops", "duration", "time", "where", "how long"])
+            is_comp_query = any(w in message_lower for w in ["complimentary", "free", "meal", "meals", "amenities", "wifi", "include", "inclusions"])
+            
+            resp_lines = []
+            for b in bookings:
+                if is_stops_query:
+                    # extract stops if present
+                    if "stops" in b.lower():
+                        parts = b.split(". ")
+                        stop_part = [p for p in parts if "stops" in p.lower()]
+                        if stop_part:
+                            resp_lines.append(f"📍 {stop_part[0]}")
+                        else:
+                            resp_lines.append(b)
+                    else:
+                        resp_lines.append(b)
+                elif is_comp_query:
+                    # extract complimentary if present
+                    if "complimentary" in b.lower() or "amenities" in b.lower():
+                        parts = b.split(". ")
+                        comp_part = [p for p in parts if "complimentary" in p.lower() or "amenities" in p.lower()]
+                        if comp_part:
+                            resp_lines.append(f"🎁 {'. '.join(comp_part)}")
+                        else:
+                            resp_lines.append(b)
+                    else:
+                        resp_lines.append(b)
+                else:
+                    resp_lines.append(b)
+                    
+            return "📋 Here are your active booking details:\n" + "\n".join(resp_lines)
+        else:
+            return "🔍 I checked your profile, but you don't have any active bookings yet! Let me know if you want to book one. 🚗"
+            
+    if user_context and any(word in message_lower for word in ["my name", "who am i", "my email", "profile", "my details", "what is my name"]):
+        lines = [line.strip() for line in user_context.split("\n") if line.strip()]
+        user_lines = [line for line in lines if "user name:" in line.lower() or "user email:" in line.lower()]
+        if user_lines:
+            return "👤 Here are your profile details:\n" + "\n".join([f"- {l}" for l in user_lines])
+            
+    if user_context and any(word in message_lower for word in ["vehicle", "vehicles", "car", "bike"]):
+        lines = [line.strip() for line in user_context.split("\n") if line.strip()]
+        veh_lines = [line for line in lines if "vehicle:" in line.lower()]
+        if veh_lines:
+            return "🚗 Here are your registered vehicles:\n" + "\n".join([f"{v}" for v in veh_lines])
+        else:
+            return "🔍 I checked your profile, but you don't have any registered vehicles yet! You can add one under My Vehicles. 🚗"
+            
+    if user_context and any(word in message_lower for word in ["trip", "trips", "itinerary"]):
+        lines = [line.strip() for line in user_context.split("\n") if line.strip()]
+        trip_lines = [line for line in lines if "trip:" in line.lower()]
+        if trip_lines:
+            return "🗺️ Here are your active trips:\n" + "\n".join([f"{t}" for t in trip_lines])
+        else:
+            return "🔍 I checked your profile, but you don't have any active trips yet! Let's plan one. 🚗"
+
     if any(word in message_lower for word in ["jaipur", "rajasthan"]):
         return ("🏰 Jaipur is a fantastic base for road trips! From Jaipur you can reach Ajmer (135 km via NH-48), "
                 "Udaipur (393 km via NH-48), Ranthambore (180 km via NH-52). "
@@ -42,9 +134,12 @@ def mock_chat_response(message: str) -> str:
                 "Try: 'Plan a 3-day trip from Jaipur to Udaipur for 2 people' 😊")
 
 
-async def call_groq_chat(messages: list[dict]) -> str:
+async def call_groq_chat(messages: list[dict], user_context: str = None) -> str:
     headers = {"Authorization": f"Bearer {settings.groq_api_key}", "Content-Type": "application/json"}
-    groq_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    sys_prompt = SYSTEM_PROMPT
+    if user_context:
+        sys_prompt += f"\n\n[USER CONTEXT]\nThe user is logged in. Use this context to answer questions about their name, profile, registered vehicles, active trips, and booking details (hotels, buses, trains, flights, cabs, transits). Be specific and match their queries with these details:\n{user_context}"
+    groq_messages = [{"role": "system", "content": sys_prompt}]
     for msg in messages:
         groq_messages.append({"role": msg["role"], "content": msg["content"]})
     payload = {"model": GROQ_MODEL, "messages": groq_messages, "temperature": 0.8, "max_tokens": 1000}
@@ -56,7 +151,7 @@ async def call_groq_chat(messages: list[dict]) -> str:
         return res.json()["choices"][0]["message"]["content"].strip()
 
 
-async def chat_with_roadbuddy(message: str, history: list[dict] = None) -> dict:
+async def chat_with_roadbuddy(message: str, history: list[dict] = None, user_context: str = None) -> dict:
     try:
         raw_history = history or []
         # Filter to reject any role other than user/assistant (prevents system prompt injection)
@@ -64,15 +159,21 @@ async def chat_with_roadbuddy(message: str, history: list[dict] = None) -> dict:
         # Apply sliding window of last 10 messages (5 turns)
         truncated_history = filtered_history[-10:]
         
+        # Guard clause for irrelevant queries
+        if not is_relevant_query(message):
+            response_text = DEFAULT_REJECTION_MESSAGE
+            updated_history = truncated_history + [{"role": "user", "content": message}, {"role": "assistant", "content": response_text}]
+            return {"response": response_text, "history": updated_history, "total_messages": len(updated_history)}
+            
         messages = truncated_history + [{"role": "user", "content": message}]
         if settings.groq_api_key:
             try:
-                response_text = await call_groq_chat(messages)
+                response_text = await call_groq_chat(messages, user_context)
             except Exception as e:
                 print(f"Groq chat failed: {e}. Falling back to mock chat response.")
-                response_text = mock_chat_response(message)
+                response_text = mock_chat_response(message, user_context)
         else:
-            response_text = mock_chat_response(message)
+            response_text = mock_chat_response(message, user_context)
         updated_history = messages + [{"role": "assistant", "content": response_text}]
         return {"response": response_text, "history": updated_history, "total_messages": len(updated_history)}
     except Exception as e:

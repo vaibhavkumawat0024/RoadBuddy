@@ -17,13 +17,15 @@ router = APIRouter()
 @router.post("/search", response_model=list[TransportOption])
 def search(
     data: TransportSearch,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """Search available buses, trains or flights."""
     results = search_transport(
         origin=data.origin,
         destination=data.destination,
         mode=data.mode,
+        db=db
     )
     if not results:
         raise HTTPException(
@@ -45,7 +47,7 @@ def book_ticket(
     Book a transport ticket.
     include_return is optional — False by default.
     """
-    option = get_transport_option_by_id(data.transport_option_id)
+    option = get_transport_option_by_id(data.transport_option_id, db)
     if not option:
         raise HTTPException(status_code=404, detail="Transport option not found")
 
@@ -54,6 +56,39 @@ def book_ticket(
             status_code=400,
             detail="return_date is required when include_return is True"
         )
+
+    # Lock and update seat count in DB
+    try:
+        parts = data.transport_option_id.split("_")
+        mode = parts[0]
+        item_id = int(parts[1])
+    except (ValueError, IndexError):
+        raise HTTPException(status_code=400, detail="Invalid transport option ID format")
+
+    if mode == "bus":
+        from app.models.models import Bus
+        bus = db.query(Bus).filter(Bus.id == item_id).with_for_update().first()
+        if not bus:
+            raise HTTPException(status_code=404, detail="Bus not found")
+        if bus.seats_available < 1:
+            raise HTTPException(status_code=400, detail="No seats available on this bus")
+        bus.seats_booked += 1
+    elif mode == "train":
+        from app.models.models import Train
+        train = db.query(Train).filter(Train.id == item_id).with_for_update().first()
+        if not train:
+            raise HTTPException(status_code=404, detail="Train not found")
+        if train.seats_available < 1:
+            raise HTTPException(status_code=400, detail="No seats available on this train")
+        train.seats_booked += 1
+    elif mode == "flight":
+        from app.models.models import Flight
+        flight = db.query(Flight).filter(Flight.id == item_id).with_for_update().first()
+        if not flight:
+            raise HTTPException(status_code=404, detail="Flight not found")
+        if flight.seats_available < 1:
+            raise HTTPException(status_code=400, detail="No seats available on this flight")
+        flight.seats_booked += 1
 
     fare = calculate_total_fare(
         going_fare=option.fare_inr,
@@ -102,27 +137,93 @@ def my_bookings(
     db: Session = Depends(get_db)
 ):
     """Get all bookings for the logged in user."""
+    from app.models.models import HotelBooking
+    
+    uid = int(current_user["user_id"])
+    
     bookings = db.query(Booking).filter(
-        Booking.user_id == int(current_user["user_id"])
+        Booking.user_id == uid
     ).all()
 
-    return [
-        BookingOut(
-            id                  = str(b.id),
-            user_id             = str(b.user_id),
-            transport_option_id = b.transport_option_id,
-            passenger_name      = b.passenger_name,
-            travel_date         = b.travel_date,
-            include_return      = b.include_return,
-            return_date         = b.return_date,
-            going_fare_inr      = b.going_fare_inr,
-            return_fare_inr     = b.return_fare_inr,
-            total_fare_inr      = b.total_fare_inr,
-            status              = b.status,
-            created_at          = str(b.created_at),
+    hotel_bookings = db.query(HotelBooking).filter(
+        HotelBooking.user_id == uid
+    ).all()
+
+    results = []
+    
+    # 1. Add transit bookings
+    for b in bookings:
+        opt = get_transport_option_by_id(b.transport_option_id, db)
+        mode = None
+        operator = None
+        origin = None
+        destination = None
+        if opt:
+            mode = opt.mode
+            operator = opt.operator
+            origin = opt.origin
+            destination = opt.destination
+        else:
+            try:
+                parts = b.transport_option_id.split("_")
+                mode = parts[0]
+            except Exception:
+                pass
+
+        results.append(
+            BookingOut(
+                id                  = str(b.id),
+                user_id             = str(b.user_id),
+                transport_option_id = b.transport_option_id,
+                passenger_name      = b.passenger_name,
+                travel_date         = b.travel_date,
+                include_return      = b.include_return,
+                return_date         = b.return_date,
+                going_fare_inr      = b.going_fare_inr,
+                return_fare_inr     = b.return_fare_inr,
+                total_fare_inr      = b.total_fare_inr,
+                status              = b.status,
+                created_at          = str(b.created_at),
+                mode                = mode,
+                transport_option_operator = operator,
+                origin              = origin,
+                destination         = destination,
+            )
         )
-        for b in bookings
-    ]
+
+    # 2. Add hotel bookings
+    for h in hotel_bookings:
+        results.append(
+            BookingOut(
+                id                  = f"hotel_{h.id}",
+                user_id             = str(h.user_id),
+                transport_option_id = f"hotel_{h.hotel_id}",
+                passenger_name      = "Self",
+                travel_date         = h.check_in_date,
+                include_return      = False,
+                return_date         = h.check_out_date,
+                going_fare_inr      = h.total_price_inr,
+                return_fare_inr     = 0.0,
+                total_fare_inr      = h.total_price_inr,
+                status              = h.status,
+                created_at          = str(h.created_at),
+                mode                = None,
+                transport_option_operator = None,
+                origin              = h.hotel.city,
+                destination         = h.hotel.city,
+                hotel_name          = h.hotel.name,
+                hotel_city          = h.hotel.city,
+                check_in_date       = h.check_in_date,
+                check_out_date      = h.check_out_date,
+                num_guests          = h.num_guests,
+                num_rooms           = h.num_rooms,
+                total_price_inr     = h.total_price_inr,
+            )
+        )
+
+    # Sort combined bookings by created_at desc
+    results.sort(key=lambda x: x.created_at, reverse=True)
+    return results
 
 
 # ── Cancel Booking ────────────────────────────────────────────────────────────

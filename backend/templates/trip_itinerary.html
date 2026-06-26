@@ -169,7 +169,403 @@
           </a>
         </div>
       </section>
+
+      <!-- Hotel Booking Section -->
+      <section class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6 text-left mt-6">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-3">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-emerald-600">hotel</span>
+            <h3 class="font-bold text-slate-800 text-base">Available Hotels</h3>
+          </div>
+          <!-- Tabs Navigation -->
+          <div class="flex bg-slate-100 p-1 rounded-lg text-xs font-semibold">
+            <button id="tab-dest-btn" onclick="switchHotelTab('dest')" class="px-3 py-1.5 rounded-md bg-white text-slate-800 shadow-sm transition-all">
+              Destination Hotels
+            </button>
+            <button id="tab-route-btn" onclick="switchHotelTab('route')" class="px-3 py-1.5 rounded-md text-slate-500 hover:text-slate-800 transition-all ml-1">
+              Route & Origin Hotels
+            </button>
+          </div>
+        </div>
+
+        <!-- Hotels Container -->
+        <div id="hotels-container" class="space-y-4">
+          <div class="text-center py-6 text-slate-400 text-xs">
+            Loading hotels...
+          </div>
+        </div>
+      </section>
     </div>
   </div>
 </div>
+
+<!-- Hotel Booking Modal -->
+<div id="hotel-booking-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+  <div id="hotel-booking-modal-card" class="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md w-full overflow-hidden text-left animate-fade-in-up">
+    <!-- Header -->
+    <div class="bg-slate-900 text-white p-6 relative">
+      <h3 class="text-xl font-bold" id="modal-hotel-name">Book Hotel Room</h3>
+      <p class="text-white/70 text-xs mt-1" id="modal-hotel-price">Price / Night</p>
+      <button onclick="closeBookModal()" class="absolute top-6 right-6 text-white/70 hover:text-white">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    
+    <!-- Form -->
+    <form onsubmit="submitHotelBooking(event)" class="p-6 space-y-4">
+      <input type="hidden" id="modal-hotel-id">
+      
+      <div>
+        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Guest Name</label>
+        <input type="text" value="{{ user.name if user else 'Self' }}" readonly class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-700 focus:outline-none">
+      </div>
+      
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Check-in Date</label>
+          <input type="date" id="modal-checkin" required onchange="calculateTotal()" class="w-full border border-slate-200 rounded-lg p-2.5 text-xs text-slate-700 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Check-out Date</label>
+          <input type="date" id="modal-checkout" required onchange="calculateTotal()" class="w-full border border-slate-200 rounded-lg p-2.5 text-xs text-slate-700 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500">
+        </div>
+      </div>
+      
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Rooms</label>
+          <input type="number" id="modal-rooms" value="1" min="1" required onchange="calculateTotal()" class="w-full border border-slate-200 rounded-lg p-2.5 text-xs text-slate-700 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Guests</label>
+          <input type="number" id="modal-guests" value="1" min="1" required class="w-full border border-slate-200 rounded-lg p-2.5 text-xs text-slate-700 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500">
+        </div>
+      </div>
+      
+      <!-- Fare summary -->
+      <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-4 flex justify-between items-center">
+        <div>
+          <span class="text-[10px] text-emerald-800 font-bold uppercase tracking-wider block">Estimated Total Price</span>
+          <span class="text-xs text-emerald-600">Calculated based on selection</span>
+        </div>
+        <strong id="modal-total-price" class="text-lg font-bold text-emerald-700">₹0</strong>
+      </div>
+      
+      <div class="flex gap-3 pt-2">
+        <button type="button" onclick="closeBookModal()" class="w-1/2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs py-3 rounded-lg transition-all">
+          Cancel
+        </button>
+        <button type="submit" id="modal-submit-btn" class="w-1/2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs py-3 rounded-lg transition-all shadow-sm">
+          Confirm Booking
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  const IS_BACKEND = true;
+  const bookedHotel = {% if booked_hotel %} {
+    hotel_name: "{{ booked_hotel.hotel_name | replace('"', '\\"') }}",
+    check_in_date: "{{ booked_hotel.check_in_date }}",
+    check_out_date: "{{ booked_hotel.check_out_date }}",
+    num_rooms: {{ booked_hotel.num_rooms }}
+  } {% else %} null {% endif %};
+  const knownHotelCities = ["Jodhpur", "Shimla", "Manali", "Chennai", "Agra", "Kolkata", "Jaipur", "Goa", "Udaipur", "Delhi", "Hyderabad", "Bangalore", "Pune", "Mumbai"];
+  
+  const destinationCity = "{{ trip.destination }}".trim();
+  const originCity = "{{ trip.origin }}".trim();
+  const tripStartDate = "{{ trip.start_date }}";
+  const tripEndDate = "{{ trip.end_date }}";
+  const stops = [
+    {% for s in trip.stops %}
+      "{{ s.place_name }}",
+    {% endfor %}
+  ];
+
+  const knownCitiesLower = knownHotelCities.map(c => c.toLowerCase());
+  
+  // Find destination matching city
+  let matchedDestinationCity = "";
+  const destLower = destinationCity.toLowerCase();
+  for (const kc of knownHotelCities) {
+    if (destLower.includes(kc.toLowerCase()) || kc.toLowerCase().includes(destLower)) {
+      matchedDestinationCity = kc;
+      break;
+    }
+  }
+  
+  // Find route and origin matching cities
+  const matchedRouteCities = new Set();
+  const originLower = originCity.toLowerCase();
+  for (const kc of knownHotelCities) {
+    if (originLower.includes(kc.toLowerCase()) || kc.toLowerCase().includes(originLower)) {
+      matchedRouteCities.add(kc);
+    }
+  }
+  for (const stopName of stops) {
+    const stopLower = stopName.toLowerCase();
+    for (const kc of knownHotelCities) {
+      if (stopLower.includes(kc.toLowerCase()) || kc.toLowerCase().includes(stopLower)) {
+        matchedRouteCities.add(kc);
+      }
+    }
+  }
+  if (matchedDestinationCity) {
+    matchedRouteCities.delete(matchedDestinationCity);
+  }
+  const routeCitiesArray = Array.from(matchedRouteCities);
+
+  let activeHotelTab = 'dest';
+  let destinationHotels = [];
+  let routeHotels = [];
+  let currentSelectedHotel = null;
+
+  async function fetchHotelsForCity(cityName) {
+    try {
+      const url = "/api/booking/hotels/search";
+      const headers = { "Content-Type": "application/json" };
+      if ("{{ token }}") {
+        headers["Authorization"] = "{{ token }}".startsWith("Bearer ") ? "{{ token }}" : "Bearer {{ token }}";
+      }
+      const res = await fetch(url, {
+        method: "POST",
+        headers: headers,
+        body: JSON.stringify({
+          city: cityName,
+          num_rooms: 1,
+          num_guests: 1
+        })
+      });
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (err) {
+      console.error("Error fetching hotels for " + cityName, err);
+      return [];
+    }
+  }
+
+  async function loadAllHotels() {
+    const container = document.getElementById('hotels-container');
+    container.innerHTML = '<div class="text-center py-6 text-slate-400 text-xs">Loading hotels...</div>';
+    
+    try {
+      if (matchedDestinationCity) {
+        destinationHotels = await fetchHotelsForCity(matchedDestinationCity);
+      }
+      
+      if (routeCitiesArray.length > 0) {
+        const routePromises = routeCitiesArray.map(city => fetchHotelsForCity(city));
+        const routeResults = await Promise.all(routePromises);
+        routeHotels = routeResults.flat();
+      }
+    } catch (err) {
+      console.error("Error loading hotels:", err);
+    }
+    
+    renderHotels();
+  }
+
+  function renderHotels() {
+    const container = document.getElementById('hotels-container');
+    
+    if (activeHotelTab === 'dest' && bookedHotel) {
+      container.innerHTML = `
+        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-6 text-center space-y-3">
+          <div class="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto text-xl">
+            🏨
+          </div>
+          <div class="space-y-1">
+            <h4 class="font-bold text-slate-800 text-base">Your hotel is booked!</h4>
+            <p class="text-xs text-slate-500">
+              You have a confirmed stay at <strong>${bookedHotel.hotel_name}</strong> in ${destinationCity}.
+            </p>
+          </div>
+          <div class="text-xs text-slate-600 space-y-1 border-t border-emerald-100 pt-3 max-w-xs mx-auto">
+            <div>📅 Check-in: <strong>${bookedHotel.check_in_date}</strong></div>
+            <div>📅 Check-out: <strong>${bookedHotel.check_out_date}</strong></div>
+            <div>🛏️ Rooms: <strong>${bookedHotel.num_rooms} Room(s)</strong></div>
+          </div>
+        </div>
+      `;
+      return;
+    }
+    
+    const hotels = activeHotelTab === 'dest' ? destinationHotels : routeHotels;
+    
+    if (hotels.length === 0) {
+      const tabName = activeHotelTab === 'dest' ? 'destination' : 'route/origin';
+      container.innerHTML = `<div class="text-center py-8 text-slate-500 text-xs italic">No hotels available along your ${tabName} route.</div>`;
+      return;
+    }
+    
+    let html = '';
+    hotels.forEach(hotel => {
+      const rating = '★'.repeat(hotel.star_rating) + '☆'.repeat(5 - hotel.star_rating);
+      const amenitiesList = hotel.amenities ? (typeof hotel.amenities === 'string' ? hotel.amenities.split(',') : hotel.amenities) : [];
+      const amenitiesHtml = amenitiesList.map(a => `<span class="bg-slate-100 text-slate-600 text-[10px] font-semibold px-2 py-0.5 rounded-full">${a.trim()}</span>`).join(' ');
+      
+      html += `
+        <div class="bg-white border border-slate-200 rounded-xl p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:shadow-md transition-all">
+          <div class="space-y-1 text-left">
+            <div class="flex items-center gap-2 flex-wrap">
+              <strong class="text-sm text-slate-800">${hotel.name}</strong>
+              <span class="text-xs text-amber-500">${rating}</span>
+            </div>
+            <p class="text-xs text-slate-500">📍 ${hotel.address}, ${hotel.city}</p>
+            <div class="flex flex-wrap gap-1 mt-2">${amenitiesHtml}</div>
+          </div>
+          <div class="flex md:flex-col items-end justify-between w-full md:w-auto border-t md:border-t-0 border-slate-100 pt-3 md:pt-0">
+            <div class="text-left md:text-right">
+              <span class="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Price Per Night</span>
+              <strong class="text-base font-extrabold text-emerald-600">₹${hotel.price_per_night_inr.toLocaleString('en-IN')}</strong>
+            </div>
+            <button onclick='openBookModal(${JSON.stringify(hotel).replace(/'/g, "&#39;")})' class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-all active:scale-95 duration-100 mt-2">
+              Book Room
+            </button>
+          </div>
+        </div>
+      `;
+    });
+    
+    container.innerHTML = html;
+  }
+
+  function switchHotelTab(tab) {
+    activeHotelTab = tab;
+    const destBtn = document.getElementById('tab-dest-btn');
+    const routeBtn = document.getElementById('tab-route-btn');
+    
+    if (tab === 'dest') {
+      destBtn.className = 'px-3 py-1.5 rounded-md bg-white text-slate-800 shadow-sm transition-all';
+      routeBtn.className = 'px-3 py-1.5 rounded-md text-slate-500 hover:text-slate-800 transition-all ml-1';
+    } else {
+      routeBtn.className = 'px-3 py-1.5 rounded-md bg-white text-slate-800 shadow-sm transition-all ml-1';
+      destBtn.className = 'px-3 py-1.5 rounded-md text-slate-500 hover:text-slate-800 transition-all';
+    }
+    
+    renderHotels();
+  }
+
+  function openBookModal(hotel) {
+    currentSelectedHotel = hotel;
+    document.getElementById('modal-hotel-name').textContent = hotel.name;
+    document.getElementById('modal-hotel-price').textContent = '₹' + hotel.price_per_night_inr.toLocaleString('en-IN') + ' / night';
+    document.getElementById('modal-hotel-id').value = hotel.id;
+    
+    const checkInInput = document.getElementById('modal-checkin');
+    const checkOutInput = document.getElementById('modal-checkout');
+    
+    if (tripStartDate) {
+      checkInInput.value = tripStartDate;
+    } else {
+      const today = new Date();
+      checkInInput.value = today.toISOString().split('T')[0];
+    }
+    
+    if (tripEndDate) {
+      checkOutInput.value = tripEndDate;
+    } else {
+      const checkInDate = new Date(checkInInput.value);
+      const tomorrow = new Date(checkInDate);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      checkOutInput.value = tomorrow.toISOString().split('T')[0];
+    }
+    
+    calculateTotal();
+    document.getElementById('hotel-booking-modal').classList.remove('hidden');
+    document.getElementById('hotel-booking-modal').classList.add('flex');
+    
+    // Reset modal internal scroll position
+    document.getElementById('hotel-booking-modal').scrollTop = 0;
+
+    // Smooth scroll page to center the hotel booking card exactly where user can fill details
+    setTimeout(() => {
+      const card = document.getElementById('hotel-booking-modal-card');
+      if (card) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      const checkin = document.getElementById('modal-checkin');
+      if (checkin) checkin.focus();
+    }, 100);
+  }
+
+  function closeBookModal() {
+    document.getElementById('hotel-booking-modal').classList.add('hidden');
+    document.getElementById('hotel-booking-modal').classList.remove('flex');
+    currentSelectedHotel = null;
+  }
+
+  function calculateTotal() {
+    if (!currentSelectedHotel) return;
+    const checkIn = new Date(document.getElementById('modal-checkin').value);
+    const checkOut = new Date(document.getElementById('modal-checkout').value);
+    const rooms = parseInt(document.getElementById('modal-rooms').value) || 1;
+    
+    if (isNaN(checkIn.getTime()) || isNaN(checkOut.getTime()) || checkOut <= checkIn) {
+      document.getElementById('modal-total-price').textContent = '₹0';
+      document.getElementById('modal-submit-btn').disabled = true;
+      return;
+    }
+    
+    document.getElementById('modal-submit-btn').disabled = false;
+    const nights = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
+    const totalPrice = currentSelectedHotel.price_per_night_inr * rooms * nights;
+    
+    document.getElementById('modal-total-price').textContent = '₹' + totalPrice.toLocaleString('en-IN');
+  }
+
+  async function submitHotelBooking(event) {
+    event.preventDefault();
+    const hotelId = parseInt(document.getElementById('modal-hotel-id').value);
+    const checkIn = document.getElementById('modal-checkin').value;
+    const checkOut = document.getElementById('modal-checkout').value;
+    const rooms = parseInt(document.getElementById('modal-rooms').value) || 1;
+    const guests = parseInt(document.getElementById('modal-guests').value) || 1;
+    
+    const submitBtn = document.getElementById('modal-submit-btn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Booking...';
+    
+    try {
+      const url = "/api/booking/hotels/book";
+      const headers = { "Content-Type": "application/json" };
+      if ("{{ token }}") {
+        headers["Authorization"] = "{{ token }}".startsWith("Bearer ") ? "{{ token }}" : "Bearer {{ token }}";
+      }
+      
+      const payload = {
+        hotel_id: hotelId,
+        check_in_date: checkIn,
+        check_out_date: checkOut,
+        num_rooms: rooms,
+        num_guests: guests
+      };
+      
+      const res = await fetch(url, {
+        method: "POST",
+        headers: headers,
+        body: JSON.stringify(payload)
+      });
+      
+      if (res.ok) {
+        alert('Hotel booked successfully!');
+        closeBookModal();
+        window.location.reload();
+      } else {
+        const err = await res.json();
+        alert('Error booking hotel: ' + (err.detail || 'Unknown error'));
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Confirm Booking';
+      }
+    } catch (err) {
+      console.error('Error booking hotel:', err);
+      alert('Failed to submit booking request.');
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Confirm Booking';
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', loadAllHotels);
+</script>
 {% endblock %}
