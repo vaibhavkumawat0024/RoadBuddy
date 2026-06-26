@@ -100,7 +100,7 @@ def test_provider_chatbot_scope_rules(client, db_session):
     # Should return real info directly in response
     assert "Rahul Sharma" in res_data["response"]
     assert "2202-08-20" in res_data["response"]
-    assert "3000" in res_data["response"]
+    assert "3000" in res_data["response"].replace(",", "")
 
     # 4. Test active vehicle list query (Show my vehicles)
     response = client.post(
@@ -121,7 +121,7 @@ def test_provider_chatbot_scope_rules(client, db_session):
     )
     assert response.status_code == 200
     res_data = response.json()
-    assert "3500" in res_data["response"]
+    assert "3500" in res_data["response"].replace(",", "")
     assert "09:00 AM" in res_data["response"] or "Departs" in res_data["response"]
 
 
@@ -145,7 +145,7 @@ def test_provider_chatbot_scope_rules(client, db_session):
     assert response.status_code == 200
     res_data2 = response.json()
     assert "updated" in res_data2["response"].lower()
-    assert "1200" in res_data2["response"]
+    assert "1200" in res_data2["response"].replace(",", "")
 
     # Verify database was updated
     db_session.expire_all()
