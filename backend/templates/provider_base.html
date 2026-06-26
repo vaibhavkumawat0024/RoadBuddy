@@ -8,10 +8,55 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
   <link rel="stylesheet" href="/static/css/style.css">
-  <link rel="stylesheet" href="/static/css/provider.css">
+  <link rel="stylesheet" href="/static/css/provider.css?v=3.3">
 </head>
 <body>
+  <!-- Page level overlays (e.g. backgrounds) -->
+  {% block page_overlay %}{% endblock %}
+
+  <!-- Provider Sidebar Backdrop Overlay -->
+  <div class="provider-sidebar-backdrop" id="provider-sidebar-backdrop"></div>
+
+  <!-- Sliding Provider Sidebar Drawer -->
+  <div class="provider-sidebar-menu" id="provider-sidebar-menu">
+    <div class="provider-sidebar-header">
+      <h3>Partner Panel</h3>
+      <button class="provider-sidebar-close" id="provider-sidebar-close" aria-label="Close menu">&times;</button>
+    </div>
+    <div class="provider-sidebar-links">
+      {% if provider %}
+      <a href="/provider/dashboard" class="provider-sidebar-link">
+        <span class="material-symbols-outlined">dashboard</span>
+        <span>Dashboard</span>
+      </a>
+      {% if provider.company_name %}
+      <a href="/provider/vehicles" class="provider-sidebar-link">
+        <span class="material-symbols-outlined">directions_car</span>
+        <span>My Vehicles</span>
+      </a>
+      <a href="/provider/bookings" class="provider-sidebar-link" id="sidebar-provider-bookings-link" style="position: relative;">
+        <span class="material-symbols-outlined">confirmation_number</span>
+        <span>Bookings</span>
+        {% if has_unread_bookings %}
+        <span class="unread-dot" style="position: absolute; top: 12px; right: 16px; width: 8px; height: 8px; background: #ff4d4f; border-radius: 50%;"></span>
+        {% endif %}
+      </a>
+      <a href="/provider/settings" class="provider-sidebar-link">
+        <span class="material-symbols-outlined">settings</span>
+        <span>Settings</span>
+      </a>
+      {% endif %}
+      <div class="provider-sidebar-divider"></div>
+      <a href="/provider/logout" class="provider-sidebar-link logout-link">
+        <span class="material-symbols-outlined">logout</span>
+        <span>Logout</span>
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
   <nav class="provider-nav">
     <a href="/provider/dashboard" class="provider-brand-logo" style="text-decoration: none; display: flex; align-items: center; gap: 10px;">
       <div class="provider-logo-icon-container" style="position: relative; display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(135deg, #FF6B35, #FF8F5E); box-shadow: 0 4px 10px rgba(255, 107, 53, 0.2); transition: var(--transition);">
@@ -30,23 +75,14 @@
         <span style="font-size: 8px; font-weight: 700; color: #9090b0; text-transform: uppercase; letter-spacing: 0.1em; line-height: 1;">Fleet Manager</span>
       </div>
     </a>
-    <button class="provider-nav-toggle" id="provider-nav-toggle" aria-label="Toggle navigation">
-      <span class="hamburger"></span>
-    </button>
-    <div class="provider-nav-menu" id="provider-nav-menu">
+    <div class="provider-nav-menu" id="provider-nav-menu" style="display: flex; align-items: center; gap: 8px; margin-left: auto;">
       {% if provider %}
-      <a href="/provider/dashboard">Dashboard</a>
-      {% if provider.company_name %}
-      <a href="/provider/vehicles">My Vehicles</a>
-      <a href="/provider/bookings" style="position: relative;" id="nav-provider-bookings-link">
-        Bookings
-        {% if has_unread_bookings %}
-        <span class="unread-dot" style="position: absolute; top: -3px; right: -8px; width: 8px; height: 8px; background: #ff4d4f; border-radius: 50%;"></span>
-        {% endif %}
-      </a>
-      <a href="/provider/settings">Settings</a>
-      {% endif %}
-      <a href="/provider/logout">Logout</a>
+      <a href="/provider/dashboard" class="provider-nav-link-desktop">Dashboard</a>
+      
+      <!-- 3-line Settings Hamburger Button -->
+      <button class="provider-sidebar-toggle" id="provider-sidebar-toggle" aria-label="Toggle settings menu">
+        <span class="material-symbols-outlined">menu</span>
+      </button>
       {% else %}
       <a href="/provider/login">Login</a>
       <a href="/provider/register">Register</a>
@@ -58,6 +94,34 @@
   </main>
 
   {% if provider %}
+  <!-- Floating Action Button for Partner Chatbot -->
+  <button class="provider-chatbot-fab" id="provider-chatbot-fab" aria-label="Open AI Partner Assistant">
+    <span class="material-symbols-outlined">smart_toy</span>
+  </button>
+
+  <!-- Floating Partner Chatbot Widget Panel -->
+  <div class="provider-chatbot-card" id="provider-chatbot-card">
+    <div class="provider-chatbot-header">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="material-symbols-outlined" style="color: #FF6B35; font-size: 20px;">smart_toy</span>
+        <div style="text-align: left;">
+          <div style="font-weight: 700; font-size: 14px; color: #fff; line-height: 1.2;">RoadBuddy Partner AI</div>
+          <div style="font-size: 11px; color: #7878a0; line-height: 1.2;">Your fleet assistant</div>
+        </div>
+      </div>
+      <button class="provider-chatbot-close" id="provider-chatbot-close" aria-label="Minimize assistant">&times;</button>
+    </div>
+    <div class="provider-chat-messages" id="provider-chat-messages">
+      <div class="provider-chat-msg provider-ai-msg">🚐 Hi! I'm RoadBuddy Partner AI. I can guide you on how to list vehicles, check bookings, view earnings, or update settings. How can I help you manage your fleet today? 😊</div>
+    </div>
+    <div class="provider-chat-input-row" style="padding: 12px 16px; border-top: 1px solid rgba(255,255,255,0.06); background: rgba(26,26,48,0.95); display: flex; gap: 8px; align-items: center;">
+      <input type="text" id="provider-chat-input" placeholder="How do I add a vehicle?..." style="flex: 1; padding: 10px 14px; border: 1.5px solid rgba(255,255,255,0.08); border-radius: 12px; font-size: 13px; background: rgba(0,0,0,0.2); color: #fff;" />
+      <button id="provider-chat-send-btn" onclick="sendProviderChat()" style="background: linear-gradient(135deg, #FF6B35, #FF8F5E); color: #fff; border: none; border-radius: 12px; padding: 0 16px; height: 38px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center;">
+        <span class="material-symbols-outlined" style="font-size: 18px;">send</span>
+      </button>
+    </div>
+  </div>
+
   <!-- Real-Time Booking Notifications -->
   <div id="provider-toast-container" style="
     position: fixed;
@@ -620,6 +684,117 @@
         }
       });
 
+      // ── Provider Chatbot Frontend Controller ──
+      let providerChatHistory = [];
+
+      window.toggleProviderChatbot = function() {
+        const card = document.getElementById("provider-chatbot-card");
+        if (card) {
+          card.classList.toggle("active");
+        }
+      };
+
+      // Click event for FAB and Close button
+      document.addEventListener("DOMContentLoaded", () => {
+        const fab = document.getElementById("provider-chatbot-fab");
+        const closeBtn = document.getElementById("provider-chatbot-close");
+        const input = document.getElementById("provider-chat-input");
+
+        if (fab) fab.addEventListener("click", window.toggleProviderChatbot);
+        if (closeBtn) closeBtn.addEventListener("click", window.toggleProviderChatbot);
+        
+        // Handle enter key press on input
+        if (input) {
+          input.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+              sendProviderChat();
+            }
+          });
+        }
+
+        // Close chatbot card on clicking outside
+        document.addEventListener("click", (e) => {
+          const card = document.getElementById("provider-chatbot-card");
+          const fab = document.getElementById("provider-chatbot-fab");
+          if (card && card.classList.contains("active")) {
+            if (!card.contains(e.target) && !fab.contains(e.target)) {
+              card.classList.remove("active");
+            }
+          }
+        });
+      });
+
+      window.sendProviderChat = async function() {
+        const input = document.getElementById("provider-chat-input");
+        const msgContainer = document.getElementById("provider-chat-messages");
+        if (!input || !msgContainer) return;
+
+        const text = input.value.trim();
+        if (!text) return;
+
+        // Clear input
+        input.value = "";
+
+        // Append user message
+        const userMsgDiv = document.createElement("div");
+        userMsgDiv.className = "provider-chat-msg provider-user-msg";
+        userMsgDiv.textContent = text;
+        msgContainer.appendChild(userMsgDiv);
+        msgContainer.scrollTop = msgContainer.scrollHeight;
+
+        // Append thinking indicator
+        const thinkingDiv = document.createElement("div");
+        thinkingDiv.className = "provider-chat-msg provider-ai-msg provider-thinking-msg";
+        thinkingDiv.innerHTML = `<span class="spinner-sm" style="border-top-color:#FF6B35;width:12px;height:12px;display:inline-block;"></span> Analysing...`;
+        msgContainer.appendChild(thinkingDiv);
+        msgContainer.scrollTop = msgContainer.scrollHeight;
+
+        try {
+          const res = await fetch("/api/provider/chat", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              message: text,
+              history: providerChatHistory
+            })
+          });
+
+          if (thinkingDiv.parentNode) thinkingDiv.remove();
+
+          if (res.ok) {
+            const data = await res.json();
+            providerChatHistory = data.history || [];
+            
+            // Append assistant response
+            const aiMsgDiv = document.createElement("div");
+            aiMsgDiv.className = "provider-chat-msg provider-ai-msg";
+            
+            // Render basic markdown/linebreaks safely
+            let formattedText = data.response
+              .replace(/\n/g, "<br/>")
+              .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+            aiMsgDiv.innerHTML = formattedText;
+            
+            msgContainer.appendChild(aiMsgDiv);
+          } else {
+            const errorDiv = document.createElement("div");
+            errorDiv.className = "provider-chat-msg provider-ai-msg";
+            errorDiv.textContent = "⚠️ Error communicating with assistant. Please try again.";
+            msgContainer.appendChild(errorDiv);
+          }
+        } catch (err) {
+          if (thinkingDiv.parentNode) thinkingDiv.remove();
+          const errorDiv = document.createElement("div");
+          errorDiv.className = "provider-chat-msg provider-ai-msg";
+          errorDiv.textContent = "⚠️ Network error. Please check your connection.";
+          msgContainer.appendChild(errorDiv);
+        }
+
+        msgContainer.scrollTop = msgContainer.scrollHeight;
+      };
+
       // Initialize
       async function initRealTimeNotifications() {
         await loadVehicles();
@@ -634,23 +809,40 @@
   </script>
   {% endif %}
   <script>
-    // Provider navigation toggle logic
+    // Provider sidebar drawer logic
     document.addEventListener("DOMContentLoaded", () => {
-      const toggleBtn = document.getElementById("provider-nav-toggle");
-      const navMenu = document.getElementById("provider-nav-menu");
-      if (toggleBtn && navMenu) {
-        toggleBtn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          toggleBtn.classList.toggle("open-active");
-          navMenu.classList.toggle("show");
-        });
-        document.addEventListener("click", (e) => {
-          if (!navMenu.contains(e.target) && !toggleBtn.contains(e.target)) {
-            toggleBtn.classList.remove("open-active");
-            navMenu.classList.remove("show");
-          }
-        });
+      const toggleBtn = document.getElementById("provider-sidebar-toggle");
+      const closeBtn = document.getElementById("provider-sidebar-close");
+      const sidebarMenu = document.getElementById("provider-sidebar-menu");
+      const backdrop = document.getElementById("provider-sidebar-backdrop");
+
+      function openSidebar() {
+        if (sidebarMenu && backdrop) {
+          sidebarMenu.classList.add("open");
+          backdrop.classList.add("open");
+          document.body.style.overflow = "hidden";
+        }
       }
+
+      function closeSidebar() {
+        if (sidebarMenu && backdrop) {
+          sidebarMenu.classList.remove("open");
+          backdrop.classList.remove("open");
+          document.body.style.overflow = "";
+        }
+      }
+
+      if (toggleBtn) toggleBtn.addEventListener("click", openSidebar);
+      if (closeBtn) closeBtn.addEventListener("click", closeSidebar);
+      if (backdrop) backdrop.addEventListener("click", closeSidebar);
+
+      // Highlight active link inside sidebar
+      const currentPath = window.location.pathname;
+      document.querySelectorAll(".provider-sidebar-link").forEach(link => {
+        if (link.getAttribute("href") === currentPath) {
+          link.classList.add("active");
+        }
+      });
     });
   </script>
 </body>

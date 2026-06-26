@@ -24,6 +24,9 @@ from app.provider.auth import (
     create_provider_token, get_current_provider,
 )
 from app.core.auth import get_current_user
+from pydantic import BaseModel
+from typing import Optional, List
+from app.services.provider_chatbot import chat_with_provider_bot
 
 router = APIRouter()
 
@@ -801,5 +804,25 @@ def mark_user_bookings_as_read(
     if unread:
         db.commit()
     return {"status": "success", "marked_count": len(unread)}
+
+
+class ProviderChatMessage(BaseModel):
+    message: str
+    history: Optional[List[dict]] = []
+
+
+@router.post("/chat")
+async def provider_chat(request: ProviderChatMessage, provider: Provider = Depends(get_current_provider)):
+    """
+    AI-powered conversational partner assistant chatbot.
+    """
+    try:
+        result = await chat_with_provider_bot(
+            message=request.message,
+            history=request.history,
+        )
+        return result
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
