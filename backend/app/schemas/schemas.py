@@ -224,6 +224,12 @@ class TransportOption(BaseModel):
     seats_available: int
     intermediate_stops: Optional[List[dict]] = None
     complimentary_items: Optional[List[str]] = None
+    origin_station_name: Optional[str] = None
+    origin_lat: Optional[float] = None
+    origin_lon: Optional[float] = None
+    destination_station_name: Optional[str] = None
+    destination_lat: Optional[float] = None
+    destination_lon: Optional[float] = None
 
 class TransportBooking(BaseModel):
     transport_option_id: str
@@ -231,6 +237,8 @@ class TransportBooking(BaseModel):
     travel_date: str
     include_return: bool = False
     return_date: Optional[str] = None
+    selected_seats: Optional[str] = None
+    travel_class: Optional[str] = None
 
 class BookingOut(BaseModel):
     id: str
@@ -245,6 +253,8 @@ class BookingOut(BaseModel):
     total_fare_inr: float
     status: str                    # "confirmed" / "cancelled"
     created_at: str
+    selected_seats: Optional[str] = None
+    travel_class: Optional[str] = None
     mode: Optional[str] = None
     transport_option_operator: Optional[str] = None
     origin: Optional[str] = None

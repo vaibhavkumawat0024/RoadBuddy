@@ -43,7 +43,9 @@ async def run_migrations():
         "ALTER TABLE trips ADD COLUMN IF NOT EXISTS origin_lat FLOAT;",
         "ALTER TABLE trips ADD COLUMN IF NOT EXISTS origin_lon FLOAT;",
         "ALTER TABLE trips ADD COLUMN IF NOT EXISTS destination_lat FLOAT;",
-        "ALTER TABLE trips ADD COLUMN IF NOT EXISTS destination_lon FLOAT;"
+        "ALTER TABLE trips ADD COLUMN IF NOT EXISTS destination_lon FLOAT;",
+        "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS selected_seats VARCHAR;",
+        "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS travel_class VARCHAR;"
     ]
     with engine.begin() as connection:
         dialect = connection.dialect.name
@@ -78,15 +80,23 @@ async def run_migrations():
             print(f"Failed to create provider_vehicle_assets table: {e}")
 
         for stmt in statements:
+            stmt_to_exec = stmt
+            if dialect == "sqlite":
+                stmt_to_exec = stmt.replace("ADD COLUMN IF NOT EXISTS", "ADD COLUMN")
             try:
-                connection.execute(text(stmt))
+                connection.execute(text(stmt_to_exec))
             except Exception as e:
-                print(f"Schema update statement skipped: {stmt}. Reason: {e}")
+                if "duplicate column name" not in str(e).lower() and "already exists" not in str(e).lower():
+                    print(f"Schema update statement skipped: {stmt_to_exec}. Reason: {e}")
 
+        stmt_asset = "ALTER TABLE provider_vehicles ADD COLUMN IF NOT EXISTS vehicle_asset_id INTEGER;"
+        if dialect == "sqlite":
+            stmt_asset = stmt_asset.replace("ADD COLUMN IF NOT EXISTS", "ADD COLUMN")
         try:
-            connection.execute(text("ALTER TABLE provider_vehicles ADD COLUMN IF NOT EXISTS vehicle_asset_id INTEGER;"))
+            connection.execute(text(stmt_asset))
         except Exception as e:
-            print(f"Failed to add vehicle_asset_id to provider_vehicles: {e}")
+            if "duplicate column name" not in str(e).lower() and "already exists" not in str(e).lower():
+                print(f"Failed to add vehicle_asset_id to provider_vehicles: {e}")
 
 
 

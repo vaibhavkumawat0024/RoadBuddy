@@ -950,9 +950,12 @@
   const currentUserId = parseInt("{{ user.id }}");
   const prefillOrigin = "{{ origin|default('') }}";
   const prefillDestination = "{{ destination|default('') }}";
+  const prefillDate = "{{ date|default('') }}";
   let loadedTransitOptions = [];
   let stopMarkers = [];
   let transitRoutePolyline = null;
+  let selectedTransitOptionId = null;
+  let simulationIntervalId = null;
   let bookingMode = 'cab'; // 'cab' or 'transit'
   let activeTransitOptionId = null;
   let activeTransitOperator = null;
@@ -1723,7 +1726,7 @@
           </div>
           <div class="trc-stops" style="margin-top:10px;padding:8px;background:#f8fafc;border-radius:8px;">
             <div class="stop-line" style="font-size:12px;color:#475569;margin-bottom:4px;">
-              <span style="font-weight:600;color:${themeColor};">Departs:</span> ${opt.departure_time} from ${opt.origin}
+              <span style="font-weight:600;color:${themeColor};">Departs:</span> ${opt.departure_time} from ${opt.origin_station_name || opt.origin}
             </div>
             ${opt.intermediate_stops && opt.intermediate_stops.length > 0 ? `
               <div style="font-size:11px;color:#475569;margin:6px 0;padding-left:8px;border-left:2px dashed #cbd5e1;">
@@ -1734,7 +1737,7 @@
               </div>
             ` : ''}
             <div class="stop-line" style="font-size:12px;color:#475569;">
-              <span style="font-weight:600;color:#ef4444;">Arrives:</span> ${opt.arrival_time} at ${opt.destination}
+              <span style="font-weight:600;color:#ef4444;">Arrives:</span> ${opt.arrival_time} at ${opt.destination_station_name || opt.destination}
             </div>
           </div>
           ${opt.complimentary_items && opt.complimentary_items.length > 0 ? `
@@ -1762,11 +1765,23 @@
     document.querySelectorAll('.transit-route-card').forEach(c => c.classList.remove('selected'));
     cardElement.classList.add('selected');
 
+    selectedTransitOptionId = optionId;
+
     const opt = loadedTransitOptions.find(o => o.id === optionId);
     if (!opt) return;
 
-    stopMarkers.forEach(m => leafletMap.removeLayer(m));
-    stopMarkers = [];
+    // Show navigation button for transit options so they can track the trip
+    const navBtn = document.getElementById('nav-toggle-btn');
+    if (navBtn) {
+      if (['bus', 'train', 'flight'].includes(opt.mode || currentMode)) {
+        navBtn.style.display = 'none';
+      } else {
+        navBtn.style.display = 'block';
+      }
+    }
+
+    // Clear all previous layers (markers, polyline) to remove the generic city markers
+    clearRouting();
 
     if (opt.intermediate_stops && opt.intermediate_stops.length > 0) {
       opt.intermediate_stops.forEach(stop => {
@@ -1786,20 +1801,210 @@
       });
     }
 
-    if (opt.intermediate_stops && opt.intermediate_stops.length > 0) {
-      const originInput = document.getElementById('origin-manual');
-      const destInput = document.getElementById('destination-input');
-      if (originInput && originInput.dataset.lat && originInput.dataset.lon && destInput && destInput.dataset.lat && destInput.dataset.lon) {
-        const points = [
-          L.latLng(parseFloat(originInput.dataset.lat), parseFloat(originInput.dataset.lon)),
-          L.latLng(parseFloat(destInput.dataset.lat), parseFloat(destInput.dataset.lon))
-        ];
+    // Clear previous transit route polyline if any
+    if (transitRoutePolyline) {
+      leafletMap.removeLayer(transitRoutePolyline);
+      transitRoutePolyline = null;
+    }
+
+    const originInput = document.getElementById('origin-manual');
+    const destInput = document.getElementById('destination-input');
+    if (originInput && originInput.dataset.lat && originInput.dataset.lon && destInput && destInput.dataset.lat && destInput.dataset.lon) {
+      const originLat = (opt.origin_lat != null) ? opt.origin_lat : parseFloat(originInput.dataset.lat);
+      const originLon = (opt.origin_lon != null) ? opt.origin_lon : parseFloat(originInput.dataset.lon);
+      const destLat = (opt.destination_lat != null) ? opt.destination_lat : parseFloat(destInput.dataset.lat);
+      const destLon = (opt.destination_lon != null) ? opt.destination_lon : parseFloat(destInput.dataset.lon);
+
+      const originName = opt.origin_station_name || originInput.value || opt.origin;
+      const destName = opt.destination_station_name || destInput.value || opt.destination;
+
+      const waypoints = [{lat: originLat, lon: originLon}];
+      if (opt.intermediate_stops && opt.intermediate_stops.length > 0) {
         opt.intermediate_stops.forEach(st => {
-          points.push(L.latLng(st.lat, st.lon));
+          waypoints.push({lat: st.lat, lon: st.lon});
         });
-        leafletMap.fitBounds(L.latLngBounds(points), { padding: [50, 50] });
+      }
+      waypoints.push({lat: destLat, lon: destLon});
+
+      const colors = { bus: '#f59e0b', train: '#6366f1', flight: '#0ea5e9', cab: '#ec4899' };
+      const lineColor = colors[opt.mode || currentMode] || '#1d9e75';
+
+      // Draw real origin and destination station markers
+      const oIcon = L.divIcon({ html:`<div style="background:#fff;border:2px solid ${lineColor};color:${lineColor};padding:4px 8px;border-radius:4px;font-size:11px;font-weight:700;box-shadow:0 2px 4px rgba(0,0,0,0.15);white-space:nowrap;">📍 ${originName}</div>`, className:'', iconSize:[null,22] });
+      const dIcon = L.divIcon({ html:`<div style="background:${lineColor};color:#fff;padding:4px 8px;border-radius:4px;font-size:11px;font-weight:700;box-shadow:0 2px 4px rgba(0,0,0,0.2);white-space:nowrap;">🎯 ${destName}</div>`, className:'', iconSize:[null,22] });
+
+      L.marker([originLat, originLon], { icon: oIcon }).addTo(leafletMap);
+      L.marker([destLat, destLon], { icon: dIcon }).addTo(leafletMap);
+
+      if (['bus', 'train', 'cab'].includes(opt.mode || currentMode)) {
+        // Query OSRM for real route
+        const coordsQuery = waypoints.map(w => `${w.lon},${w.lat}`).join(';');
+        const url = `https://router.project-osrm.org/route/v1/driving/${coordsQuery}?overview=full&geometries=geojson`;
+        
+        fetch(url)
+          .then(res => res.json())
+          .then(data => {
+            if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+              const routeCoords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+              
+              if (transitRoutePolyline) {
+                leafletMap.removeLayer(transitRoutePolyline);
+              }
+              
+              transitRoutePolyline = L.polyline(routeCoords, {
+                color: lineColor,
+                weight: 6,
+                opacity: 0.9
+              }).addTo(leafletMap);
+              
+              opt.routeCoordinates = routeCoords;
+              leafletMap.fitBounds(transitRoutePolyline.getBounds(), { padding: [50, 50] });
+            } else {
+              drawFallbackLine(waypoints, opt, lineColor);
+            }
+          })
+          .catch(err => {
+            console.error("OSRM fetch failed, using fallback line:", err);
+            drawFallbackLine(waypoints, opt, lineColor);
+          });
+      } else {
+        // Airplane mode or flight - straight segments line
+        drawFallbackLine(waypoints, opt, lineColor);
       }
     }
+  }
+
+  function drawFallbackLine(waypoints, opt, lineColor) {
+    if (transitRoutePolyline) {
+      leafletMap.removeLayer(transitRoutePolyline);
+    }
+    const latlngs = waypoints.map(w => [w.lat, w.lon]);
+    transitRoutePolyline = L.polyline(latlngs, {
+      color: lineColor,
+      weight: 5,
+      opacity: 0.8,
+      dashArray: (opt.mode || currentMode) === 'flight' ? '8,8' : null
+    }).addTo(leafletMap);
+    
+    opt.routeCoordinates = latlngs;
+    leafletMap.fitBounds(transitRoutePolyline.getBounds(), { padding: [50, 50] });
+  }
+
+  let selectedTransitClass = "";
+  let baseTransitOptionFare = 0;
+
+  function buildClassSelector(mode, baseFare) {
+    baseTransitOptionFare = baseFare;
+    const container = document.getElementById("booking-class-selector-container");
+    if (!container) return;
+    container.innerHTML = "";
+    
+    let classes = [];
+    if (mode === 'train') {
+      classes = [
+        { id: 'SL', name: 'Sleeper Class (SL)', mult: 1.0 },
+        { id: 'CC', name: 'AC Chair Car (CC)', mult: 1.8 },
+        { id: '3A', name: 'AC 3 Tier (3A)', mult: 2.2 },
+        { id: '2A', name: 'AC 2 Tier (2A)', mult: 3.2 },
+        { id: '1A', name: 'AC First Class (1A)', mult: 5.0 }
+      ];
+    } else if (mode === 'flight') {
+      classes = [
+        { id: 'Economy', name: 'Economy Class', mult: 1.0 },
+        { id: 'Premium', name: 'Premium Economy', mult: 1.5 },
+        { id: 'Business', name: 'Business Class', mult: 3.0 },
+        { id: 'First', name: 'First Class', mult: 5.0 }
+      ];
+    }
+
+    if (classes.length === 0) return;
+
+    classes.forEach((c, idx) => {
+      const classFare = Math.round(baseFare * c.mult);
+      const card = document.createElement("div");
+      card.className = "class-option-card" + (idx === 0 ? " selected" : "");
+      card.dataset.id = c.id;
+      card.dataset.name = c.name;
+      card.dataset.fare = classFare;
+      
+      card.innerHTML = `
+        <span class="class-name-label">${c.id}</span>
+        <span class="class-price-label">₹${classFare}</span>
+      `;
+
+      card.addEventListener("click", () => {
+        container.querySelectorAll(".class-option-card").forEach(el => el.classList.remove("selected"));
+        card.classList.add("selected");
+        selectedTransitClass = c.name;
+        seatPricePerSeat = classFare;
+        
+        if (mode === 'flight') {
+          document.querySelectorAll(".seats-grid .seat-price").forEach(el => {
+            el.textContent = `₹${classFare}`;
+          });
+        }
+        updateSeatSummary();
+      });
+
+      container.appendChild(card);
+      if (idx === 0) {
+        selectedTransitClass = c.name;
+        seatPricePerSeat = classFare;
+      }
+    });
+  }
+
+  function buildTransitSeatMap(mode, farePerSeat) {
+    const grid = document.getElementById("seats-grid");
+    if (!grid) return;
+    grid.innerHTML = "";
+    selectedSeats = [];
+    seatPricePerSeat = farePerSeat;
+    updateSeatSummary();
+
+    let layoutHTML = "";
+    
+    if (mode === 'bus') {
+      grid.style.gridTemplateColumns = "repeat(5, 1fr)";
+      let seatCounter = 1;
+      for (let r = 1; r <= 6; r++) {
+        layoutHTML += createSeatHTML(`Seat ${seatCounter}A`, farePerSeat, []);
+        layoutHTML += createSeatHTML(`Seat ${seatCounter}B`, farePerSeat, []);
+        layoutHTML += `<div></div>`;
+        layoutHTML += createSeatHTML(`Seat ${seatCounter}C`, farePerSeat, []);
+        layoutHTML += createSeatHTML(`Seat ${seatCounter}D`, farePerSeat, []);
+        seatCounter++;
+      }
+    } else if (mode === 'flight') {
+      grid.style.gridTemplateColumns = "repeat(7, 1fr)";
+      let rowCounter = 1;
+      for (let r = 1; r <= 8; r++) {
+        layoutHTML += createSeatHTML(`${rowCounter}A`, farePerSeat, []);
+        layoutHTML += createSeatHTML(`${rowCounter}B`, farePerSeat, []);
+        layoutHTML += createSeatHTML(`${rowCounter}C`, farePerSeat, []);
+        layoutHTML += `<div style="display:flex; align-items:center; justify-content:center; font-size:10px; color:#cbd5e1; font-weight:700;">${rowCounter}</div>`;
+        layoutHTML += createSeatHTML(`${rowCounter}D`, farePerSeat, []);
+        layoutHTML += createSeatHTML(`${rowCounter}E`, farePerSeat, []);
+        layoutHTML += createSeatHTML(`${rowCounter}F`, farePerSeat, []);
+        rowCounter++;
+      }
+    }
+
+    grid.innerHTML = layoutHTML;
+
+    grid.querySelectorAll(".seat-block:not(.booked)").forEach(block => {
+      block.addEventListener("click", () => {
+        const id = block.dataset.id;
+        if (block.classList.contains("selected")) {
+          block.classList.remove("selected");
+          selectedSeats = selectedSeats.filter(s => s !== id);
+        } else {
+          block.classList.add("selected");
+          selectedSeats.push(id);
+        }
+        updateSeatSummary();
+      });
+    });
   }
 
   function bookTransitFromMap(optionId, operator, mode, fare) {
@@ -1813,7 +2018,7 @@
     activeTransitOrigin = document.getElementById('origin-manual').value.trim();
     activeTransitDestination = document.getElementById('destination-input').value.trim();
 
-    // Reset inputs and modal steps
+    // Reset passenger details
     document.getElementById("passenger-name-input").value = "";
     document.getElementById("passenger-phone-input").value = "";
     document.getElementById("passenger-email-input").value = "";
@@ -1838,19 +2043,49 @@
     const modeNames = { bus: 'Bus', train: 'Train', flight: 'Flight' };
     document.getElementById("seat-modal-vehicle-title").textContent = `Book ${modeNames[mode]} — ${operator}`;
 
-    // Hide cab specific elements
-    document.querySelector(".vehicle-layout-container").style.display = "none";
-    document.querySelector(".seat-legend").style.display = "none";
-    document.getElementById("booking-route-stops-container").style.display = "none";
-    document.getElementById("selected-seats-summary-row").style.display = "none";
+    // Clean up notice
+    const existingNotice = document.getElementById("private-cab-notice");
+    if (existingNotice) existingNotice.remove();
+
+    const container = document.querySelector(".vehicle-layout-container");
+    const legend = document.querySelector(".seat-legend");
+    const stopsContainer = document.getElementById("booking-route-stops-container");
+    const summaryRow = document.getElementById("selected-seats-summary-row");
+    const classWrapper = document.getElementById("booking-class-selector-wrapper");
+
+    stopsContainer.style.display = "none";
+    selectedTransitClass = "";
+
+    if (mode === 'bus') {
+      if (container) container.style.display = "block";
+      if (legend) legend.style.display = "flex";
+      if (summaryRow) summaryRow.style.display = "flex";
+      if (classWrapper) classWrapper.style.display = "none";
+      buildTransitSeatMap('bus', fare);
+    } else if (mode === 'train') {
+      if (container) container.style.display = "none";
+      if (legend) legend.style.display = "none";
+      if (summaryRow) summaryRow.style.display = "none";
+      if (classWrapper) classWrapper.style.display = "flex";
+      buildClassSelector('train', fare);
+    } else if (mode === 'flight') {
+      if (container) container.style.display = "block";
+      if (legend) legend.style.display = "flex";
+      if (summaryRow) summaryRow.style.display = "flex";
+      if (classWrapper) classWrapper.style.display = "flex";
+      buildClassSelector('flight', fare);
+      buildTransitSeatMap('flight', fare);
+    } else {
+      if (container) container.style.display = "none";
+      if (legend) legend.style.display = "none";
+      if (summaryRow) summaryRow.style.display = "none";
+      if (classWrapper) classWrapper.style.display = "none";
+      seatPricePerSeat = fare;
+    }
 
     // Show return journey options
     const returnContainer = document.getElementById("booking-return-container");
     if (returnContainer) returnContainer.style.display = "flex";
-
-    // Clean up notice
-    const existingNotice = document.getElementById("private-cab-notice");
-    if (existingNotice) existingNotice.remove();
 
     updateSeatSummary();
   }
@@ -2157,16 +2392,40 @@
 
       const includeReturn = document.getElementById("booking-include-return-checkbox").checked;
       const returnDate = document.getElementById("booking-return-date-input").value;
-
-      let totalFare = activeTransitFare;
-      if (includeReturn) {
-        totalFare = activeTransitFare * 2;
-      }
-      totalDisplay.textContent = "₹" + totalFare;
-
       const isReturnValid = !includeReturn || returnDate;
       const name = nameInput.value.trim();
-      btn.disabled = !(name && phone && email && isReturnValid);
+
+      let baseFare = seatPricePerSeat || activeTransitFare;
+      let totalFare = baseFare;
+
+      if (activeTransitMode === 'bus' || activeTransitMode === 'flight') {
+        countDisplay.textContent = selectedSeats.length;
+        seatsDisplay.textContent = selectedSeats.length > 0 ? selectedSeats.join(", ") : "None";
+        
+        totalFare = selectedSeats.length * baseFare;
+        if (includeReturn) {
+          totalFare = totalFare * 2;
+        }
+        totalDisplay.textContent = "₹" + totalFare;
+        
+        btn.disabled = !(name && phone && email && isReturnValid && selectedSeats.length > 0);
+      } else if (activeTransitMode === 'train') {
+        countDisplay.textContent = "1 (Auto-Assigned)";
+        seatsDisplay.textContent = "Coach S4, Seat 22 (Auto)";
+        
+        if (includeReturn) {
+          totalFare = baseFare * 2;
+        }
+        totalDisplay.textContent = "₹" + totalFare;
+        
+        btn.disabled = !(name && phone && email && isReturnValid);
+      } else {
+        if (includeReturn) {
+          totalFare = baseFare * 2;
+        }
+        totalDisplay.textContent = "₹" + totalFare;
+        btn.disabled = !(name && phone && email && isReturnValid);
+      }
     } else if (!isPrivateBooking) {
       countDisplay.textContent = selectedSeats.length;
       seatsDisplay.textContent = selectedSeats.length > 0 ? selectedSeats.join(", ") : "None";
@@ -2256,8 +2515,23 @@
       
       const includeReturn = document.getElementById("booking-include-return-checkbox").checked;
       const returnDate = document.getElementById("booking-return-date-input").value;
-      document.getElementById("summary-seats").textContent = includeReturn ? `One-way + Return Ticket (${returnDate})` : "One-way Ticket";
       
+      let seatsText = "";
+      if (activeTransitMode === 'bus') {
+        seatsText = `Seats: ${selectedSeats.join(", ")}`;
+      } else if (activeTransitMode === 'train') {
+        seatsText = `Class: ${selectedTransitClass} | Seat: Coach S4, Seat 22 (Auto-Assigned)`;
+      } else if (activeTransitMode === 'flight') {
+        seatsText = `Class: ${selectedTransitClass} | Seats: ${selectedSeats.join(", ")}`;
+      } else {
+        seatsText = includeReturn ? `One-way + Return Ticket (${returnDate})` : "One-way Ticket";
+      }
+
+      if (includeReturn && (activeTransitMode === 'bus' || activeTransitMode === 'train' || activeTransitMode === 'flight')) {
+        seatsText += ` (Includes Return on ${returnDate})`;
+      }
+      
+      document.getElementById("summary-seats").textContent = seatsText;
       document.getElementById("summary-fare").textContent = document.getElementById("selected-seats-total").textContent;
       document.getElementById("summary-phone").textContent = phone;
       document.getElementById("summary-email").textContent = email;
@@ -2353,12 +2627,27 @@
       travelDate = new Date().toISOString().slice(0, 10);
     }
 
+    let selSeats = null;
+    let selClass = null;
+    if (activeTransitMode === 'bus') {
+      selSeats = selectedSeats.join(", ");
+      selClass = "Standard Seat";
+    } else if (activeTransitMode === 'train') {
+      selSeats = "Coach S4, Seat 22 (Auto-Assigned)";
+      selClass = selectedTransitClass;
+    } else if (activeTransitMode === 'flight') {
+      selSeats = selectedSeats.join(", ");
+      selClass = selectedTransitClass;
+    }
+
     const payload = {
       transport_option_id: activeTransitOptionId,
       passenger_name: passengerName,
       travel_date: travelDate,
       include_return: includeReturn,
-      return_date: returnDate
+      return_date: returnDate,
+      selected_seats: selSeats,
+      travel_class: selClass
     };
 
     try {
@@ -2374,6 +2663,113 @@
         const data = await res.json();
         alert('Ticket booked successfully!\nBooking Reference ID: ' + data.id);
         closeSeatModal();
+
+        // Find the booked option details to display the ticket
+        const opt = loadedTransitOptions.find(o => o.id === activeTransitOptionId);
+        if (opt) {
+          const colors = { bus: '#f59e0b', train: '#6366f1', flight: '#0ea5e9' };
+          const themeColor = colors[opt.mode || currentMode] || '#1d9e75';
+          const wrap = document.getElementById('directions-wrap');
+          const totalFareText = document.getElementById("selected-seats-total").textContent;
+          
+          let inclusionsHTML = "";
+          if (opt.complimentary_items && opt.complimentary_items.length > 0) {
+            inclusionsHTML = `
+              <div style="margin-top: 12px; border-top: 1px dashed #e2e8f0; padding-top: 12px; text-align: left;">
+                <div style="font-size: 10px; color: #64748b; text-transform: uppercase; margin-bottom: 6px; font-weight: 700; letter-spacing: 0.5px;">Inclusions & Amenities</div>
+                <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                  ${opt.complimentary_items.map(item => `
+                    <span style="background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">🎁 ${item}</span>
+                  `).join('')}
+                </div>
+              </div>
+            `;
+          }
+          
+          wrap.innerHTML = `
+            <div class="booking-ticket-card" style="background: #fff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; overflow: hidden; margin-top: 12px;">
+              <div style="background: ${themeColor}; color: #fff; padding: 16px; text-align: center; position: relative;">
+                <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9;">Boarding Pass / Ticket</div>
+                <div style="font-size: 18px; font-weight: 800; margin-top: 4px;">RoadBuddy Transit</div>
+                <!-- Ticket circles decorative cutouts -->
+                <div style="position: absolute; bottom: -8px; left: -8px; width: 16px; height: 16px; background: #f8fafc; border-radius: 50%;"></div>
+                <div style="position: absolute; bottom: -8px; right: -8px; width: 16px; height: 16px; background: #f8fafc; border-radius: 50%;"></div>
+              </div>
+              <div style="padding: 16px; background: #fff; position: relative;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                  <div>
+                    <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Operator</div>
+                    <div style="font-size: 14px; font-weight: 700; color: #0f172a;">${opt.operator}</div>
+                  </div>
+                  <div style="text-align: right;">
+                    <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Reference ID</div>
+                    <div style="font-size: 12px; font-weight: 700; color: ${themeColor}; font-family: monospace;">RB-${data.id}</div>
+                  </div>
+                </div>
+                
+                <div style="border-top: 1px dashed #e2e8f0; margin: 12px 0;"></div>
+                
+                <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                  <div>
+                    <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Passenger</div>
+                    <div style="font-size: 13px; font-weight: 600; color: #0f172a;">${passengerName}</div>
+                  </div>
+                  <div style="text-align: right;">
+                    <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Travel Date</div>
+                    <div style="font-size: 13px; font-weight: 600; color: #0f172a;">${travelDate}</div>
+                  </div>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                  <div>
+                    <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">From</div>
+                    <div style="font-size: 13px; font-weight: 600; color: #0f172a;">${opt.origin_station_name || opt.origin}</div>
+                  </div>
+                  <div style="text-align: right;">
+                    <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">To</div>
+                    <div style="font-size: 13px; font-weight: 600; color: #0f172a;">${opt.destination_station_name || opt.destination}</div>
+                  </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                  <div>
+                    <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Class</div>
+                    <div style="font-size: 13px; font-weight: 600; color: #0f172a;">${selClass || 'Standard'}</div>
+                  </div>
+                  <div style="text-align: right;">
+                    <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Seat / Berth</div>
+                    <div style="font-size: 13px; font-weight: 700; color: #1d9e75;">${selSeats || 'Auto-Assigned'}</div>
+                  </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                  <div>
+                    <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Timing</div>
+                    <div style="font-size: 13px; font-weight: 600; color: #0f172a;">Departs: ${opt.departure_time}</div>
+                  </div>
+                  <div style="text-align: right;">
+                    <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Total Fare</div>
+                    <div style="font-size: 13px; font-weight: 700; color: #0d9488;">${totalFareText}</div>
+                  </div>
+                </div>
+
+                ${inclusionsHTML}
+
+                <div style="border-top: 1px dashed #e2e8f0; margin: 12px 0; position: relative;">
+                  <!-- Ticket circles decorative cutouts -->
+                  <div style="position: absolute; top: -8px; left: -24px; width: 16px; height: 16px; background: #f8fafc; border-radius: 50%;"></div>
+                  <div style="position: absolute; top: -8px; right: -24px; width: 16px; height: 16px; background: #f8fafc; border-radius: 50%;"></div>
+                </div>
+                
+                <div style="text-align: center; margin-top: 10px;">
+                  <div style="font-size: 12px; color: #15803d; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; background: #f0fdf4; border: 1px solid #bbf7d0; padding: 6px 12px; border-radius: 8px; width: 100%; justify-content: center;">
+                    <span>✅ Ticket Active & Confirmed</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        }
       } else {
         const err = await res.json().catch(() => ({}));
         alert('Booking failed: ' + (err.detail || res.status));
@@ -2592,9 +2988,10 @@
     const colors = { bus:'#f59e0b', train:'#6366f1', flight:'#0ea5e9', cab:'#ec4899' };
     const lineColor = colors[mode] || '#1D9E75';
 
-    currentPolyline = L.polyline([originLatLng, destLatLng], {
-      color: lineColor, weight: 4, opacity: 0.8, dashArray: mode === 'flight' ? '8,8' : null
-    }).addTo(leafletMap);
+    // Remove the fake straight route line to only show the real OSRM routes when a card is selected
+    // currentPolyline = L.polyline([originLatLng, destLatLng], {
+    //   color: lineColor, weight: 4, opacity: 0.8, dashArray: mode === 'flight' ? '8,8' : null
+    // }).addTo(leafletMap);
 
     const oIcon = L.divIcon({ html:`<div style="background:#fff;border:2px solid ${lineColor};color:${lineColor};padding:4px 8px;border-radius:4px;font-size:11px;font-weight:700;box-shadow:0 2px 4px rgba(0,0,0,0.15);white-space:nowrap;">📍 ${originName}</div>`, className:'', iconSize:[null,22] });
     const dIcon = L.divIcon({ html:`<div style="background:${lineColor};color:#fff;padding:4px 8px;border-radius:4px;font-size:11px;font-weight:700;box-shadow:0 2px 4px rgba(0,0,0,0.2);white-space:nowrap;">🎯 ${destName}</div>`, className:'', iconSize:[null,22] });
@@ -2639,12 +3036,153 @@
   // ─── UTILITIES & HELPERS ─────────────────────────────────
   function toggleNavigation() { isNavigating ? stopNavigation() : startNavigation(); }
 
+  function createTransitIcon(mode, heading) {
+    const rotation = heading != null ? heading : 0;
+    const icons = {
+      bus: `<div style="background:#f59e0b;color:#fff;border:2px solid #fff;border-radius:50%;width:30px;height:30px;box-shadow:0 2px 5px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;font-size:16px;transform:rotate(${rotation}deg);">🚌</div>`,
+      train: `<div style="background:#6366f1;color:#fff;border:2px solid #fff;border-radius:50%;width:30px;height:30px;box-shadow:0 2px 5px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;font-size:16px;transform:rotate(${rotation}deg);">🚂</div>`,
+      flight: `<div style="background:#0ea5e9;color:#fff;border:2px solid #fff;border-radius:50%;width:30px;height:30px;box-shadow:0 2px 5px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;font-size:16px;transform:rotate(${rotation}deg);">✈️</div>`
+    };
+    const html = icons[mode] || icons['bus'];
+    return L.divIcon({
+      html: html,
+      className: '',
+      iconSize: [30, 30],
+      iconAnchor: [15, 15]
+    });
+  }
+
+  function startTransitSimulation(opt, startIndex = 0) {
+    if (simulationIntervalId) {
+      clearInterval(simulationIntervalId);
+      simulationIntervalId = null;
+    }
+    
+    isNavigating = true;
+    document.getElementById('nav-toggle-btn').textContent = '🛑 Stop Navigation';
+    document.getElementById('nav-hud').classList.add('visible');
+    document.getElementById('compass-widget').classList.add('visible');
+    
+    let routeCoords = opt.routeCoordinates;
+    const mode = opt.mode || currentMode;
+    if (mode === 'flight' && routeCoords && routeCoords.length === 2) {
+      const p1 = routeCoords[0];
+      const p2 = routeCoords[1];
+      const interpolated = [];
+      const steps = 100;
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const lat = p1[0] + (p2[0] - p1[0]) * t;
+        const lon = p1[1] + (p2[1] - p1[1]) * t;
+        interpolated.push([lat, lon]);
+      }
+      routeCoords = interpolated;
+    }
+    let simIndex = startIndex;
+    
+    if (simIndex === 0) {
+      // Initialize stop pause flags
+      if (opt.intermediate_stops) {
+        opt.intermediate_stops.forEach(st => st.hasPaused = false);
+      }
+    }
+    
+    let initialHeading = 0;
+    if (simIndex < routeCoords.length - 1) {
+      initialHeading = calcBearing(routeCoords[simIndex][0], routeCoords[simIndex][1], routeCoords[simIndex + 1][0], routeCoords[simIndex + 1][1]);
+    }
+    
+    if (!userMarker) {
+      userMarker = L.marker(routeCoords[simIndex], {
+        icon: createTransitIcon(mode, initialHeading),
+        zIndexOffset: 1000
+      }).addTo(leafletMap);
+    } else {
+      userMarker.setLatLng(routeCoords[simIndex]);
+      userMarker.setIcon(createTransitIcon(mode, initialHeading));
+    }
+    userMarker.bindPopup(`<strong>${opt.operator}</strong><br/>En Route`);
+    
+    leafletMap.setView(routeCoords[simIndex], 16);
+    
+    const speedRanges = { bus: [60, 80], train: [100, 130], flight: [700, 900] };
+    const range = speedRanges[mode] || [60, 80];
+    
+    simulationIntervalId = setInterval(() => {
+      if (!isNavigating) {
+        clearInterval(simulationIntervalId);
+        simulationIntervalId = null;
+        return;
+      }
+      
+      simIndex++;
+      if (simIndex >= routeCoords.length) {
+        clearInterval(simulationIntervalId);
+        simulationIntervalId = null;
+        stopNavigation();
+        alert(`🎉 You have arrived at your destination: ${opt.destination}!`);
+        return;
+      }
+      
+      const prevPt = routeCoords[simIndex - 1];
+      const currPt = routeCoords[simIndex];
+      
+      userMarker.setLatLng(currPt);
+      leafletMap.setView(currPt, 16);
+      
+      const heading = calcBearing(prevPt[0], prevPt[1], currPt[0], currPt[1]);
+      userHeading = heading;
+      updateCompass(heading);
+      userMarker.setIcon(createTransitIcon(mode, heading));
+      
+      const speed = Math.round(range[0] + Math.random() * (range[1] - range[0]));
+      document.getElementById('hud-speed').textContent = `${speed} km/h`;
+      
+      if (opt.intermediate_stops && opt.intermediate_stops.length > 0) {
+        const stopIndex = opt.intermediate_stops.findIndex(st => {
+          const dist = Math.sqrt(Math.pow(st.lat - currPt[0], 2) + Math.pow(st.lon - currPt[1], 2));
+          return dist < 0.002;
+        });
+        
+        if (stopIndex !== -1) {
+          const stop = opt.intermediate_stops[stopIndex];
+          if (!stop.hasPaused) {
+            stop.hasPaused = true;
+            clearInterval(simulationIntervalId);
+            simulationIntervalId = null;
+            
+            userMarker.openPopup();
+            userMarker.setPopupContent(`<strong>🛑 Arrived at: ${stop.name}</strong><br/>Pausing for ${stop.duration_mins} mins`);
+            document.getElementById('hud-speed').textContent = `0 km/h (At Station)`;
+            
+            setTimeout(() => {
+              if (isNavigating) {
+                userMarker.closePopup();
+                userMarker.setPopupContent(`<strong>${opt.operator}</strong><br/>En Route`);
+                startTransitSimulation(opt, simIndex);
+              }
+            }, 3000);
+          }
+        }
+      }
+    }, 200);
+  }
+
   function startNavigation() {
     isNavigating = true;
     prevGpsCoords = null;
     document.getElementById('nav-toggle-btn').textContent = '🛑 Stop Navigation';
     document.getElementById('nav-hud').classList.add('visible');
     document.getElementById('compass-widget').classList.add('visible');
+
+    const isTransit = ['bus', 'train', 'flight'].includes(currentMode);
+    if (isTransit && selectedTransitOptionId) {
+      const opt = loadedTransitOptions.find(o => o.id === selectedTransitOptionId);
+      if (opt && opt.routeCoordinates && opt.routeCoordinates.length > 0) {
+        startTransitSimulation(opt);
+        return;
+      }
+    }
 
     // Centering map view immediately on starting navigation
     const originInput = document.getElementById('origin-manual');
@@ -2713,6 +3251,10 @@
     if (trackWatchId !== null) {
       navigator.geolocation.clearWatch(trackWatchId);
       trackWatchId = null;
+    }
+    if (simulationIntervalId !== null) {
+      clearInterval(simulationIntervalId);
+      simulationIntervalId = null;
     }
     // Reset compass needle
     const needle = document.getElementById('compass-needle');
@@ -3207,7 +3749,11 @@
     
     const dateInput = document.getElementById('travel-date-input');
     if (dateInput) {
-      dateInput.value = new Date().toISOString().slice(0, 10);
+      if (prefillDate) {
+        dateInput.value = prefillDate;
+      } else {
+        dateInput.value = new Date().toISOString().slice(0, 10);
+      }
     }
     
     // Live validation for passenger inputs
@@ -3308,6 +3854,56 @@
     position: relative;
     box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
     margin-bottom: 16px;
+  }
+
+  /* Travel class selection cards */
+  .booking-class-selector-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+    margin-top: 6px;
+    margin-bottom: 12px;
+  }
+  .class-option-card {
+    flex: 1;
+    min-width: 90px;
+    background: #ffffff;
+    border: 1.5px solid var(--border-color);
+    border-radius: 8px;
+    padding: 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    user-select: none;
+  }
+  .class-option-card:hover {
+    border-color: var(--primary);
+    background: #f0fdf9;
+  }
+  .class-option-card.selected {
+    background: var(--primary);
+    color: #ffffff;
+    border-color: var(--primary);
+    box-shadow: 0 4px 6px -1px rgba(29, 158, 117, 0.2);
+  }
+  .class-option-card.selected .class-price-label {
+    color: #ffffff;
+    opacity: 0.9;
+  }
+  .class-name-label {
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .class-price-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: #64748b;
   }
 
   /* Interactive grid for seats */
@@ -3447,6 +4043,14 @@
     <!-- ══ STEP 1: SELECTION & DETAILS FORM ══ -->
     <div id="seat-step-1" style="display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden;">
       <div class="seat-modal-body">
+        <!-- Class Selector for Trains & Flights -->
+        <div id="booking-class-selector-wrapper" style="display: none; flex-direction: column; gap: 6px; width: 100%; margin-bottom: 12px;">
+          <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; align-self: flex-start;">Select Travel Class</div>
+          <div class="booking-class-selector-container" id="booking-class-selector-container">
+            <!-- Dynamically populated classes -->
+          </div>
+        </div>
+
         <div class="vehicle-layout-container">
           <div class="seats-grid" id="seats-grid">
             <!-- Dynamically populated seats -->

@@ -108,6 +108,8 @@ def book_ticket(
         return_fare_inr     = fare["return_fare_inr"],
         total_fare_inr      = fare["total_fare_inr"],
         status              = "confirmed",
+        selected_seats      = data.selected_seats,
+        travel_class        = data.travel_class,
     )
     db.add(booking)
     db.commit()
@@ -126,6 +128,8 @@ def book_ticket(
         total_fare_inr      = booking.total_fare_inr,
         status              = booking.status,
         created_at          = str(booking.created_at),
+        selected_seats      = booking.selected_seats,
+        travel_class        = booking.travel_class,
     )
 
 
@@ -161,8 +165,8 @@ def my_bookings(
         if opt:
             mode = opt.mode
             operator = opt.operator
-            origin = opt.origin
-            destination = opt.destination
+            origin = opt.origin_station_name or opt.origin
+            destination = opt.destination_station_name or opt.destination
         else:
             try:
                 parts = b.transport_option_id.split("_")
@@ -188,6 +192,8 @@ def my_bookings(
                 transport_option_operator = operator,
                 origin              = origin,
                 destination         = destination,
+                selected_seats      = b.selected_seats,
+                travel_class        = b.travel_class,
             )
         )
 

@@ -119,6 +119,8 @@ class Booking(Base):
     return_fare_inr     = Column(Float,   default=0)
     total_fare_inr      = Column(Float,   nullable=False)
     status              = Column(String,  default="confirmed")
+    selected_seats      = Column(String,  nullable=True)
+    travel_class        = Column(String,  nullable=True)
     created_at          = Column(DateTime, server_default=func.now())
 
     user = relationship("User")

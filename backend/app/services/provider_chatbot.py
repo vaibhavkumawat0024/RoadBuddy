@@ -557,8 +557,63 @@ async def chat_with_provider_bot(message: str, history: list[dict] = None, provi
             updated_history = messages + [{"role": "assistant", "content": response_text}]
             return {"response": response_text, "history": updated_history, "total_messages": len(updated_history)}
 
-        # Check for vehicle update commands
+        # Check for vehicle update commands or direct booking/vehicle queries
         if db and provider_id:
+            # Check for direct booking query
+            if any(phrase in msg_lower for phrase in ["what are my booking", "my bookings", "show my booking", "list my booking", "display my booking", "show booking", "list booking"]):
+                from app.models.models import ProviderVehicle, ProviderBooking
+                bookings = db.query(ProviderBooking).join(ProviderVehicle).filter(ProviderVehicle.provider_id == provider_id).all()
+                if not bookings:
+                    response_text = "📋 You don't have any bookings yet."
+                else:
+                    active_bookings = [b for b in bookings if b.status != "cancelled"]
+                    if not active_bookings:
+                        response_text = "📋 All your bookings are currently cancelled or inactive."
+                    else:
+                        lines = []
+                        for b in active_bookings:
+                            lines.append(
+                                f"• **Booking #{b.id}** by {b.passenger_name} | {b.travel_date} | "
+                                f"Seats: {b.selected_seats or b.num_seats} | Fare: ₹{b.total_fare_inr} | "
+                                f"Phone: {b.passenger_phone or 'N/A'}"
+                            )
+                        response_text = f"📋 You have {len(active_bookings)} active booking(s):\n" + "\n".join(lines)
+                updated_history = messages + [{"role": "assistant", "content": response_text}]
+                return {"response": response_text, "history": updated_history, "total_messages": len(updated_history)}
+
+            # Check for direct vehicle query
+            if any(phrase in msg_lower for phrase in ["show my vehicle", "list my vehicle", "my vehicles", "show vehicle", "list vehicle", "display my vehicle", "display vehicle"]):
+                from app.models.models import ProviderVehicle
+                vehicles = db.query(ProviderVehicle).filter(ProviderVehicle.provider_id == provider_id).all()
+                if not vehicles:
+                    response_text = "🚙 You have no vehicles listed yet. Would you like me to guide you on how to add one?"
+                else:
+                    lines = []
+                    for v in vehicles:
+                        fare_parts = []
+                        if v.fixed_fare_inr:
+                            fare_parts.append(f"Fixed Fare: ₹{int(v.fixed_fare_inr)}")
+                        if v.price_per_km_inr:
+                            fare_parts.append(f"Price: ₹{v.price_per_km_inr}/km")
+                        fare_str = " / ".join(fare_parts) if fare_parts else "N/A"
+                        time_parts = []
+                        if v.departure_time:
+                            time_parts.append(f"Departs: {v.departure_time}")
+                        if v.arrival_time:
+                            time_parts.append(f"Arrives: {v.arrival_time}")
+                        time_str = " · ".join(time_parts) if time_parts else "N/A"
+                        lines.append(
+                            f"• **{v.vehicle_name}** ({v.vehicle_type.upper()})\n"
+                            f"  - Route: {v.origin} → {v.destination}\n"
+                            f"  - Fare: {fare_str}\n"
+                            f"  - Timing: {time_str}\n"
+                            f"  - Seats: {v.seats_available}/{v.total_seats} available\n"
+                            f"  - Status: {'Active' if v.is_active else 'Inactive'}"
+                        )
+                    response_text = "🚗 Here are your vehicles:\n" + "\n".join(lines)
+                updated_history = messages + [{"role": "assistant", "content": response_text}]
+                return {"response": response_text, "history": updated_history, "total_messages": len(updated_history)}
+
             update_response = try_intercept_vehicle_update_flow(message, raw_history, provider_id, db)
             if update_response:
                 updated_history = messages + [{"role": "assistant", "content": update_response}]

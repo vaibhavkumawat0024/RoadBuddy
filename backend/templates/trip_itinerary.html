@@ -159,7 +159,7 @@
 
         <!-- Launch Navigation controls -->
         <div class="flex flex-wrap gap-3 pt-6 border-t border-slate-100">
-          <a href="/start-trip?trip_id={{ trip.id }}&origin={{ trip.origin|urlencode }}&destination={{ trip.destination|urlencode }}" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-5 py-3 rounded-lg transition-all active:scale-95 duration-100 inline-flex items-center gap-1.5 shadow-sm">
+          <a href="/start-trip?trip_id={{ trip.id }}&origin={{ trip.origin|urlencode }}&destination={{ trip.destination|urlencode }}&date={{ trip.start_date }}" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-5 py-3 rounded-lg transition-all active:scale-95 duration-100 inline-flex items-center gap-1.5 shadow-sm">
             <span class="material-symbols-outlined text-sm">navigation</span>
             Start Map Navigation
           </a>

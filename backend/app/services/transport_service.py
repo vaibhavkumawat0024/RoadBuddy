@@ -209,6 +209,162 @@ def get_transit_stops_and_amenities(origin: str, destination: str, mode: str, op
     return stops, complimentary
 
 
+def get_transit_stations(origin: str, destination: str, mode: str) -> tuple[tuple[str, float, float], tuple[str, float, float]]:
+    orig = origin.strip().lower()
+    dest = destination.strip().lower()
+    m_val = mode.strip().lower()
+
+    if m_val not in ("bus", "train", "flight"):
+        sfx = "Station"
+        if m_val == "cab":
+            sfx = "Pickup Point"
+        o_name = f"{origin} {sfx}"
+        d_name = f"{destination} {sfx}"
+        o_lat, o_lon = 26.0, 76.0
+        d_lat, d_lon = 26.0, 76.0
+        coords = {
+            "delhi": (28.6139, 77.2090), "mumbai": (19.0760, 72.8777), "jaipur": (26.9124, 75.7873),
+            "udaipur": (24.5854, 73.7125), "goa": (15.2993, 74.1240), "manali": (32.2396, 77.1887),
+            "jodhpur": (26.2389, 73.0243), "agra": (27.1767, 78.0081), "shimla": (31.1048, 77.1734),
+            "bangalore": (12.9716, 77.5946), "kolkata": (22.5726, 88.3639), "pune": (18.5204, 73.8567),
+            "chennai": (13.0827, 80.2707), "hyderabad": (17.3850, 78.4867)
+        }
+        for city, v in coords.items():
+            if city in orig:
+                o_lat, o_lon = v
+            if city in dest:
+                d_lat, d_lon = v
+        return (o_name, o_lat, o_lon), (d_name, d_lat, d_lon)
+
+    stations_data = {
+        "jaipur": {
+            "bus": ("Jaipur Sindhi Camp Bus Stand", 26.9248, 75.7985),
+            "train": ("Jaipur Jn Railway Station", 26.9197, 75.7878),
+            "flight": ("Jaipur International Airport (JAI)", 26.8289, 75.8122),
+        },
+        "udaipur": {
+            "bus": ("Udaipur Central Bus Stand", 24.5801, 73.7027),
+            "train": ("Udaipur City Railway Station", 24.5714, 73.6967),
+            "flight": ("Maharana Pratap Airport Udaipur (UDR)", 24.6125, 73.8961),
+        },
+        "delhi": {
+            "bus": ("ISBT Kashmiri Gate Bus Stand", 28.6675, 77.2282),
+            "train": ("New Delhi Railway Station (NDLS)", 28.6430, 77.2223),
+            "flight": ("Indira Gandhi International Airport (DEL)", 28.5562, 77.1000),
+        },
+        "manali": {
+            "bus": ("Manali Private Volvo Bus Stand", 32.2396, 77.1887),
+            "train": ("Chandigarh Junction Station", 30.7061, 76.8013),
+            "flight": ("Kullu-Manali Bhuntar Airport (KUU)", 31.8767, 77.1541),
+        },
+        "mumbai": {
+            "bus": ("Mumbai Central Bus Depot", 18.9723, 72.8188),
+            "train": ("CSMT Railway Station Mumbai", 18.9400, 72.8354),
+            "flight": ("CSM International Airport (BOM)", 19.0896, 72.8656),
+        },
+        "goa": {
+            "bus": ("Panaji Kadam Bus Stand", 15.4950, 73.8340),
+            "train": ("Madgaon Junction Railway Station", 15.2755, 73.9582),
+            "flight": ("Manohar International Airport Goa (GOX)", 15.7291, 73.8728),
+        },
+        "jodhpur": {
+            "bus": ("Jodhpur Central Bus Stand", 26.2694, 73.0309),
+            "train": ("Jodhpur Junction Railway Station", 26.2863, 73.0163),
+            "flight": ("Jodhpur Airport (JDH)", 26.2514, 73.0486),
+        },
+        "agra": {
+            "bus": ("ISBT Agra Bus Stand", 27.2155, 77.9622),
+            "train": ("Agra Cantt Railway Station", 27.1587, 78.0068),
+            "flight": ("Agra Airport (AGR)", 27.1558, 77.9611),
+        },
+        "shimla": {
+            "bus": ("Shimla ISBT Tutikandi", 31.0967, 77.1420),
+            "train": ("Shimla Railway Station", 31.1030, 77.1610),
+            "flight": ("Shimla Airport (SLV)", 31.0818, 77.0683),
+        },
+        "bangalore": {
+            "bus": ("Kempegowda Bus Station (Majestic)", 12.9779, 77.5729),
+            "train": ("KSR Bengaluru City Railway Station", 12.9781, 77.5697),
+            "flight": ("Kempegowda International Airport (BLR)", 13.1986, 77.7066),
+        },
+        "kolkata": {
+            "bus": ("Esplanade Bus Terminus", 22.5647, 88.3517),
+            "train": ("Howrah Junction Railway Station", 22.5836, 88.3414),
+            "flight": ("Netaji Subhash Chandra Bose International Airport (CCU)", 22.6547, 88.4467),
+        },
+        "pune": {
+            "bus": ("Swargate Bus Station", 18.5018, 73.8587),
+            "train": ("Pune Junction Railway Station", 18.5289, 73.8744),
+            "flight": ("Pune International Airport (PNQ)", 18.5822, 73.9197),
+        },
+        "chennai": {
+            "bus": ("Koyambedu CMBT", 13.0678, 80.2056),
+            "train": ("Chennai Central Railway Station", 13.0827, 80.2754),
+            "flight": ("Chennai International Airport (MAA)", 12.9941, 80.1709),
+        },
+        "hyderabad": {
+            "bus": ("Mahatma Gandhi Bus Station (MGBS)", 17.3776, 78.4839),
+            "train": ("Secunderabad Junction Railway Station", 17.4344, 78.5017),
+            "flight": ("Rajiv Gandhi International Airport (HYD)", 17.2403, 78.4294),
+        }
+    }
+
+    o_res = None
+    d_res = None
+
+    for city, modes in stations_data.items():
+        if city in orig:
+            o_res = modes.get(m_val)
+        if city in dest:
+            d_res = modes.get(m_val)
+
+    if o_res is None:
+        suffix = {
+            "bus": "Central Bus Station",
+            "train": "Junction Railway Station",
+            "flight": "Airport"
+        }
+        sfx = suffix.get(m_val, "Station")
+        o_name = f"{origin} {sfx}"
+        o_lat, o_lon = 26.0, 76.0
+        coords = {
+            "delhi": (28.6139, 77.2090), "mumbai": (19.0760, 72.8777), "jaipur": (26.9124, 75.7873),
+            "udaipur": (24.5854, 73.7125), "goa": (15.2993, 74.1240), "manali": (32.2396, 77.1887),
+            "jodhpur": (26.2389, 73.0243), "agra": (27.1767, 78.0081), "shimla": (31.1048, 77.1734),
+            "bangalore": (12.9716, 77.5946), "kolkata": (22.5726, 88.3639), "pune": (18.5204, 73.8567),
+            "chennai": (13.0827, 80.2707), "hyderabad": (17.3850, 78.4867)
+        }
+        for city in coords:
+            if city in orig:
+                o_lat, o_lon = coords[city]
+                break
+        o_res = (o_name, o_lat, o_lon)
+
+    if d_res is None:
+        suffix = {
+            "bus": "Central Bus Station",
+            "train": "Junction Railway Station",
+            "flight": "Airport"
+        }
+        sfx = suffix.get(m_val, "Station")
+        d_name = f"{destination} {sfx}"
+        d_lat, d_lon = 26.0, 76.0
+        coords = {
+            "delhi": (28.6139, 77.2090), "mumbai": (19.0760, 72.8777), "jaipur": (26.9124, 75.7873),
+            "udaipur": (24.5854, 73.7125), "goa": (15.2993, 74.1240), "manali": (32.2396, 77.1887),
+            "jodhpur": (26.2389, 73.0243), "agra": (27.1767, 78.0081), "shimla": (31.1048, 77.1734),
+            "bangalore": (12.9716, 77.5946), "kolkata": (22.5726, 88.3639), "pune": (18.5204, 73.8567),
+            "chennai": (13.0827, 80.2707), "hyderabad": (17.3850, 78.4867)
+        }
+        for city in coords:
+            if city in dest:
+                d_lat, d_lon = coords[city]
+                break
+        d_res = (d_name, d_lat, d_lon)
+
+    return o_res, d_res
+
+
 def search_transport(origin: str, destination: str, mode: str, db: Session) -> list:
     """
     Search available buses, trains, or flights in the database.
@@ -226,6 +382,7 @@ def search_transport(origin: str, destination: str, mode: str, db: Session) -> l
         ).all()
         for b in buses:
             stops, items = get_transit_stops_and_amenities(b.origin, b.destination, "bus", b.operator_name, f"bus_{b.id}")
+            (o_st_name, o_st_lat, o_st_lon), (d_st_name, d_st_lat, d_st_lon) = get_transit_stations(b.origin, b.destination, "bus")
             results.append(TransportOption(
                 id=f"bus_{b.id}",
                 origin=b.origin,
@@ -239,6 +396,12 @@ def search_transport(origin: str, destination: str, mode: str, db: Session) -> l
                 seats_available=b.seats_available,
                 intermediate_stops=stops,
                 complimentary_items=items,
+                origin_station_name=o_st_name,
+                origin_lat=o_st_lat,
+                origin_lon=o_st_lon,
+                destination_station_name=d_st_name,
+                destination_lat=d_st_lat,
+                destination_lon=d_st_lon
             ))
             
     elif mode == TransportMode.train:
@@ -249,6 +412,7 @@ def search_transport(origin: str, destination: str, mode: str, db: Session) -> l
         ).all()
         for t in trains:
             stops, items = get_transit_stops_and_amenities(t.origin, t.destination, "train", t.train_name, f"train_{t.id}")
+            (o_st_name, o_st_lat, o_st_lon), (d_st_name, d_st_lat, d_st_lon) = get_transit_stations(t.origin, t.destination, "train")
             results.append(TransportOption(
                 id=f"train_{t.id}",
                 origin=t.origin,
@@ -262,6 +426,12 @@ def search_transport(origin: str, destination: str, mode: str, db: Session) -> l
                 seats_available=t.seats_available,
                 intermediate_stops=stops,
                 complimentary_items=items,
+                origin_station_name=o_st_name,
+                origin_lat=o_st_lat,
+                origin_lon=o_st_lon,
+                destination_station_name=d_st_name,
+                destination_lat=d_st_lat,
+                destination_lon=d_st_lon
             ))
             
     elif mode == TransportMode.flight:
@@ -272,6 +442,7 @@ def search_transport(origin: str, destination: str, mode: str, db: Session) -> l
         ).all()
         for f in flights:
             stops, items = get_transit_stops_and_amenities(f.origin, f.destination, "flight", f.airline, f"flight_{f.id}")
+            (o_st_name, o_st_lat, o_st_lon), (d_st_name, d_st_lat, d_st_lon) = get_transit_stations(f.origin, f.destination, "flight")
             results.append(TransportOption(
                 id=f"flight_{f.id}",
                 origin=f.origin,
@@ -285,6 +456,12 @@ def search_transport(origin: str, destination: str, mode: str, db: Session) -> l
                 seats_available=f.seats_available,
                 intermediate_stops=stops,
                 complimentary_items=items,
+                origin_station_name=o_st_name,
+                origin_lat=o_st_lat,
+                origin_lon=o_st_lon,
+                destination_station_name=d_st_name,
+                destination_lat=d_st_lat,
+                destination_lon=d_st_lon
             ))
             
     return results
@@ -308,6 +485,7 @@ def get_transport_option_by_id(option_id: str, db: Session) -> TransportOption |
         item = db.query(Bus).filter(Bus.id == item_id).first()
         if item:
             stops, items = get_transit_stops_and_amenities(item.origin, item.destination, "bus", item.operator_name, option_id)
+            (o_st_name, o_st_lat, o_st_lon), (d_st_name, d_st_lat, d_st_lon) = get_transit_stations(item.origin, item.destination, "bus")
             return TransportOption(
                 id=option_id,
                 origin=item.origin,
@@ -321,12 +499,19 @@ def get_transport_option_by_id(option_id: str, db: Session) -> TransportOption |
                 seats_available=item.seats_available,
                 intermediate_stops=stops,
                 complimentary_items=items,
+                origin_station_name=o_st_name,
+                origin_lat=o_st_lat,
+                origin_lon=o_st_lon,
+                destination_station_name=d_st_name,
+                destination_lat=d_st_lat,
+                destination_lon=d_st_lon
             )
     elif mode == "train":
         from app.models.models import Train
         item = db.query(Train).filter(Train.id == item_id).first()
         if item:
             stops, items = get_transit_stops_and_amenities(item.origin, item.destination, "train", item.train_name, option_id)
+            (o_st_name, o_st_lat, o_st_lon), (d_st_name, d_st_lat, d_st_lon) = get_transit_stations(item.origin, item.destination, "train")
             return TransportOption(
                 id=option_id,
                 origin=item.origin,
@@ -340,12 +525,19 @@ def get_transport_option_by_id(option_id: str, db: Session) -> TransportOption |
                 seats_available=item.seats_available,
                 intermediate_stops=stops,
                 complimentary_items=items,
+                origin_station_name=o_st_name,
+                origin_lat=o_st_lat,
+                origin_lon=o_st_lon,
+                destination_station_name=d_st_name,
+                destination_lat=d_st_lat,
+                destination_lon=d_st_lon
             )
     elif mode == "flight":
         from app.models.models import Flight
         item = db.query(Flight).filter(Flight.id == item_id).first()
         if item:
             stops, items = get_transit_stops_and_amenities(item.origin, item.destination, "flight", item.airline, option_id)
+            (o_st_name, o_st_lat, o_st_lon), (d_st_name, d_st_lat, d_st_lon) = get_transit_stations(item.origin, item.destination, "flight")
             return TransportOption(
                 id=option_id,
                 origin=item.origin,
@@ -359,6 +551,12 @@ def get_transport_option_by_id(option_id: str, db: Session) -> TransportOption |
                 seats_available=item.seats_available,
                 intermediate_stops=stops,
                 complimentary_items=items,
+                origin_station_name=o_st_name,
+                origin_lat=o_st_lat,
+                origin_lon=o_st_lon,
+                destination_station_name=d_st_name,
+                destination_lat=d_st_lat,
+                destination_lon=d_st_lon
             )
     return None
 

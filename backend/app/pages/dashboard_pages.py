@@ -218,7 +218,8 @@ def trip_itinerary_page(trip_id: int, request: Request, db: Session = Depends(ge
     booked_hotel = db.query(HotelBooking).join(Hotel).filter(
         HotelBooking.user_id == user.id,
         HotelBooking.status == "confirmed",
-        Hotel.city.ilike(f"%{trip.destination}%")
+        Hotel.city.ilike(f"%{trip.destination}%"),
+        HotelBooking.check_in_date == trip.start_date
     ).first()
 
     booked_hotel_dict = None
@@ -248,6 +249,7 @@ def start_trip_page(
     trip_id: int = None,
     origin: str = "",
     destination: str = "",
+    date: str = "",
     db: Session = Depends(get_db)
 ):
     user = get_user_from_cookie(request, db)
@@ -262,6 +264,8 @@ def start_trip_page(
                 origin = trip.origin
             if not destination:
                 destination = trip.destination
+            if not date:
+                date = trip.start_date
 
     vehicles = db.query(Vehicle).filter(Vehicle.user_id == user.id).all()
     token = request.cookies.get("access_token")
@@ -275,6 +279,7 @@ def start_trip_page(
         "trip": trip,
         "origin": origin,
         "destination": destination,
+        "date": date,
         "has_unread_bookings": has_unread_bookings
     })
 
