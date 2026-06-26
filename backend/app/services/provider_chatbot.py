@@ -84,6 +84,27 @@ Bookings List:
 def mock_partner_chat_response(message: str, provider_id: int = None, db: Session = None) -> str:
     msg_lower = message.lower()
 
+    # ── Early exit: explicitly handle booking queries before any other logic ──
+    if db and provider_id and any(phrase in msg_lower for phrase in [
+        "what are my booking", "my bookings", "show my booking", "list my booking",
+        "display my booking", "show booking", "list booking"
+    ]):
+        from app.models.models import ProviderVehicle, ProviderBooking
+        bookings = db.query(ProviderBooking).join(ProviderVehicle).filter(ProviderVehicle.provider_id == provider_id).all()
+        if not bookings:
+            return "📋 You don't have any bookings yet."
+        active_bookings = [b for b in bookings if b.status != "cancelled"]
+        if not active_bookings:
+            return "📋 All your bookings are currently cancelled or inactive."
+        lines = []
+        for b in active_bookings:
+            lines.append(
+                f"• **Booking #{b.id}** by {b.passenger_name} | {b.travel_date} | "
+                f"Seats: {b.selected_seats or b.num_seats} | Fare: ₹{b.total_fare_inr} | "
+                f"Phone: {b.passenger_phone or 'N/A'}"
+            )
+        return f"📋 You have {len(active_bookings)} active booking(s):\n" + "\n".join(lines)
+
     # ── Early exit: explicitly handle "show/list my vehicles" before any other logic ──
     if db and provider_id and any(phrase in msg_lower for phrase in [
         "show my vehicle", "list my vehicle", "my vehicles", "show vehicle",
