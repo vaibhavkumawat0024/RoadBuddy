@@ -342,6 +342,56 @@ def delete_vehicle(vehicle_id: int, request: Request, db: Session = Depends(get_
     return RedirectResponse("/provider/vehicles?success=Vehicle deleted.", status_code=303)
 
 
+@router.post("/vehicles/{vehicle_id}/edit", response_class=HTMLResponse)
+def edit_vehicle_submit(
+    vehicle_id: int,
+    request: Request,
+    origin: Optional[str] = Form(None),
+    destination: Optional[str] = Form(None),
+    departure_time: Optional[str] = Form(None),
+    arrival_time: Optional[str] = Form(None),
+    fixed_fare_inr: Optional[float] = Form(None),
+    price_per_km_inr: Optional[float] = Form(None),
+    pickup_points: Optional[str] = Form(None),
+    dropoff_points: Optional[str] = Form(None),
+    service_dates: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+):
+    provider = get_provider_from_cookie(request, db)
+    if not provider:
+        return RedirectResponse("/provider/login", status_code=303)
+    if not provider.company_name:
+        return RedirectResponse("/provider/dashboard?setup_required=1", status_code=303)
+
+    vehicle = db.query(ProviderVehicle).filter(
+        ProviderVehicle.id == vehicle_id,
+        ProviderVehicle.provider_id == provider.id,
+    ).first()
+
+    if vehicle:
+        if origin is not None:
+            vehicle.origin = origin
+        if destination is not None:
+            vehicle.destination = destination
+        if departure_time is not None:
+            vehicle.departure_time = departure_time if departure_time else None
+        if arrival_time is not None:
+            vehicle.arrival_time = arrival_time if arrival_time else None
+        if fixed_fare_inr is not None:
+            vehicle.fixed_fare_inr = fixed_fare_inr
+        if price_per_km_inr is not None:
+            vehicle.price_per_km_inr = price_per_km_inr
+        
+        vehicle.pickup_points = pickup_points if pickup_points else None
+        vehicle.dropoff_points = dropoff_points if dropoff_points else None
+        vehicle.service_dates = service_dates if service_dates else None
+
+        db.commit()
+
+    return RedirectResponse("/provider/vehicles?success=Vehicle listing updated successfully!", status_code=303)
+
+
+
 # ── Bookings ───────────────────────────────────────────────────────────────
 
 @router.get("/bookings", response_class=HTMLResponse)

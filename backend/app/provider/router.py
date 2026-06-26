@@ -812,7 +812,11 @@ class ProviderChatMessage(BaseModel):
 
 
 @router.post("/chat")
-async def provider_chat(request: ProviderChatMessage, provider: Provider = Depends(get_current_provider)):
+async def provider_chat(
+    request: ProviderChatMessage,
+    provider: Provider = Depends(get_current_provider),
+    db: Session = Depends(get_db),
+):
     """
     AI-powered conversational partner assistant chatbot.
     """
@@ -820,8 +824,11 @@ async def provider_chat(request: ProviderChatMessage, provider: Provider = Depen
         result = await chat_with_provider_bot(
             message=request.message,
             history=request.history,
+            provider_id=provider.id,
+            db=db,
         )
         return result
+
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e))
 
