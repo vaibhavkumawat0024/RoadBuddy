@@ -135,10 +135,24 @@
   <nav class="sticky top-0 z-50 bg-surface-container-lowest border-b border-outline-variant">
     <div class="max-w-max-width mx-auto px-layout h-16 flex justify-between items-center">
       <!-- Brand -->
-      <div class="flex items-center gap-sm">
-        <span class="material-symbols-outlined text-primary text-3xl" style="font-variation-settings: 'FILL' 1;">directions_car</span>
-        <span class="text-headline-lg font-headline-lg font-bold text-primary">RoadBuddy</span>
-      </div>
+      <a href="/dashboard" class="flex items-center gap-2.5 group cursor-pointer text-decoration-none">
+        <div class="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-tr from-primary to-primary-container shadow-md shadow-primary/10 transition-all duration-300 group-hover:scale-105 group-hover:rotate-3">
+          <div class="absolute inset-0.5 rounded-[10px] border border-white/20"></div>
+          <svg class="w-5 h-5 text-white transition-all duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L2 22L12 18L22 22L12 2Z" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+          </svg>
+          <span class="absolute -bottom-0.5 -right-0.5 flex h-2.5 w-2.5">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-secondary"></span>
+          </span>
+        </div>
+        <div class="flex flex-col">
+          <span class="text-xl font-extrabold tracking-tight text-on-surface select-none">
+            Road<span class="bg-gradient-to-r from-primary-container to-primary bg-clip-text text-transparent">Buddy</span>
+          </span>
+          <span class="text-[9px] text-on-surface-variant font-bold tracking-widest uppercase -mt-0.5 select-none">Your Trip Pilot</span>
+        </div>
+      </a>
       
       <!-- Actions -->
       <div class="flex items-center gap-md">

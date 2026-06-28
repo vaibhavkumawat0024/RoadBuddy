@@ -50,10 +50,10 @@
     </div>
   </div>
 
-  <!-- Tabs Selector -->
   <div class="flex border-b border-slate-200 gap-1 bg-white p-1 rounded-xl border border-outline-variant">
     <button class="booking-tab-btn active px-4 py-2 text-xs font-semibold text-slate-500 rounded-lg transition-colors flex-1" data-tab="hotels">🏨 Hotels</button>
     <button class="booking-tab-btn px-4 py-2 text-xs font-semibold text-slate-500 rounded-lg transition-colors flex-1" data-tab="transport">🚌 Transit Options</button>
+    <button class="booking-tab-btn px-4 py-2 text-xs font-semibold text-slate-500 rounded-lg transition-colors flex-1" data-tab="cabs">🚕 Cab Service</button>
     <button class="booking-tab-btn px-4 py-2 text-xs font-semibold text-slate-500 rounded-lg transition-colors flex-1" data-tab="my-bookings">🎫 My Bookings</button>
   </div>
 
@@ -112,6 +112,29 @@
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="trans-results">
       <!-- Transport search results grid -->
+    </div>
+  </div>
+
+  <!-- CABS TAB CONTENT -->
+  <div id="tab-cabs" class="tab-content-panel space-y-6" style="display:none;">
+    <section class="bg-white border border-outline-variant rounded-2xl p-6 shadow-sm">
+      <form id="cab-search-form" class="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Departure City</label>
+          <input type="text" id="cab-origin" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-background focus:ring-1 focus:ring-primary focus:border-primary" placeholder="e.g. Jaipur" required>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Arrival City</label>
+          <input type="text" id="cab-destination" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-background focus:ring-1 focus:ring-primary focus:border-primary" placeholder="e.g. Udaipur" required>
+        </div>
+        <div class="md:col-span-2 pt-2">
+          <button type="submit" class="bg-primary hover:bg-primary-container text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition-colors w-full md:w-auto">Search Available Cabs</button>
+        </div>
+      </form>
+    </section>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="cab-results">
+      <!-- Cab search results grid -->
     </div>
   </div>
 
@@ -272,6 +295,16 @@
       document.getElementById(`tab-${tab}`).style.display = "block";
     });
   });
+
+  // Set tab based on URL param
+  const urlParams = new URLSearchParams(window.location.search);
+  const activeTab = urlParams.get('tab');
+  if (activeTab) {
+    const tabBtn = document.querySelector(`.booking-tab-btn[data-tab="${activeTab}"]`);
+    if (tabBtn) {
+      tabBtn.click();
+    }
+  }
 
   // ── HOTELS SEARCH & BOOK ──
   document.getElementById("hotel-search-form").addEventListener("submit", async (e) => {
@@ -483,6 +516,73 @@
         alert(err.message);
       }
     });
+  });
+
+  // ── CABS OPTIONS SEARCH ──
+  document.getElementById("cab-search-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    
+    const origin = document.getElementById("cab-origin").value.trim();
+    const destination = document.getElementById("cab-destination").value.trim();
+    const resultsContainer = document.getElementById("cab-results");
+    
+    resultsContainer.innerHTML = `<div class="col-span-full text-center py-6 text-slate-400 text-xs italic"><p>Searching available cabs...</p></div>`;
+    
+    try {
+      const res = await fetch(`/bookings/cabs/services?origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}`);
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.detail || "Search failed");
+      
+      if (data.length === 0) {
+        resultsContainer.innerHTML = `<p class="col-span-full text-center py-6 text-slate-400 text-xs italic">No cab services registered between "${origin}" and "${destination}" yet.</p>`;
+        return;
+      }
+      
+      const categoryLabels = { private: '🚖 Private Cab', company: '🏢 Company / Operator', rental: '🔑 Self-Drive Rental' };
+
+      resultsContainer.innerHTML = data.map(s => {
+        const isPrivate = s.destination === 'Private';
+        const isFullyBooked = (s.seats_available === 0);
+        const driverLabel = s.driver_included ? 'Driver Included' : 'Self-Drive';
+        const typeLabel = `${categoryLabels[s.cab_category] || s.cab_category}`;
+        
+        const cardTitle = `${typeLabel} · ${s.provider_name}`;
+        
+        const detailsLink = `/start-trip?origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}`;
+        
+        const bookingAction = isFullyBooked
+          ? `<button class="bg-slate-100 text-slate-400 text-xs font-semibold py-2 rounded-lg cursor-not-allowed w-full text-center" disabled>Fully Booked</button>`
+          : `<a class="bg-primary hover:bg-primary-container text-white text-xs font-semibold py-2 rounded-lg transition-colors w-full inline-block text-center" href="${detailsLink}">Book & Select Seats</a>`;
+
+        return `
+        <div class="bg-white border border-outline-variant rounded-2xl p-5 shadow-sm flex flex-col justify-between space-y-4 animate-fade-in-up">
+          <div class="flex justify-between items-start border-b border-slate-100 pb-2">
+            <div>
+              <h4 class="font-bold text-slate-800 text-sm line-clamp-1">${cardTitle}</h4>
+              <p class="text-[10px] text-slate-400">🕒 Service: ${s.vehicle_name} (${s.vehicle_type})</p>
+            </div>
+            <div class="text-right">
+              <span class="font-extrabold text-primary text-sm block">
+                ${isPrivate ? `₹${s.price_per_km_inr}/km` : (s.fixed_fare_inr ? `₹${s.fixed_fare_inr}` : 'Price on request')}
+              </span>
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-1 text-[9px] font-bold">
+            <span class="bg-slate-100 text-slate-500 px-2 py-0.5 rounded">${driverLabel}</span>
+            <span class="bg-slate-100 text-slate-500 px-2 py-0.5 rounded">${s.seats_available} seat(s) available</span>
+            ${isPrivate ? `<span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded">Private Rental</span>` : `<span class="bg-primary/10 text-primary px-2 py-0.5 rounded">Fixed Route</span>`}
+          </div>
+          <div class="text-[11px] text-slate-500 pt-1">
+            <strong>Route:</strong> ${s.origin} → ${s.destination}
+          </div>
+          ${bookingAction}
+        </div>
+        `;
+      }).join('');
+    } catch (err) {
+      resultsContainer.innerHTML = `<p class="col-span-full text-red-500 text-xs text-center py-4">Error: ${err.message}</p>`;
+    }
   });
 </script>
 {% endblock %}

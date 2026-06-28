@@ -81,9 +81,25 @@
 
   <!-- Sidebar Navigation (Stitch Style) -->
   <aside class="h-screen w-64 fixed left-0 top-0 hidden lg:flex flex-col gap-4 p-6 border-r border-outline-variant bg-surface-container-low z-50">
-    <div class="flex flex-col gap-1 mb-6">
-      <span class="text-lg font-bold text-primary">🚗 RoadBuddy</span>
-      <span class="text-xs text-on-surface-variant uppercase tracking-widest font-semibold">Command Center</span>
+    <div class="mb-6">
+      <a href="/dashboard" class="flex items-center gap-2.5 group cursor-pointer text-decoration-none">
+        <div class="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-tr from-primary to-primary-container shadow-md shadow-primary/10 transition-all duration-300 group-hover:scale-105 group-hover:rotate-3">
+          <div class="absolute inset-0.5 rounded-[10px] border border-white/20"></div>
+          <svg class="w-5 h-5 text-white transition-all duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L2 22L12 18L22 22L12 2Z" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+          </svg>
+          <span class="absolute -bottom-0.5 -right-0.5 flex h-2.5 w-2.5">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-secondary"></span>
+          </span>
+        </div>
+        <div class="flex flex-col">
+          <span class="text-xl font-extrabold tracking-tight text-on-surface select-none">
+            Road<span class="bg-gradient-to-r from-primary-container to-primary bg-clip-text text-transparent">Buddy</span>
+          </span>
+          <span class="text-[9px] text-on-surface-variant font-bold tracking-widest uppercase -mt-0.5 select-none">Your Trip Pilot</span>
+        </div>
+      </a>
     </div>
     <nav class="flex flex-col gap-2 flex-grow">
       <a class="flex items-center gap-3 p-3 {% if active_page == 'dashboard' %}bg-primary/10 text-primary font-bold{% else %}text-on-surface-variant hover:bg-black/5{% endif %} rounded-lg transition-all duration-200" href="/dashboard">
@@ -162,7 +178,19 @@
     <!-- Top Navigation Bar -->
     <header class="sticky top-0 z-40 bg-white border-b border-outline-variant h-16 flex items-center justify-between px-6 w-full flex-shrink-0">
       <h1 class="text-lg font-bold text-primary lg:block hidden">{% block header_title %}RoadBuddy{% endblock %}</h1>
-      <h1 class="text-lg font-bold text-primary lg:hidden block">🚗 RoadBuddy</h1>
+      <div class="lg:hidden block">
+        <a href="/dashboard" class="flex items-center gap-2 group text-decoration-none">
+          <div class="relative flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-tr from-primary to-primary-container shadow-sm shadow-primary/10 transition-all duration-300 group-hover:scale-105">
+            <div class="absolute inset-0.5 rounded-[6px] border border-white/20"></div>
+            <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2L2 22L12 18L22 22L12 2Z" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <span class="text-base font-extrabold tracking-tight text-on-surface select-none">
+            Road<span class="bg-gradient-to-r from-primary-container to-primary bg-clip-text text-transparent">Buddy</span>
+          </span>
+        </a>
+      </div>
       <div class="flex items-center gap-4">
         <button class="material-symbols-outlined p-2 hover:bg-black/5 rounded-full text-on-surface-variant">notifications</button>
         <a href="/settings" class="w-8 h-8 rounded-full overflow-hidden border border-primary block">
@@ -365,8 +393,25 @@
             }, 50);
           }
         } else {
-          if (dot) dot.classList.add("hidden");
-          if (mobileDot) mobileDot.classList.add("hidden");
+          try {
+            const unreadRes = await fetch("/bookings/unread-check");
+            if (unreadRes.ok) {
+              const unreadData = await unreadRes.json();
+              if (unreadData.has_unread) {
+                if (dot) dot.classList.remove("hidden");
+                if (mobileDot) mobileDot.classList.remove("hidden");
+              } else {
+                if (dot) dot.classList.add("hidden");
+                if (mobileDot) mobileDot.classList.add("hidden");
+              }
+            } else {
+              if (dot) dot.classList.add("hidden");
+              if (mobileDot) mobileDot.classList.add("hidden");
+            }
+          } catch (e) {
+            if (dot) dot.classList.add("hidden");
+            if (mobileDot) mobileDot.classList.add("hidden");
+          }
         }
 
       } catch (err) {

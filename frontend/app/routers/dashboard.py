@@ -35,9 +35,10 @@ class ChatBody(BaseModel):
 
 
 @router.post("/dashboard/chat")
-async def proxy_chat(body: ChatBody):
+async def proxy_chat(request: Request, body: ChatBody):
+    token = _get_token(request)
     try:
-        result = await api_client.trip_chat(body.message, body.history)
+        result = await api_client.trip_chat(body.message, body.history, token=token)
         return result
     except api_client.BackendError as e:
         return JSONResponse(status_code=e.status_code, content={"detail": e.detail})

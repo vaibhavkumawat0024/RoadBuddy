@@ -214,7 +214,7 @@ def trip_itinerary_page(trip_id: int, request: Request, db: Session = Depends(ge
         TripStop.trip_id == trip.id
     ).order_by(TripStop.day, TripStop.time_slot).all()
 
-    from app.models.models import HotelBooking, Hotel
+    from app.models.models import HotelBooking, Hotel, Booking, ProviderBooking
     booked_hotel = db.query(HotelBooking).join(Hotel).filter(
         HotelBooking.user_id == user.id,
         HotelBooking.status == "confirmed",
@@ -231,6 +231,79 @@ def trip_itinerary_page(trip_id: int, request: Request, db: Session = Depends(ge
             "num_rooms": booked_hotel.num_rooms
         }
 
+    booked_bus = None
+    booked_train = None
+    booked_flight = None
+    booked_cab = None
+
+    from app.services.transport_service import get_transport_option_by_id
+
+    # Transit bookings query
+    transit_bookings = db.query(Booking).filter(
+        Booking.user_id == user.id,
+        Booking.travel_date == trip.start_date,
+        Booking.status == "confirmed"
+    ).all()
+
+    for b in transit_bookings:
+        opt = get_transport_option_by_id(b.transport_option_id, db)
+        mode = opt.mode if opt else None
+        operator = opt.operator if opt else None
+        if not mode:
+            try:
+                mode = b.transport_option_id.split("_")[0]
+            except:
+                pass
+        b_dict = {
+            "id": str(b.id),
+            "transport_option_id": b.transport_option_id,
+            "passenger_name": b.passenger_name,
+            "travel_date": b.travel_date,
+            "include_return": b.include_return,
+            "return_date": b.return_date,
+            "going_fare_inr": b.going_fare_inr,
+            "return_fare_inr": b.return_fare_inr,
+            "total_fare_inr": b.total_fare_inr,
+            "status": b.status,
+            "selected_seats": b.selected_seats,
+            "travel_class": b.travel_class,
+            "mode": mode,
+            "operator": operator,
+            "departure_time": opt.departure_time if opt else "10:00 AM",
+            "arrival_time": opt.arrival_time if opt else "06:00 PM",
+        }
+        if mode == "bus":
+            booked_bus = b_dict
+        elif mode == "train":
+            booked_train = b_dict
+        elif mode == "flight":
+            booked_flight = b_dict
+
+    # Cab bookings query
+    cab_bookings = db.query(ProviderBooking).filter(
+        ProviderBooking.user_id == user.id,
+        ProviderBooking.travel_date == trip.start_date,
+        ProviderBooking.status == "confirmed"
+    ).all()
+
+    for cb in cab_bookings:
+        booked_cab = {
+            "id": str(cb.id),
+            "vehicle_id": cb.vehicle_id,
+            "vehicle_name": cb.vehicle.vehicle_name if cb.vehicle else "Cab",
+            "passenger_name": cb.passenger_name,
+            "passenger_phone": cb.passenger_phone,
+            "passenger_email": cb.passenger_email,
+            "travel_date": cb.travel_date,
+            "num_seats": cb.num_seats,
+            "pickup_location": cb.pickup_location,
+            "dropoff_location": cb.dropoff_location,
+            "selected_seats": cb.selected_seats,
+            "total_fare_inr": cb.total_fare_inr,
+            "status": cb.status,
+        }
+        break
+
     token = request.cookies.get("access_token")
     has_unread_bookings = check_unread_bookings(user, db)
     
@@ -239,7 +312,11 @@ def trip_itinerary_page(trip_id: int, request: Request, db: Session = Depends(ge
         "trip": trip,
         "token": token,
         "has_unread_bookings": has_unread_bookings,
-        "booked_hotel": booked_hotel_dict
+        "booked_hotel": booked_hotel_dict,
+        "booked_bus": booked_bus,
+        "booked_train": booked_train,
+        "booked_flight": booked_flight,
+        "booked_cab": booked_cab
     })
 
 
@@ -271,6 +348,79 @@ def start_trip_page(
     token = request.cookies.get("access_token")
     has_unread_bookings = check_unread_bookings(user, db)
 
+    booked_bus = None
+    booked_train = None
+    booked_flight = None
+    booked_cab = None
+
+    if date:
+        from app.models.models import Booking, ProviderBooking
+        from app.services.transport_service import get_transport_option_by_id
+
+        transit_bookings = db.query(Booking).filter(
+            Booking.user_id == user.id,
+            Booking.travel_date == date,
+            Booking.status == "confirmed"
+        ).all()
+
+        for b in transit_bookings:
+            opt = get_transport_option_by_id(b.transport_option_id, db)
+            mode = opt.mode if opt else None
+            operator = opt.operator if opt else None
+            if not mode:
+                try:
+                    mode = b.transport_option_id.split("_")[0]
+                except:
+                    pass
+            b_dict = {
+                "id": str(b.id),
+                "transport_option_id": b.transport_option_id,
+                "passenger_name": b.passenger_name,
+                "travel_date": b.travel_date,
+                "include_return": b.include_return,
+                "return_date": b.return_date,
+                "going_fare_inr": b.going_fare_inr,
+                "return_fare_inr": b.return_fare_inr,
+                "total_fare_inr": b.total_fare_inr,
+                "status": b.status,
+                "selected_seats": b.selected_seats,
+                "travel_class": b.travel_class,
+                "mode": mode,
+                "operator": operator,
+                "departure_time": opt.departure_time if opt else "10:00 AM",
+                "arrival_time": opt.arrival_time if opt else "06:00 PM",
+            }
+            if mode == "bus":
+                booked_bus = b_dict
+            elif mode == "train":
+                booked_train = b_dict
+            elif mode == "flight":
+                booked_flight = b_dict
+
+        cab_bookings = db.query(ProviderBooking).filter(
+            ProviderBooking.user_id == user.id,
+            ProviderBooking.travel_date == date,
+            ProviderBooking.status == "confirmed"
+        ).all()
+
+        for cb in cab_bookings:
+            booked_cab = {
+                "id": str(cb.id),
+                "vehicle_id": cb.vehicle_id,
+                "vehicle_name": cb.vehicle.vehicle_name if cb.vehicle else "Cab",
+                "passenger_name": cb.passenger_name,
+                "passenger_phone": cb.passenger_phone,
+                "passenger_email": cb.passenger_email,
+                "travel_date": cb.travel_date,
+                "num_seats": cb.num_seats,
+                "pickup_location": cb.pickup_location,
+                "dropoff_location": cb.dropoff_location,
+                "selected_seats": cb.selected_seats,
+                "total_fare_inr": cb.total_fare_inr,
+                "status": cb.status,
+            }
+            break
+
     return templates.TemplateResponse(request, "start_trip.html", {
         "user": user,
         "vehicles": vehicles,
@@ -280,7 +430,11 @@ def start_trip_page(
         "origin": origin,
         "destination": destination,
         "date": date,
-        "has_unread_bookings": has_unread_bookings
+        "has_unread_bookings": has_unread_bookings,
+        "booked_bus": booked_bus,
+        "booked_train": booked_train,
+        "booked_flight": booked_flight,
+        "booked_cab": booked_cab
     })
 
 

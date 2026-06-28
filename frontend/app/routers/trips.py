@@ -16,7 +16,7 @@ def _get_token(request: Request) -> str | None:
 
 
 @router.get("/plan-trip")
-async def plan_trip_page(request: Request):
+async def plan_trip_page(request: Request, origin: str = "", destination: str = ""):
     token = _get_token(request)
     if not token:
         return RedirectResponse(url="/login")
@@ -27,7 +27,12 @@ async def plan_trip_page(request: Request):
     except api_client.BackendError:
         vehicles = []  # fine if user has none yet — bus/train/flight modes don't need one
 
-    return templates.TemplateResponse(request, "plan_trip.html", {"request": request, "vehicles": vehicles})
+    return templates.TemplateResponse(request, "plan_trip.html", {
+        "request": request,
+        "vehicles": vehicles,
+        "origin": origin,
+        "destination": destination
+    })
 
 
 class TripGenerateBody(BaseModel):

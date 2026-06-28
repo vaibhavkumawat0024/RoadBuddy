@@ -199,7 +199,11 @@ async def search_transport(request: Request, body: TransportSearchBody):
     if not token:
         return JSONResponse(status_code=401, content={"detail": "Unauthorized. Please log in."})
     try:
-        return await api_client.search_transport(token, body.model_dump())
+        payload = body.model_dump()
+        if "travel_date" not in payload or not payload["travel_date"]:
+            from datetime import date
+            payload["travel_date"] = date.today().isoformat()
+        return await api_client.search_transport(token, payload)
     except api_client.BackendError as e:
         return JSONResponse(status_code=e.status_code, content={"detail": e.detail})
 
@@ -210,6 +214,8 @@ class TransportBookBody(BaseModel):
     travel_date: str
     include_return: bool = False
     return_date: Optional[str] = None
+    selected_seats: Optional[str] = None
+    travel_class: Optional[str] = None
 
 
 @router.post("/bookings/transport/book")
@@ -262,7 +268,23 @@ async def my_bookings_page(request: Request):
 
     bookings = []
     try:
-        bookings = await api_client.list_provider_bookings(token)
+        # Mark unread bookings as read when this page is loaded
+        try:
+            await api_client.mark_unread_provider_bookings_as_read(token)
+        except Exception:
+            pass
+        cab_bookings = await api_client.list_provider_bookings(token)
+        transit_bookings = await api_client.list_bookings(token)
+
+        for b in transit_bookings:
+            if b.get("mode") is None and b.get("hotel_name") is not None:
+                b["is_hotel"] = True
+            else:
+                b["is_transit"] = True
+
+        all_bookings = list(cab_bookings) + list(transit_bookings)
+        all_bookings.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+        bookings = all_bookings
     except Exception:
         pass
 
@@ -287,6 +309,22 @@ async def cancel_booking(booking_id: int, request: Request):
 
     try:
         await api_client.cancel_provider_booking(token, booking_id)
+    except Exception:
+        pass
+
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/my-bookings", status_code=303)
+
+
+@router.post("/cancel-transit-booking/{booking_id}")
+async def cancel_transit_booking(booking_id: str, request: Request):
+    token = _get_token(request)
+    if not token:
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/login", status_code=303)
+
+    try:
+        await api_client.cancel_booking(token, booking_id)
     except Exception:
         pass
 
@@ -325,3 +363,41 @@ async def unread_check_route(request: Request):
         return await api_client.check_unread_provider_bookings(token)
     except api_client.BackendError as e:
         return JSONResponse(status_code=e.status_code, content={"detail": e.detail})
+
+
+@router.post("/bookings/mark-read")
+async def mark_read_route(request: Request):
+    token = _get_token(request)
+    if not token:
+        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+    try:
+        return await api_client.mark_unread_provider_bookings_as_read(token)
+    except api_client.BackendError as e:
+        return JSONResponse(status_code=e.status_code, content={"detail": e.detail})
+
+
+@router.get("/bookings/cabs/services")
+async def list_cabs_proxy(request: Request, origin: Optional[str] = "", destination: Optional[str] = ""):
+    token = _get_token(request)
+    if not token:
+        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+    try:
+        return await api_client.list_cab_services(origin=origin, destination=destination)
+    except api_client.BackendError as e:
+        return JSONResponse(status_code=e.status_code, content={"detail": e.detail})
+
+
+@router.post("/cancel-hotel-booking/{booking_id}")
+async def cancel_hotel_booking_route(booking_id: int, request: Request):
+    token = _get_token(request)
+    if not token:
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/login", status_code=303)
+
+    try:
+        await api_client.cancel_hotel_booking(token, booking_id)
+    except Exception:
+        pass
+
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/my-bookings", status_code=303)

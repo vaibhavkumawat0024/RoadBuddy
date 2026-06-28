@@ -1,0 +1,327 @@
+{% extends "provider_base.html" %}
+{% block title %}Partner Dashboard — RoadBuddy{% endblock %}
+{% block header_title %}Dashboard & Analytics{% endblock %}
+
+{% block content %}
+<div class="space-y-8 animate-fade-in">
+  
+  <!-- Dashboard Header -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <h1 class="font-outfit font-extrabold text-2xl md:text-3xl text-white tracking-tight">Welcome, {{ provider.contact_person or 'Partner' }} 👋</h1>
+      <p class="text-sm text-slate-400 mt-1">Manage your transit operations and review booking analytics</p>
+    </div>
+    <div>
+      {% if show_setup %}
+      <button onclick="openSetupPopup()" class="px-5 py-3 bg-brand-orange hover:bg-opacity-95 text-white font-bold rounded-xl text-sm transition-all active:scale-[0.98] shadow-lg shadow-orange-500/10 flex items-center gap-2">
+        <span class="material-symbols-outlined text-sm">add</span> Add Vehicle
+      </button>
+      {% else %}
+      <a href="/provider/vehicles" class="px-5 py-3 bg-brand-orange hover:bg-opacity-95 text-white font-bold rounded-xl text-sm transition-all active:scale-[0.98] shadow-lg shadow-orange-500/10 flex items-center gap-2">
+        <span class="material-symbols-outlined text-sm">add</span> Add Vehicle
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Warning Banner -->
+  {% if show_setup %}
+  <div class="p-6 bg-amber-500 bg-opacity-10 border border-amber-500 border-opacity-20 rounded-3xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div class="flex items-start gap-4">
+      <div class="w-12 h-12 bg-amber-500 bg-opacity-20 text-amber-400 rounded-2xl flex items-center justify-center text-xl flex-shrink-0">
+        ⚠️
+      </div>
+      <div>
+        <h3 class="font-bold text-white text-base">Quick Setup Incomplete</h3>
+        <p class="text-sm text-slate-400 mt-0.5">Please complete your business profile setup first. You won't be able to list vehicles or receive client bookings until activated.</p>
+      </div>
+    </div>
+    <button onclick="openSetupPopup()" class="px-5 py-2.5 bg-amber-500 hover:bg-opacity-90 text-slate-950 font-bold rounded-xl text-xs tracking-wider uppercase transition-all whitespace-nowrap">
+      Activate Now
+    </button>
+  </div>
+  {% endif %}
+
+  <!-- Stats Grid -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl flex items-center gap-5">
+      <div class="w-12 h-12 rounded-2xl bg-sky-500 bg-opacity-10 text-sky-400 flex items-center justify-center text-2xl font-bold">
+        🚗
+      </div>
+      <div>
+        <p class="text-2xl font-extrabold text-white font-outfit">{{ vehicle_count }}</p>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-0.5">Active Listings</p>
+      </div>
+    </div>
+
+    <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl flex items-center gap-5">
+      <div class="w-12 h-12 rounded-2xl bg-indigo-500 bg-opacity-10 text-indigo-400 flex items-center justify-center text-2xl font-bold">
+        📋
+      </div>
+      <div>
+        <p class="text-2xl font-extrabold text-white font-outfit">{{ total_bookings }}</p>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-0.5">Total Bookings</p>
+      </div>
+    </div>
+
+    <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl flex items-center gap-5">
+      <div class="w-12 h-12 rounded-2xl bg-brand-orange bg-opacity-10 text-brand-orange flex items-center justify-center text-2xl font-bold">
+        💺
+      </div>
+      <div>
+        <p class="text-2xl font-extrabold text-white font-outfit">{{ total_seats_booked }}</p>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-0.5">Seats Booked</p>
+      </div>
+    </div>
+
+    <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl flex items-center gap-5">
+      <div class="w-12 h-12 rounded-2xl bg-emerald-500 bg-opacity-10 text-emerald-400 flex items-center justify-center text-2xl font-bold">
+        💰
+      </div>
+      <div>
+        <p class="text-2xl font-extrabold text-white font-outfit">₹{{ "{:,.0f}".format(total_revenue) }}</p>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-0.5">Gross Revenue</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Vehicle Listings Section -->
+  <div class="space-y-4">
+    <h2 class="font-outfit font-extrabold text-lg text-white tracking-wide">Active Fleet Listings</h2>
+    
+    {% if vehicles %}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {% for v in vehicles %}
+      <div class="bg-slate-900 border border-slate-850 hover:border-slate-800 p-5 rounded-2xl flex items-start gap-4 transition-all duration-200">
+        <div class="w-12 h-12 rounded-2xl bg-slate-800 flex items-center justify-center text-2xl flex-shrink-0">
+          {% if 'bus' in v.vehicle_type %}🚌
+          {% elif v.vehicle_type == 'suv' %}🚙
+          {% else %}🚗
+          {% endif %}
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center justify-between gap-2">
+            <h4 class="font-bold text-white text-base truncate">{{ v.vehicle_name }}</h4>
+            <span class="px-2.5 py-0.5 text-[10px] font-extrabold tracking-wider uppercase rounded-full {% if v.is_active %}bg-emerald-500 bg-opacity-10 text-emerald-400 border border-emerald-500 border-opacity-20{% else %}bg-slate-800 text-slate-400{% endif %}">
+              {{ 'Active' if v.is_active else 'Inactive' }}
+            </span>
+          </div>
+          
+          <p class="text-xs text-slate-400 font-medium mt-1 flex items-center gap-1">
+            <span class="material-symbols-outlined text-sm text-slate-500">near_me</span>
+            {{ v.origin }} <span class="text-brand-orange font-bold">→</span> {{ v.destination }}
+            {% if v.departure_time %} · 🕐 {{ v.departure_time }}{% endif %}
+          </p>
+          
+          <div class="text-[11px] text-slate-500 mt-2 flex flex-wrap gap-x-3 gap-y-1">
+            <span>💺 {{ v.seats_available }} / {{ v.total_seats }} seats open</span>
+            {% if v.fixed_fare_inr %}<span>· ₹{{ v.fixed_fare_inr|int }} fare</span>{% endif %}
+            {% if v.price_per_km_inr %}<span>· ₹{{ v.price_per_km_inr }}/km</span>{% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="bg-slate-900 border border-dashed border-slate-800 rounded-3xl p-12 text-center max-w-lg mx-auto">
+      <div class="text-4xl mb-3">🚗</div>
+      <h3 class="font-bold text-white text-base">No active vehicle listings</h3>
+      <p class="text-sm text-slate-500 mt-1 mb-6">List routes or private rentals to show them on customer maps</p>
+      <a href="/provider/vehicles" class="px-5 py-2.5 bg-brand-orange hover:bg-opacity-95 text-white font-bold rounded-xl text-xs tracking-wider uppercase transition-all shadow-lg shadow-orange-500/10">
+        Register Fleet Vehicle
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ═══ Quick Setup Overlay Popup ═══ -->
+{% if show_setup %}
+<div class="fixed inset-0 bg-black bg-opacity-65 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" id="setup-overlay">
+  <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-xl max-h-[90vh] overflow-y-auto p-8 shadow-2xl relative" id="setup-popup">
+    
+    <div class="flex items-start justify-between border-b border-slate-800 pb-4 mb-6">
+      <div>
+        <h2 class="font-outfit font-extrabold text-xl text-white tracking-tight flex items-center gap-2">
+          <span class="text-brand-orange">⚡</span> Partner Service Activation
+        </h2>
+        <p class="text-xs text-slate-400 mt-0.5">Please provide your business and booking parameters</p>
+      </div>
+      <button class="text-slate-400 hover:text-white" onclick="closeSetupPopup()">&times;</button>
+    </div>
+
+    <form method="POST" action="/provider/setup" class="space-y-6">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        <div>
+          <label for="setup-company" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Business / Company Name *</label>
+          <input type="text" id="setup-company" name="company_name" placeholder="e.g. Jaipur Cabs Pvt Ltd" required 
+            class="w-full bg-slate-950 border border-slate-800 focus:border-brand-orange rounded-xl px-4 py-3 text-sm text-white placeholder-slate-650 outline-none transition-all duration-200" />
+        </div>
+
+        <div>
+          <label for="setup-contact" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Primary Contact Name *</label>
+          <input type="text" id="setup-contact" name="contact_person" placeholder="e.g. Ramesh Kumar" required 
+            class="w-full bg-slate-950 border border-slate-800 focus:border-brand-orange rounded-xl px-4 py-3 text-sm text-white placeholder-slate-650 outline-none transition-all duration-200" />
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+        <div class="sm:col-span-2">
+          <label for="setup-phone" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Primary Phone Number *</label>
+          <input type="tel" id="setup-phone" name="phone" placeholder="9876543210" required 
+            class="w-full bg-slate-950 border border-slate-800 focus:border-brand-orange rounded-xl px-4 py-3 text-sm text-white placeholder-slate-650 outline-none transition-all duration-200" />
+        </div>
+        <div>
+          <label for="setup-city" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Primary City *</label>
+          <input type="text" id="setup-city" name="city" placeholder="e.g. Jaipur" required
+            class="w-full bg-slate-950 border border-slate-800 focus:border-brand-orange rounded-xl px-4 py-3 text-sm text-white placeholder-slate-650 outline-none transition-all duration-200" />
+        </div>
+      </div>
+
+      <div>
+        <label for="setup-alt-email" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Alternate Contact Email (Optional)</label>
+        <input type="email" id="setup-alt-email" name="alternate_email" placeholder="owner@company.com" 
+          class="w-full bg-slate-950 border border-slate-800 focus:border-brand-orange rounded-xl px-4 py-3 text-sm text-white placeholder-slate-650 outline-none transition-all duration-200" />
+      </div>
+
+      <div class="space-y-3">
+        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Service Portfolio Type *</label>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <label class="relative flex items-center gap-3 p-4 bg-slate-950 border border-slate-850 rounded-2xl cursor-pointer hover:border-slate-800 transition-all select-none">
+            <input type="radio" name="service_type" value="cabs_buses" checked class="text-brand-orange focus:ring-0" />
+            <div class="flex flex-col">
+              <span class="text-sm font-bold text-white flex items-center gap-1.5">🚐 Cabs & Buses</span>
+              <span class="text-[10px] text-slate-500">Route transport, shared poolings & outstations</span>
+            </div>
+          </label>
+          <label class="relative flex items-center gap-3 p-4 bg-slate-950 border border-slate-850 rounded-2xl cursor-pointer hover:border-slate-800 transition-all select-none">
+            <input type="radio" name="service_type" value="self_drive_rentals" class="text-brand-orange focus:ring-0" />
+            <div class="flex flex-col">
+              <span class="text-sm font-bold text-white flex items-center gap-1.5">🏢 Self-Drive Rentals</span>
+              <span class="text-[10px] text-slate-500">Drive-yourself rent packages & private rentals</span>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div class="space-y-3" id="booking-mode-section">
+        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Business & Dispatch Mode *</label>
+        
+        <!-- Standard Options -->
+        <div class="space-y-3" id="opts-standard">
+          <label class="flex items-center gap-3 p-4 bg-slate-950 border border-slate-850 rounded-2xl cursor-pointer hover:border-slate-800 transition-all">
+            <input type="radio" name="booking_mode" value="solo_owner" checked class="text-brand-orange focus:ring-0" />
+            <div class="flex flex-col">
+              <span class="text-sm font-bold text-white">Private Cabs / Solo Rentals</span>
+              <span class="text-[10px] text-slate-500">Charge per kilometer distance, custom routes</span>
+            </div>
+          </label>
+          <label class="flex items-center gap-3 p-4 bg-slate-950 border border-slate-850 rounded-2xl cursor-pointer hover:border-slate-800 transition-all">
+            <input type="radio" name="booking_mode" value="route_based" class="text-brand-orange focus:ring-0" />
+            <div class="flex flex-col">
+              <span class="text-sm font-bold text-white">Route-Based Public Cabs & Buses</span>
+              <span class="text-[10px] text-slate-500">Scheduled runs with fixed ticket fares per seat</span>
+            </div>
+          </label>
+          <label class="flex items-center gap-3 p-4 bg-slate-950 border border-slate-850 rounded-2xl cursor-pointer hover:border-slate-800 transition-all">
+            <input type="radio" name="booking_mode" value="both_services" class="text-brand-orange focus:ring-0" />
+            <div class="flex flex-col">
+              <span class="text-sm font-bold text-white">Hybrid Service Model</span>
+              <span class="text-[10px] text-slate-500">Manage both route-based listings and private hires</span>
+            </div>
+          </label>
+        </div>
+
+        <!-- Rentals Options (hidden initially) -->
+        <div class="space-y-3 hidden" id="opts-rentals">
+          <label class="flex items-center gap-3 p-4 bg-slate-950 border border-slate-850 rounded-2xl cursor-pointer hover:border-slate-800 transition-all">
+            <input type="radio" name="booking_mode" value="self_drive_only" checked disabled class="text-brand-orange focus:ring-0" />
+            <div class="flex flex-col">
+              <span class="text-sm font-bold text-white">Pure Self-Drive Rentals</span>
+              <span class="text-[10px] text-slate-500">Standard daily rent listings only</span>
+            </div>
+          </label>
+          <label class="flex items-center gap-3 p-4 bg-slate-950 border border-slate-850 rounded-2xl cursor-pointer hover:border-slate-800 transition-all">
+            <input type="radio" name="booking_mode" value="self_drive_private" disabled class="text-brand-orange focus:ring-0" />
+            <div class="flex flex-col">
+              <span class="text-sm font-bold text-white">Self-Drive & Private Chauffeur Rentals</span>
+              <span class="text-[10px] text-slate-500">Support optional driver inclusions</span>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <button type="submit" 
+        class="w-full py-3 bg-brand-orange hover:bg-opacity-90 active:scale-[0.98] transition-all rounded-xl text-sm font-bold text-white shadow-lg shadow-orange-500/10 mt-4">
+        Complete Activation
+      </button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<script>
+  const overlay = document.getElementById("setup-overlay");
+  if (overlay) {
+    overlay.addEventListener("click", function(e) {
+      if (e.target === overlay) {
+        closeSetupPopup();
+      }
+    });
+  }
+
+  function openSetupPopup() {
+    if (overlay) {
+      overlay.classList.remove("hidden");
+      overlay.classList.add("flex");
+    }
+  }
+
+  function closeSetupPopup() {
+    if (overlay) {
+      overlay.classList.add("hidden");
+      overlay.classList.remove("flex");
+    }
+  }
+
+  function updateBookingModeUI(serviceType) {
+    const optsStandard = document.getElementById("opts-standard");
+    const optsRentals = document.getElementById("opts-rentals");
+    
+    if (serviceType === "self_drive_rentals") {
+      optsStandard.classList.add("hidden");
+      optsStandard.querySelectorAll("input").forEach(i => { i.disabled = true; i.checked = false; });
+      
+      optsRentals.classList.remove("hidden");
+      optsRentals.querySelectorAll("input").forEach(i => i.disabled = false);
+      const checked = optsRentals.querySelector("input:checked");
+      if (!checked) {
+        optsRentals.querySelector("input").checked = true;
+      }
+    } else {
+      optsRentals.classList.add("hidden");
+      optsRentals.querySelectorAll("input").forEach(i => { i.disabled = true; i.checked = false; });
+      
+      optsStandard.classList.remove("hidden");
+      optsStandard.querySelectorAll("input").forEach(i => i.disabled = false);
+      const checked = optsStandard.querySelector("input:checked");
+      if (!checked) {
+        optsStandard.querySelector("input").checked = true;
+      }
+    }
+  }
+
+  // Set listeners for service type changes
+  document.querySelectorAll('input[name="service_type"]').forEach(r => {
+    r.addEventListener('change', function() {
+      updateBookingModeUI(this.value);
+    });
+  });
+
+  // Init UI state
+  const checkedService = document.querySelector('input[name="service_type"]:checked');
+  if (checkedService) {
+    updateBookingModeUI(checkedService.value);
+  }
+</script>
+{% endblock %}

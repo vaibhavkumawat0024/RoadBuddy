@@ -16,8 +16,12 @@ class BackendError(Exception):
 
 async def _request(method: str, path: str, **kwargs):
     url = f"{BACKEND_URL}{path}"
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        resp = await client.request(method, url, **kwargs)
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.request(method, url, **kwargs)
+    except httpx.RequestError as exc:
+        raise BackendError(503, f"Backend connection failed: {exc}")
+
     if resp.status_code >= 400:
         try:
             detail = resp.json().get("detail", resp.text)
@@ -106,11 +110,19 @@ async def add_vehicle(token: str, payload: dict):
     )
 
 
+async def delete_vehicle(token: str, vehicle_id: str):
+    """Calls backend DELETE /api/users/vehicles/{vehicle_id} — requires Bearer token."""
+    return await _request(
+        "DELETE", f"/api/users/vehicles/{vehicle_id}", headers=_auth_headers(token)
+    )
+
+
 # ── Trips ─────────────────────────────────────────────────────────────────────
 
-async def trip_chat(message: str, history: list):
+async def trip_chat(message: str, history: list, token: str = None):
+    headers = _auth_headers(token) if token else {}
     return await _request(
-        "POST", "/api/trips/chat", json={"message": message, "history": history}
+        "POST", "/api/trips/chat", json={"message": message, "history": history}, headers=headers
     )
 
 
@@ -154,6 +166,13 @@ async def delete_trip(token: str, trip_id: str):
     """Calls backend DELETE /api/trips/{trip_id} — requires Bearer token."""
     return await _request(
         "DELETE", f"/api/trips/{trip_id}", headers=_auth_headers(token)
+    )
+
+
+async def get_trip(token: str, trip_id: str):
+    """Calls backend GET /api/trips/{trip_id} — requires Bearer token."""
+    return await _request(
+        "GET", f"/api/trips/{trip_id}", headers=_auth_headers(token)
     )
 
 
@@ -277,6 +296,12 @@ async def book_hotel(token: str, payload: dict):
     )
 
 
+async def cancel_hotel_booking(token: str, booking_id: int):
+    return await _request(
+        "POST", f"/cancel-hotel-booking/{booking_id}", headers=_auth_headers(token)
+    )
+
+
 async def search_trains(token: str, payload: dict):
     return await _request(
         "POST", "/api/booking/trains/search", json=payload, headers=_auth_headers(token)
@@ -344,3 +369,105 @@ async def track_provider_booking(token: str, booking_id: int):
 async def check_unread_provider_bookings(token: str):
     """Calls backend GET /api/provider/bookings/unread-check — requires Bearer token."""
     return await _request("GET", "/api/provider/bookings/unread-check", headers=_auth_headers(token))
+
+
+async def mark_unread_provider_bookings_as_read(token: str):
+    """Calls backend POST /api/provider/bookings/mark-read — requires Bearer token."""
+    return await _request("POST", "/api/provider/bookings/mark-read", headers=_auth_headers(token))
+
+
+async def list_cab_services(origin: str | None = None, destination: str | None = None):
+    """Calls backend GET /api/provider/services."""
+    params = {}
+    if origin:
+        params["origin"] = origin
+    if destination:
+        params["destination"] = destination
+    return await _request("GET", "/api/provider/services", params=params)
+
+
+# ── Provider Management API Client Calls ──────────────────────────────────────
+
+async def register_provider(payload: dict):
+    """Calls backend POST /api/provider/register"""
+    return await _request("POST", "/api/provider/register", json=payload)
+
+
+async def login_provider(payload: dict):
+    """Calls backend POST /api/provider/login"""
+    return await _request("POST", "/api/provider/login", json=payload)
+
+
+async def get_provider_profile(token: str):
+    """Calls backend GET /api/provider/me"""
+    return await _request("GET", "/api/provider/me", headers=_auth_headers(token))
+
+
+async def update_provider_profile(token: str, payload: dict):
+    """Calls backend PATCH /api/provider/me"""
+    return await _request("PATCH", "/api/provider/me", json=payload, headers=_auth_headers(token))
+
+
+async def list_provider_vehicle_assets(token: str):
+    """Calls backend GET /api/provider/vehicle-assets"""
+    return await _request("GET", "/api/provider/vehicle-assets", headers=_auth_headers(token))
+
+
+async def add_provider_vehicle_asset(token: str, payload: dict):
+    """Calls backend POST /api/provider/vehicle-assets"""
+    return await _request("POST", "/api/provider/vehicle-assets", json=payload, headers=_auth_headers(token))
+
+
+async def delete_provider_vehicle_asset(token: str, asset_id: int):
+    """Calls backend DELETE /api/provider/vehicle-assets/{asset_id}"""
+    return await _request("DELETE", f"/api/provider/vehicle-assets/{asset_id}", headers=_auth_headers(token))
+
+
+async def list_provider_vehicles(token: str):
+    """Calls backend GET /api/provider/vehicles"""
+    return await _request("GET", "/api/provider/vehicles", headers=_auth_headers(token))
+
+
+async def add_provider_vehicle(token: str, payload: dict):
+    """Calls backend POST /api/provider/vehicles"""
+    return await _request("POST", "/api/provider/vehicles", json=payload, headers=_auth_headers(token))
+
+
+async def delete_provider_vehicle(token: str, vehicle_id: int):
+    """Calls backend DELETE /api/provider/vehicles/{vehicle_id}"""
+    return await _request("DELETE", f"/api/provider/vehicles/{vehicle_id}", headers=_auth_headers(token))
+
+
+async def list_provider_bookings_all(token: str):
+    """Calls backend GET /api/provider/bookings (provider side)"""
+    return await _request("GET", "/api/provider/bookings", headers=_auth_headers(token))
+
+
+async def start_provider_booking_nav(token: str, booking_id: int):
+    """Calls backend POST /api/provider/bookings/{booking_id}/start-nav"""
+    return await _request("POST", f"/api/provider/bookings/{booking_id}/start-nav", headers=_auth_headers(token))
+
+
+async def update_provider_booking_location(token: str, booking_id: int, lat: float, lon: float):
+    """Calls backend POST /api/provider/bookings/{booking_id}/location"""
+    return await _request(
+        "POST",
+        f"/api/provider/bookings/{booking_id}/location",
+        json={"lat": lat, "lon": lon},
+        headers=_auth_headers(token),
+    )
+
+
+async def start_provider_vehicle_trip(token: str, vehicle_id: int):
+    """Calls backend POST /api/provider/vehicles/{vehicle_id}/start-trip"""
+    return await _request("POST", f"/api/provider/vehicles/{vehicle_id}/start-trip", headers=_auth_headers(token))
+
+
+async def update_provider_vehicle_location(token: str, vehicle_id: int, lat: float, lon: float):
+    """Calls backend POST /api/provider/vehicles/{vehicle_id}/location"""
+    return await _request(
+        "POST",
+        f"/api/provider/vehicles/{vehicle_id}/location",
+        json={"lat": lat, "lon": lon},
+        headers=_auth_headers(token),
+    )

@@ -20,7 +20,6 @@
     {% elif not trips %}
       <div class="bg-white border border-outline-variant rounded-2xl p-8 text-center">
         <p class="text-slate-500 text-xs mb-3">No saved trips found.</p>
-        <a href="/plan-trip" class="bg-primary hover:bg-primary-container text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors inline-block">Plan a Trip Now</a>
       </div>
     {% else %}
       {% for trip in trips %}
@@ -52,9 +51,9 @@
 
         <!-- Actions -->
         <div class="flex gap-2 pt-2">
-          <a href="/start-trip?origin={{ trip.origin|urlencode }}&destination={{ trip.destination|urlencode }}" class="bg-primary hover:bg-primary-container text-white text-[10px] font-bold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
-            <span class="material-symbols-outlined text-xs">navigation</span>
-            Start Map
+          <a href="/my-trips/{{ trip.id }}/itinerary" class="bg-primary hover:bg-primary-container text-white text-[10px] font-bold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
+            <span class="material-symbols-outlined text-xs">explore</span>
+            Start Trip
           </a>
           <a href="/journal/{{ trip.id }}" class="bg-slate-800 hover:bg-slate-900 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
             <span class="material-symbols-outlined text-xs">auto_stories</span>

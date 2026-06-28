@@ -53,3 +53,16 @@ async def add_vehicle(request: Request, body: VehicleBody):
         return result
     except api_client.BackendError as e:
         return JSONResponse(status_code=e.status_code, content={"detail": e.detail})
+
+
+@router.post("/vehicles/delete/{vehicle_id}")
+async def delete_vehicle(request: Request, vehicle_id: str):
+    token = _get_token(request)
+    if not token:
+        return JSONResponse(status_code=401, content={"detail": "Please log in again."})
+
+    try:
+        await api_client.delete_vehicle(token, vehicle_id)
+        return {"ok": True}
+    except api_client.BackendError as e:
+        return JSONResponse(status_code=e.status_code, content={"detail": e.detail})
