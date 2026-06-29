@@ -22,6 +22,7 @@ from app.provider.auth import (
     create_provider_token, get_provider_from_cookie,
 )
 from app.provider.router import _auto_cleanup_expired_routes
+from app.core.email_otp import generate_and_send_otp, verify_otp, clear_otp, _otp_store
 
 router = APIRouter(prefix="/provider")
 templates = Jinja2Templates(directory="templates")
@@ -107,6 +108,93 @@ def logout():
     response = RedirectResponse("/provider/login", status_code=303)
     response.delete_cookie("provider_access_token")
     return response
+
+
+@router.get("/forgot-password", response_class=HTMLResponse)
+def forgot_password_page(request: Request):
+    return templates.TemplateResponse(request, "provider_forgot_password.html", {})
+
+
+@router.post("/forgot-password", response_class=HTMLResponse)
+def forgot_password_submit(
+    request: Request,
+    email: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    provider = db.query(Provider).filter(Provider.email == email).first()
+    if not provider:
+        return templates.TemplateResponse(request, "provider_forgot_password.html", {
+            "error": "No partner account registered with this email address."
+        })
+    try:
+        generate_and_send_otp(email, provider.company_name or provider.email)
+    except ValueError as e:
+        return templates.TemplateResponse(request, "provider_forgot_password.html", {
+            "error": str(e)
+        })
+    return templates.TemplateResponse(request, "provider_forgot_password_reset.html", {
+        "email": email
+    })
+
+
+@router.post("/forgot-password/reset", response_class=HTMLResponse)
+def forgot_password_reset_submit(
+    request: Request,
+    email: str = Form(...),
+    otp: str = Form(...),
+    new_password: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    provider = db.query(Provider).filter(Provider.email == email).first()
+    if not provider:
+        return templates.TemplateResponse(request, "provider_forgot_password.html", {
+            "error": "No partner account registered with this email address."
+        })
+
+    if not verify_otp(email, otp):
+        return templates.TemplateResponse(request, "provider_forgot_password_reset.html", {
+            "email": email,
+            "error": "Invalid or expired OTP code. Please try again."
+        })
+
+    if len(new_password) < 6:
+        return templates.TemplateResponse(request, "provider_forgot_password_reset.html", {
+            "email": email,
+            "error": "New password must be at least 6 characters long."
+        })
+
+    provider.password_hash = hash_password(new_password)
+    db.commit()
+    clear_otp(email)
+
+    return RedirectResponse("/provider/login?success=Password reset successfully! Please login with your new password.", status_code=303)
+
+
+@router.post("/register/send-otp")
+def provider_send_otp(
+    email: str = Form(...),
+    password: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    existing = db.query(Provider).filter(Provider.email == email).first()
+    if existing:
+        return {"success": False, "error": "Email already registered."}
+    try:
+        generate_and_send_otp(email, "Partner")
+    except ValueError as e:
+        return {"success": False, "error": str(e)}
+    _otp_store[email]["password"] = hash_password(password)
+    return {"success": True}
+
+
+@router.post("/register/verify-otp")
+def provider_verify_otp(
+    email: str = Form(...),
+    otp: str = Form(...),
+):
+    if not verify_otp(email, otp):
+        return {"success": False, "error": "Invalid or expired OTP."}
+    return {"success": True}
 
 
 # ── Quick Setup (first-time profile completion) ───────────────────────────

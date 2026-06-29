@@ -20,6 +20,7 @@ class Settings(BaseSettings):
 
     # Brevo API (Email) -- works without domain verification, unlike Resend sandbox
     brevo_api_key: str = ""
+    brevo_sender_email: str = "kunalsinghtanwar355@gmail.com"
 
     # JWT Auth
     secret_key: str

@@ -22,7 +22,7 @@ def send_otp_email(email: str, name: str, otp: str) -> bool:
         }
         payload = {
             # "sender" must be an email you verified inside Brevo's dashboard
-            "sender": {"name": "RoadBuddy", "email": "kunalsinghtanwar355@gmail.com"},
+            "sender": {"name": "RoadBuddy", "email": settings.brevo_sender_email},
             "to": [{"email": email, "name": name}],
             "subject": f"{otp} is your RoadBuddy verification code",
             "htmlContent": f"<strong>Hi {name}</strong>, your code is {otp}",
@@ -77,8 +77,6 @@ def verify_otp(email: str, otp: str) -> bool:
     read other fields (e.g. "name", "password") off _otp_store[email]
     afterward. Call clear_otp() explicitly once done.
     """
-    if otp == "1234":
-        return True
     record = _otp_store.get(email)
     if record is None:
         return False
