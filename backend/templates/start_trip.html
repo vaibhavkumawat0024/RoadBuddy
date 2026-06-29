@@ -599,6 +599,50 @@
     .left-panel.collapsed-view {
       max-height: 150px;
     }
+
+    /* Hide ticket card in the left-panel on mobile to avoid squishing/overlapping */
+    .left-panel .booking-ticket-card {
+      display: none !important;
+    }
+
+    /* Show the mobile ticket button inside the left panel on mobile */
+    .view-ticket-mobile-btn {
+      display: block !important;
+    }
+  }
+
+  /* Mobile Ticket Button (hidden on desktop) */
+  .view-ticket-mobile-btn {
+    display: none;
+  }
+
+  /* Generic Confirmation Overlay & Modal */
+  .confirm-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(8px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  .confirm-overlay.show {
+    display: flex;
+    opacity: 1;
+  }
+  .confirm-modal {
+    background: #ffffff;
+    border-radius: 20px;
+    width: 95%;
+    max-width: 500px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15);
   }
 
   /* Splitwise Modal Overlay */
@@ -1512,6 +1556,29 @@
     }
   }
 
+  function openMobileTicketModal() {
+    const originalTicket = document.querySelector('.left-panel .booking-ticket-card');
+    const modalContent = document.getElementById('mobile-ticket-card-content');
+    if (originalTicket && modalContent) {
+      modalContent.innerHTML = originalTicket.outerHTML;
+      const card = modalContent.querySelector('.booking-ticket-card');
+      if (card) {
+        card.style.display = 'block';
+      }
+    }
+    const overlay = document.getElementById("mobile-ticket-modal-overlay");
+    if (overlay) {
+      overlay.classList.add("show");
+    }
+  }
+
+  function closeMobileTicketModal() {
+    const overlay = document.getElementById("mobile-ticket-modal-overlay");
+    if (overlay) {
+      overlay.classList.remove("show");
+    }
+  }
+
   function renderConfirmedTicket(wrap, booking, mode) {
     let themeColor = "#1d9e75";
     let titleText = "RoadBuddy Transit";
@@ -1631,6 +1698,15 @@
             </div>
           </div>
         </div>
+      </div>
+    `;
+
+    // Append the mobile button right next to the card
+    wrap.innerHTML += `
+      <div class="view-ticket-mobile-btn" style="padding: 12px 16px; text-align: center;">
+        <button type="button" onclick="openMobileTicketModal()" class="btn-primary" style="display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 12px; font-weight: 700; font-size: 13.5px; border: none; border-radius: 8px; cursor: pointer; background: var(--primary); color: #fff; box-shadow: 0 4px 12px rgba(16,185,129,0.15);">
+          🎟️ View Confirmed Ticket
+        </button>
       </div>
     `;
   }
@@ -4146,6 +4222,18 @@
           <!-- Settlement reports here -->
         </div>
       </div>
+    </div>
+  </div>
+</div>
+<!-- Mobile Ticket Modal Overlay -->
+<div class="confirm-overlay" id="mobile-ticket-modal-overlay" style="z-index: 10002;">
+  <div class="confirm-modal" style="width: 95%; max-width: 500px; padding: 0; overflow: hidden; background: #f8fafc;">
+    <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-bottom: 1px solid #e2e8f0; background: #fff;">
+      <h3 style="margin: 0; color: #0f172a; font-size: 16px; font-weight: 600;">🎫 Your Ticket</h3>
+      <button onclick="closeMobileTicketModal()" style="background: none; border: none; font-size: 24px; color: #64748b; cursor: pointer; padding: 4px; line-height: 1;">&times;</button>
+    </div>
+    <div style="padding: 16px; max-height: 70vh; overflow-y: auto;">
+      <div id="mobile-ticket-card-content"></div>
     </div>
   </div>
 </div>
