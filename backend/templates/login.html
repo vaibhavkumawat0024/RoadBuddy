@@ -18,8 +18,11 @@
     <label>Email</label>
     <input type="email" name="email" required placeholder="you@example.com">
 
-    <label>Password</label>
-    <input type="password" name="password" required placeholder="••••••••">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px; margin-bottom: 6px;">
+      <label style="margin: 0; text-transform: uppercase;">Password</label>
+      <a href="/forgot-password" style="font-size: 12px; font-weight: 600; text-decoration: none; color: var(--primary);">Forgot Password?</a>
+    </div>
+    <input type="password" name="password" required placeholder="••••••••" style="margin-top: 0;">
 
     <button type="submit">Login</button>
   </form>

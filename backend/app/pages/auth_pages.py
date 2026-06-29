@@ -105,3 +105,63 @@ def logout():
     response = RedirectResponse("/login", status_code=303)
     response.delete_cookie("access_token")
     return response
+
+
+@router.get("/forgot-password", response_class=HTMLResponse)
+def forgot_password_page(request: Request):
+    return templates.TemplateResponse(request, "forgot_password.html")
+
+
+@router.post("/forgot-password", response_class=HTMLResponse)
+def forgot_password_submit(
+    request: Request,
+    email: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        return templates.TemplateResponse(request, "forgot_password.html", {
+            "error": "No account registered with this email address."
+        })
+    try:
+        generate_and_send_otp(email, user.name)
+    except ValueError as e:
+        return templates.TemplateResponse(request, "forgot_password.html", {
+            "error": str(e)
+        })
+    return templates.TemplateResponse(request, "forgot_password_reset.html", {
+        "email": email
+    })
+
+
+@router.post("/forgot-password/reset", response_class=HTMLResponse)
+def forgot_password_reset_submit(
+    request: Request,
+    email: str = Form(...),
+    otp: str = Form(...),
+    new_password: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        return templates.TemplateResponse(request, "forgot_password.html", {
+            "error": "No account registered with this email address."
+        })
+        
+    if not verify_otp(email, otp):
+        return templates.TemplateResponse(request, "forgot_password_reset.html", {
+            "email": email,
+            "error": "Invalid or expired OTP code. Please try again."
+        })
+        
+    if len(new_password) < 8:
+        return templates.TemplateResponse(request, "forgot_password_reset.html", {
+            "email": email,
+            "error": "New password must be at least 8 characters long."
+        })
+        
+    user.password_hash = hash_password(new_password)
+    db.commit()
+    clear_otp(email)
+    
+    return RedirectResponse("/login?success=Password reset successfully! Please login with your new password.", status_code=303)
