@@ -1651,28 +1651,148 @@ h2 {
 /* Mobile responsiveness adjustments */
 @media (max-width: 768px) {
   nav {
-    padding: 16px 20px;
+    padding: 12px 16px;
   }
   
+  .nav-menu {
+    display: none !important; /* Hide horizontal nav links on mobile, sidebar drawer is the cleaner UI */
+  }
 
+  main {
+    padding: 20px 16px !important;
+  }
 
   .dashboard-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 16px;
+    gap: 12px;
   }
   
   .dashboard-header div {
     width: 100%;
-    justify-content: flex-start;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .btn-primary, .btn-secondary {
+    width: 100% !important;
+    justify-content: center !important;
   }
   
   .stats-row {
     flex-direction: column;
+    gap: 12px !important;
+  }
+
+  .stat-card {
+    padding: 16px 20px !important;
   }
   
   .ai-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
+  }
+
+  .auth-card {
+    padding: 24px 20px !important;
+    margin: 30px 16px !important;
+  }
+
+  /* Cost card adjustments */
+  .cost-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+    width: 100%;
+  }
+
+  .cost-card {
+    padding: 12px !important;
+  }
+
+  /* Trip list cards */
+  .trip-card {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+    padding: 16px !important;
+  }
+
+  .trip-card .btn-primary,
+  .trip-card .btn-secondary {
+    width: 100% !important;
+  }
+
+  /* Action/button rows */
+  .action-row, .trip-actions {
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+
+  .action-row button,
+  .action-row a,
+  .trip-actions button,
+  .trip-actions a {
+    width: 100% !important;
+    justify-content: center !important;
+    text-align: center;
+  }
+  
+  /* Vehicle card stacking */
+  .vehicle-card {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    text-align: center !important;
+    padding: 16px !important;
+    gap: 12px !important;
+  }
+
+  .vehicle-icon {
+    margin: 0 auto !important;
+  }
+
+  .btn-delete {
+    width: 100% !important;
+  }
+
+  /* Itinerary header layout */
+  .itinerary-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+  }
+
+  /* Cabs/Transport layout and modal inputs */
+  .form-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Predefined route grids & list cards */
+  .routes-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Profile page card stretching */
+  .profile-card {
+    padding: 20px !important;
+    border-radius: var(--radius-md) !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .cost-grid {
+    grid-template-columns: 1fr !important; /* Stack costs on very small viewports */
+  }
+
+  .safety-score-row {
+    flex-direction: column !important;
+    gap: 16px !important;
+    text-align: center !important;
+    padding: 16px !important;
+  }
+
+  .safety-score {
+    font-size: 40px !important;
   }
 }
 

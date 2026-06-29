@@ -1641,6 +1641,9 @@
     
     if (bookedCab) {
       renderConfirmedTicket(wrap, bookedCab, 'cab');
+      setTimeout(() => {
+        plotTransitRouteOnMap(bookedCab);
+      }, 600);
       return;
     }
     
@@ -1665,6 +1668,9 @@
     const activeBooking = (mode === 'bus' ? bookedBus : (mode === 'train' ? bookedTrain : (mode === 'flight' ? bookedFlight : null)));
     if (activeBooking) {
       renderConfirmedTicket(wrap, activeBooking, mode);
+      setTimeout(() => {
+        plotTransitRouteOnMap(activeBooking);
+      }, 600);
       return;
     }
     
@@ -1701,6 +1707,10 @@
       }
     }
 
+    plotTransitRouteOnMap(opt);
+  }
+
+  function plotTransitRouteOnMap(opt) {
     // Clear all previous layers (markers, polyline) to remove the generic city markers
     clearRouting();
 
@@ -1754,8 +1764,10 @@
       const oIcon = L.divIcon({ html:`<div style="background:#fff;border:2px solid ${lineColor};color:${lineColor};padding:4px 8px;border-radius:4px;font-size:11px;font-weight:700;box-shadow:0 2px 4px rgba(0,0,0,0.15);white-space:nowrap;">📍 ${originName}</div>`, className:'', iconSize:[null,22] });
       const dIcon = L.divIcon({ html:`<div style="background:${lineColor};color:#fff;padding:4px 8px;border-radius:4px;font-size:11px;font-weight:700;box-shadow:0 2px 4px rgba(0,0,0,0.2);white-space:nowrap;">🎯 ${destName}</div>`, className:'', iconSize:[null,22] });
 
-      L.marker([originLat, originLon], { icon: oIcon }).addTo(leafletMap);
-      L.marker([destLat, destLon], { icon: dIcon }).addTo(leafletMap);
+      const oMarker = L.marker([originLat, originLon], { icon: oIcon }).addTo(leafletMap);
+      const dMarker = L.marker([destLat, destLon], { icon: dIcon }).addTo(leafletMap);
+      stopMarkers.push(oMarker);
+      stopMarkers.push(dMarker);
 
       if (['bus', 'train', 'cab'].includes(opt.mode || currentMode)) {
         // Query OSRM for real route

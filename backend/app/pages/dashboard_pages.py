@@ -304,6 +304,9 @@ def trip_itinerary_page(trip_id: int, request: Request, db: Session = Depends(ge
         }
         break
 
+    from app.models.models import Vehicle
+    vehicles = db.query(Vehicle).filter(Vehicle.user_id == user.id).all()
+
     token = request.cookies.get("access_token")
     has_unread_bookings = check_unread_bookings(user, db)
     
@@ -316,7 +319,8 @@ def trip_itinerary_page(trip_id: int, request: Request, db: Session = Depends(ge
         "booked_bus": booked_bus,
         "booked_train": booked_train,
         "booked_flight": booked_flight,
-        "booked_cab": booked_cab
+        "booked_cab": booked_cab,
+        "vehicles": vehicles
     })
 
 
@@ -355,7 +359,7 @@ def start_trip_page(
 
     if date:
         from app.models.models import Booking, ProviderBooking
-        from app.services.transport_service import get_transport_option_by_id
+        from app.services.transport_service import get_transport_option_by_id, get_transit_stops_and_amenities
 
         transit_bookings = db.query(Booking).filter(
             Booking.user_id == user.id,
@@ -372,6 +376,13 @@ def start_trip_page(
                     mode = b.transport_option_id.split("_")[0]
                 except:
                     pass
+            
+            stops = []
+            if opt:
+                stops, _ = get_transit_stops_and_amenities(opt.origin, opt.destination, mode or "", operator or "", b.transport_option_id)
+            else:
+                stops, _ = get_transit_stops_and_amenities(trip.origin, trip.destination, mode or "", operator or "", b.transport_option_id)
+
             b_dict = {
                 "id": str(b.id),
                 "transport_option_id": b.transport_option_id,
@@ -389,6 +400,7 @@ def start_trip_page(
                 "operator": operator,
                 "departure_time": opt.departure_time if opt else "10:00 AM",
                 "arrival_time": opt.arrival_time if opt else "06:00 PM",
+                "intermediate_stops": stops,
             }
             if mode == "bus":
                 booked_bus = b_dict
@@ -404,6 +416,12 @@ def start_trip_page(
         ).all()
 
         for cb in cab_bookings:
+            stops = []
+            if cb.vehicle:
+                stops, _ = get_transit_stops_and_amenities(cb.vehicle.origin, cb.vehicle.destination, "cab", cb.vehicle.vehicle_name or "", f"cab_{cb.vehicle_id}")
+            else:
+                stops, _ = get_transit_stops_and_amenities(trip.origin, trip.destination, "cab", "Cab", f"cab_{cb.vehicle_id}")
+
             booked_cab = {
                 "id": str(cb.id),
                 "vehicle_id": cb.vehicle_id,
@@ -418,6 +436,8 @@ def start_trip_page(
                 "selected_seats": cb.selected_seats,
                 "total_fare_inr": cb.total_fare_inr,
                 "status": cb.status,
+                "mode": "cab",
+                "intermediate_stops": stops,
             }
             break
 
