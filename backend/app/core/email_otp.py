@@ -12,23 +12,27 @@ OTP_RESEND_COOLDOWN = 30    # must wait 30s between resend attempts
 
 
 def send_otp_email(email: str, name: str, otp: str) -> bool:
-    """Send OTP email via Resend API."""
+    """Send OTP email via Brevo's transactional email API."""
     try:
-        url = "https://api.resend.com/emails"
+        url = "https://api.brevo.com/v3/smtp/email"
         headers = {
-            "Authorization": f"Bearer {settings.resend_api_key}",
-            "Content-Type": "application/json"
+            "api-key": settings.brevo_api_key,
+            "Content-Type": "application/json",
+            "Accept": "application/json",
         }
         payload = {
-            "from": "RoadBuddy <onboarding@resend.dev>",  # Use your domain once verified
-            "to": [email],
+            # "sender" must be an email you verified inside Brevo's dashboard
+            "sender": {"name": "RoadBuddy", "email": "kunalsinghtanwar355@gmail.com"},
+            "to": [{"email": email, "name": name}],
             "subject": f"{otp} is your RoadBuddy verification code",
-            "html": f"<strong>Hi {name}</strong>, your code is {otp}"
+            "htmlContent": f"<strong>Hi {name}</strong>, your code is {otp}",
         }
 
         with httpx.Client() as client:
             res = client.post(url, headers=headers, json=payload)
-            res.raise_for_status()
+            if res.status_code >= 400:
+                print(f"API Email failed: {res.status_code} {res.text}")
+                return False
         return True
 
     except Exception as e:

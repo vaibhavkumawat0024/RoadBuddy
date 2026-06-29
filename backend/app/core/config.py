@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     # Resend API (Email)
     resend_api_key: str = ""
 
+    # Brevo API (Email) -- works without domain verification, unlike Resend sandbox
+    brevo_api_key: str = ""
+
     # JWT Auth
     secret_key: str
     algorithm: str = "HS256"
@@ -25,8 +28,7 @@ class Settings(BaseSettings):
 
     allowed_origins: list[str] = ["http://localhost:8000", "http://127.0.0.1:8000"]
 
-    class Config:
-        env_file = ".env"
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
 settings = Settings()
