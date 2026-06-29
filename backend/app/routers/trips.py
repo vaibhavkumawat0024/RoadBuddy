@@ -579,6 +579,7 @@ async def trip_chat(
             history=body.history,
             user_context=user_context,
             db=db,
+            user_id=int(opt_user["user_id"]) if opt_user else None,
         )
         return result
     except RuntimeError as e:

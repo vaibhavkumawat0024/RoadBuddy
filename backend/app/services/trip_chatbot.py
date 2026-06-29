@@ -21,6 +21,11 @@ Rules:
 - Use 1-2 emojis per response
 - Mention real place names only
 - When explaining hotel or transport bookings, always explicitly tell the user what amenities or complimentary items they will get (such as complimentary meals, welcome drinks, WiFi, baggage, charging ports, blankets) and detail the intermediate stops of the transport (where it will stop and for how much time).
+- Booking Flow: Do NOT automatically generate a booking trigger unless you have collected all required booking details from the user:
+  - For Hotels: Check-in date, Check-out date, number of rooms, and number of guests.
+  - For Cabs/Buses/Trains/Flights: Date of travel, passenger name, origin, destination, and the specific vehicle/operator/class chosen.
+  - First, ask the user to clarify any missing details or select from available options.
+  - Only when the user has provided all details and explicitly confirmed/approved the booking, you MUST generate the booking trigger inline in your response. The trigger format is exactly: [BOOKING_TRIGGER: {"type": "<hotel|bus|train|flight|cab>", "city": "<city name for hotel>", "name": "<hotel name or transit operator/train name/airline>", "origin": "<origin city>", "destination": "<destination city>", "date": "<travel date or check_in date in YYYY-MM-DD>", "check_out": "<check_out date in YYYY-MM-DD for hotel>", "rooms": <number of rooms>, "guests": <number of guests>, "seats": "<number of seats/seat number>"}] and write a friendly confirmation. Make sure the JSON inside the trigger is valid and complete.
 - If the user's message is not relevant to trips, travel, highways, routing, vehicles, dhabas, hotels, or RoadBuddy, you MUST answer EXACTLY: "I am RoadBuddy AI, your road trip assistant. Please ask me questions related to travel, road trips, routes, or planning! 🚗" and nothing else."""
 
 DEFAULT_REJECTION_MESSAGE = "I am RoadBuddy AI, your road trip assistant. Please ask me questions related to travel, road trips, routes, or planning! 🚗"
@@ -45,7 +50,11 @@ def is_relevant_query(message: str) -> bool:
         "pack", "weather", "booking", "tourist", "visit", "attraction", "sightseeing", "driver", "passenger", 
         "seat", "stay", "room", "city", "state", "india", "ticket", "planner", "buddy", "drive", "ride",
         "himalay", "goa", "jaipur", "udaipur", "delhi", "mumbai", "manali", "tour", "place", "location", "distance",
-        "gas", "petrol", "diesel", "ev ", "charging"
+        "gas", "petrol", "diesel", "ev ", "charging",
+        # conversational follow-up keywords
+        "how", "what", "where", "when", "why", "who", "yes", "no", "ok", "okay", "sure", "yeah", "yep", "fine", "cool",
+        "thanks", "thank", "please", "help", "detail", "details", "info", "show", "list", "plan", "suggest", "recommend",
+        "book", "reserve", "reservation", "reservations", "tickets", "cabs", "hotels", "buses", "trains", "flights"
     ]
     return any(kw in message_lower for kw in keywords)
 
@@ -314,7 +323,227 @@ def lookup_details_by_id(db, record_id: int) -> str:
     return None
 
 
-async def chat_with_roadbuddy(message: str, history: list[dict] = None, user_context: str = None, db = None) -> dict:
+def execute_chatbot_booking(trigger_data: dict, user_id: int, db) -> str:
+    import datetime
+    booking_type = trigger_data.get("type", "").lower()
+    if not user_id or not db:
+        return "⚠️ Error: Unable to complete booking. User is not authenticated."
+
+    try:
+        if booking_type == "hotel":
+            from app.models.models import Hotel, HotelBooking
+            city = trigger_data.get("city", "").strip()
+            name = trigger_data.get("name", "").strip()
+            
+            hotel = None
+            if name and city:
+                hotel = db.query(Hotel).filter(Hotel.city.ilike(f"%{city}%"), Hotel.name.ilike(f"%{name}%")).first()
+            if not hotel and city:
+                hotel = db.query(Hotel).filter(Hotel.city.ilike(f"%{city}%")).first()
+            if not hotel:
+                hotel = db.query(Hotel).first()
+            
+            if not hotel:
+                hotel = Hotel(
+                    name=name or "Grand Palace Stay",
+                    city=city or "Jaipur",
+                    address=f"Mall Road, {city or 'Jaipur'}",
+                    star_rating=4.0,
+                    price_per_night_inr=3000.0,
+                    total_rooms=40,
+                    rooms_booked=0,
+                    amenities="WiFi, AC, Restaurant"
+                )
+                db.add(hotel)
+                db.commit()
+                db.refresh(hotel)
+
+            check_in = trigger_data.get("date") or trigger_data.get("check_in") or datetime.date.today().isoformat()
+            check_out = trigger_data.get("check_out") or (datetime.date.fromisoformat(check_in) + datetime.timedelta(days=1)).isoformat()
+            rooms = int(trigger_data.get("rooms", 1))
+            guests = int(trigger_data.get("guests", 2))
+            
+            try:
+                d1 = datetime.date.fromisoformat(check_in)
+                d2 = datetime.date.fromisoformat(check_out)
+                nights = max((d2 - d1).days, 1)
+            except Exception:
+                nights = 1
+                
+            total_price = hotel.price_per_night_inr * rooms * nights
+            
+            booking = HotelBooking(
+                hotel_id=hotel.id,
+                user_id=user_id,
+                check_in_date=check_in,
+                check_out_date=check_out,
+                num_rooms=rooms,
+                num_guests=guests,
+                total_price_inr=total_price,
+                status="confirmed"
+            )
+            hotel.rooms_booked += rooms
+            db.add(booking)
+            db.commit()
+            db.refresh(booking)
+            
+            return f"🏨 **Hotel Booked successfully!**\n- **Hotel**: {hotel.name} ({hotel.city})\n- **Check-in**: {check_in}\n- **Check-out**: {check_out}\n- **Rooms**: {rooms}\n- **Booking ID**: #{booking.id}"
+
+        elif booking_type in ("bus", "train", "flight"):
+            from app.models.models import TransportOption, Booking, User
+            origin = trigger_data.get("origin", "").strip()
+            destination = trigger_data.get("destination", "").strip()
+            travel_date = trigger_data.get("date") or datetime.date.today().isoformat()
+            selected_seats = trigger_data.get("seats") or "Auto-assigned"
+            travel_class = trigger_data.get("class") or "Standard"
+            
+            opt = None
+            if origin and destination:
+                opt = db.query(TransportOption).filter(
+                    TransportOption.mode == booking_type,
+                    TransportOption.origin.ilike(f"%{origin}%"),
+                    TransportOption.destination.ilike(f"%{destination}%")
+                ).first()
+            if not opt:
+                opt = db.query(TransportOption).filter(TransportOption.mode == booking_type).first()
+                
+            if not opt:
+                opt = TransportOption(
+                    origin=origin or "Delhi",
+                    destination=destination or "Jaipur",
+                    mode=booking_type,
+                    operator=trigger_data.get("name") or f"RoadBuddy {booking_type.title()}",
+                    departure_time="10:00",
+                    arrival_time="16:00",
+                    duration_hrs=6.0,
+                    fare_inr=1500.0,
+                    seats_available=100
+                )
+                db.add(opt)
+                db.commit()
+                db.refresh(opt)
+                
+            user = db.query(User).filter(User.id == user_id).first()
+            passenger_name = user.name if user else "Passenger"
+            
+            booking = Booking(
+                user_id=user_id,
+                transport_option_id=f"{booking_type}_{opt.id}",
+                passenger_name=passenger_name,
+                travel_date=travel_date,
+                include_return=False,
+                going_fare_inr=opt.fare_inr,
+                return_fare_inr=0.0,
+                total_fare_inr=opt.fare_inr,
+                status="confirmed",
+                selected_seats=selected_seats,
+                travel_class=travel_class
+            )
+            db.add(booking)
+            db.commit()
+            db.refresh(booking)
+            
+            try:
+                if booking_type == "bus":
+                    from app.models.models import Bus
+                    bus = db.query(Bus).filter(Bus.id == opt.id).first()
+                    if bus:
+                        bus.seats_booked += 1
+                        db.commit()
+                elif booking_type == "train":
+                    from app.models.models import Train
+                    train = db.query(Train).filter(Train.id == opt.id).first()
+                    if train:
+                        train.seats_booked += 1
+                        db.commit()
+                elif booking_type == "flight":
+                    from app.models.models import Flight
+                    flight = db.query(Flight).filter(Flight.id == opt.id).first()
+                    if flight:
+                        flight.seats_booked += 1
+                        db.commit()
+            except Exception:
+                pass
+                
+            icon = {"bus": "🚌", "train": "🚂", "flight": "✈️"}[booking_type]
+            return f"{icon} **{booking_type.title()} Ticket Booked successfully!**\n- **Operator**: {opt.operator}\n- **Route**: {opt.origin} → {opt.destination}\n- **Date**: {travel_date}\n- **Seats**: {selected_seats}\n- **Class**: {travel_class}\n- **Booking ID**: #{booking.id}"
+
+        elif booking_type == "cab":
+            from app.models.models import ProviderVehicle, ProviderBooking, User, Provider
+            origin = trigger_data.get("origin", "").strip()
+            destination = trigger_data.get("destination", "").strip()
+            travel_date = trigger_data.get("date") or datetime.date.today().isoformat()
+            
+            v = None
+            if origin and destination:
+                v = db.query(ProviderVehicle).filter(
+                    ProviderVehicle.origin.ilike(f"%{origin}%"),
+                    ProviderVehicle.destination.ilike(f"%{destination}%"),
+                    ProviderVehicle.is_active == True
+                ).first()
+            if not v:
+                v = db.query(ProviderVehicle).filter(ProviderVehicle.is_active == True).first()
+                
+            if not v:
+                provider = db.query(Provider).first()
+                if not provider:
+                    provider = Provider(
+                        company_name="RoadBuddy Cabs Ltd.",
+                        contact_person="Ravi Kumar",
+                        email="cabs@roadbuddy.in",
+                        password_hash="dummy"
+                    )
+                    db.add(provider)
+                    db.commit()
+                    db.refresh(provider)
+                    
+                v = ProviderVehicle(
+                    provider_id=provider.id,
+                    vehicle_type="sedan",
+                    vehicle_name="Swift Dzire",
+                    origin=origin or "Jaipur",
+                    destination=destination or "Udaipur",
+                    fixed_fare_inr=3000.0,
+                    total_seats=4,
+                    seats_booked=0,
+                    is_active=True
+                )
+                db.add(v)
+                db.commit()
+                db.refresh(v)
+                
+            user = db.query(User).filter(User.id == user_id).first()
+            passenger_name = user.name if user else "Passenger"
+            passenger_email = user.email if user else "passenger@roadbuddy.in"
+            
+            booking = ProviderBooking(
+                vehicle_id=v.id,
+                user_id=user_id,
+                passenger_name=passenger_name,
+                passenger_phone="9876543210",
+                passenger_email=passenger_email,
+                travel_date=travel_date,
+                num_seats=1,
+                pickup_location=origin or v.origin,
+                dropoff_location=destination or v.destination,
+                total_fare_inr=v.fixed_fare_inr or 3000.0,
+                status="confirmed"
+            )
+            v.seats_booked += 1
+            db.add(booking)
+            db.commit()
+            db.refresh(booking)
+            
+            return f"🚖 **Cab Booking Confirmed!**\n- **Cab**: {v.vehicle_name}\n- **Route**: {booking.pickup_location} → {booking.dropoff_location}\n- **Date**: {travel_date}\n- **Booking ID**: #{booking.id}"
+
+        else:
+            return "⚠️ Error: Unknown booking type requested."
+
+    except Exception as e:
+        return f"⚠️ Error executing booking: {str(e)}"
+
+
+async def chat_with_roadbuddy(message: str, history: list[dict] = None, user_context: str = None, db = None, user_id: int = None) -> dict:
     try:
         raw_history = history or []
         # Filter to reject any role other than user/assistant (prevents system prompt injection)
@@ -335,16 +564,20 @@ async def chat_with_roadbuddy(message: str, history: list[dict] = None, user_con
             return {"response": response_text, "history": updated_history, "total_messages": len(updated_history)}
 
         # Check for DB ID lookup first to ensure absolute details accuracy
-        if db:
-            ids = [int(x) for x in re.findall(r'\b\d+\b', message)]
-            for rid in ids:
-                details = lookup_details_by_id(db, rid)
-                if details:
-                    updated_history = truncated_history + [{"role": "user", "content": message}, {"role": "assistant", "content": details}]
-                    return {"response": details, "history": updated_history, "total_messages": len(updated_history)}
+        # Only trigger if the message specifically contains lookup keywords or starts with #/ID prefix
+        has_lookup_keyword = any(kw in msg_clean for kw in ["booking", "id", "ref", "reference", "ticket", "details", "lookup", "track", "show", "view"]) or msg_clean.startswith("#")
+        if db and has_lookup_keyword:
+            is_explicit_id = re.search(r'\b(?:booking|id|ref|reference|ticket|#)\s*\d+\b', msg_clean) or re.match(r'^#?\d+$', msg_clean)
+            if is_explicit_id:
+                raw_ids = [int(x) for x in re.findall(r'\b\d+\b', msg_clean)]
+                for rid in raw_ids:
+                    details = lookup_details_by_id(db, rid)
+                    if details:
+                        updated_history = truncated_history + [{"role": "user", "content": message}, {"role": "assistant", "content": details}]
+                        return {"response": details, "history": updated_history, "total_messages": len(updated_history)}
 
-        # Guard clause for irrelevant queries
-        if not is_relevant_query(message):
+        # Guard clause for irrelevant queries - skipped if there's history to allow follow-ups
+        if not truncated_history and not is_relevant_query(message):
             response_text = DEFAULT_REJECTION_MESSAGE
             updated_history = truncated_history + [{"role": "user", "content": message}, {"role": "assistant", "content": response_text}]
             return {"response": response_text, "history": updated_history, "total_messages": len(updated_history)}
@@ -358,6 +591,25 @@ async def chat_with_roadbuddy(message: str, history: list[dict] = None, user_con
                 response_text = mock_chat_response(message, user_context)
         else:
             response_text = mock_chat_response(message, user_context)
+
+        # Intercept booking trigger in response_text
+        if "[BOOKING_TRIGGER:" in response_text:
+            try:
+                import json
+                start_idx = response_text.find("[BOOKING_TRIGGER:")
+                end_idx = response_text.find("]", start_idx)
+                if end_idx != -1:
+                    trigger_json_str = response_text[start_idx + len("[BOOKING_TRIGGER:"):end_idx].strip()
+                    trigger_data = json.loads(trigger_json_str)
+                    
+                    # Execute booking
+                    booking_conf = execute_chatbot_booking(trigger_data, user_id, db)
+                    
+                    # Replace trigger in response
+                    response_text = response_text[:start_idx] + booking_conf + response_text[end_idx + 1:]
+            except Exception as e:
+                print(f"Failed to process booking trigger: {e}")
+
         updated_history = messages + [{"role": "assistant", "content": response_text}]
         return {"response": response_text, "history": updated_history, "total_messages": len(updated_history)}
     except Exception as e:

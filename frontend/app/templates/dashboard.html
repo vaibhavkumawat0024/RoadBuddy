@@ -232,8 +232,12 @@
         const data = await postJSON("/dashboard/chat", { message, history: chatHistory });
         const reply = data.reply || data.response || data.message || JSON.stringify(data);
         appendChatBubble("ai", reply);
-        chatHistory.push({ role: "user", content: message });
-        chatHistory.push({ role: "assistant", content: reply });
+        if (data.history) {
+          chatHistory = data.history;
+        } else {
+          chatHistory.push({ role: "user", content: message });
+          chatHistory.push({ role: "assistant", content: reply });
+        }
       } catch (err) {
         appendChatBubble("ai", "Error: " + err.message);
       }

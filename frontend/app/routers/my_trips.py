@@ -63,56 +63,26 @@ async def my_trip_itinerary_page(request: Request, trip_id: str):
         return RedirectResponse(url=f"/my-trips?error={e.detail}")
 
     booked_hotel_dict = None
-    booked_bus = None
-    booked_train = None
-    booked_flight = None
-    booked_cab = None
     try:
-        start_date = trip.get("start_date", "")
-        dest = trip.get("destination", "").lower()
-        
-        # 1. Fetch transit and hotel bookings
         bookings = await api_client.list_bookings(token)
+        dest = trip.get("destination", "").lower()
+        start_date = trip.get("start_date", "")
         for b in bookings:
-            if b.get("status") == "confirmed":
-                if b.get("hotel_name") and b.get("check_in_date") == start_date:
-                    city = b.get("hotel_city", "").lower()
-                    if dest in city or city in dest:
-                        booked_hotel_dict = {
-                            "hotel_name": b.get("hotel_name"),
-                            "check_in_date": b.get("check_in_date"),
-                            "check_out_date": b.get("check_out_date"),
-                            "num_rooms": b.get("num_rooms")
-                        }
-                elif b.get("travel_date") == start_date:
-                    mode = b.get("mode")
-                    if not mode:
-                        try:
-                            mode = b.get("transport_option_id", "").split("_")[0]
-                        except:
-                            pass
-                    if mode == "bus":
-                        booked_bus = b
-                    elif mode == "train":
-                        booked_train = b
-                    elif mode == "flight":
-                        booked_flight = b
-
-        # 2. Fetch cab bookings
-        cab_bookings = await api_client.list_provider_bookings(token)
-        for cb in cab_bookings:
-            if cb.get("status") == "confirmed" and cb.get("travel_date") == start_date:
-                booked_cab = cb
-                break
+            if b.get("hotel_name") and b.get("status") == "confirmed" and b.get("check_in_date") == start_date:
+                city = b.get("hotel_city", "").lower()
+                if dest in city or city in dest:
+                    booked_hotel_dict = {
+                        "hotel_name": b.get("hotel_name"),
+                        "check_in_date": b.get("check_in_date"),
+                        "check_out_date": b.get("check_out_date"),
+                        "num_rooms": b.get("num_rooms")
+                    }
+                    break
     except Exception:
         pass
 
     return templates.TemplateResponse(request, "trip_itinerary.html", {
         "request": request,
         "trip": trip,
-        "booked_hotel": booked_hotel_dict,
-        "booked_bus": booked_bus,
-        "booked_train": booked_train,
-        "booked_flight": booked_flight,
-        "booked_cab": booked_cab
+        "booked_hotel": booked_hotel_dict
     })

@@ -716,7 +716,7 @@ async def chat_with_provider_bot(message: str, history: list[dict] = None, provi
 
         is_out_of_scope = any(word in msg_lower for word in non_app_words) and not any(word in msg_lower for word in app_words)
 
-        if is_out_of_scope:
+        if not truncated_history and is_out_of_scope:
             response_text = "I can only answer questions related to our app."
             updated_history = messages + [{"role": "assistant", "content": response_text}]
             return {"response": response_text, "history": updated_history, "total_messages": len(updated_history)}

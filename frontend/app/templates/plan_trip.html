@@ -117,6 +117,22 @@
 
 {% block scripts %}
 <script>
+  // Disable past dates in date picker
+  const startDateInput = document.getElementById("start_date");
+  const endDateInput = document.getElementById("end_date");
+  const todayStr = new Date().toISOString().split("T")[0];
+  startDateInput.min = todayStr;
+  endDateInput.min = todayStr;
+
+  startDateInput.addEventListener("change", () => {
+    if (startDateInput.value) {
+      endDateInput.min = startDateInput.value;
+      if (endDateInput.value && endDateInput.value < startDateInput.value) {
+        endDateInput.value = startDateInput.value;
+      }
+    }
+  });
+
   const vehicleRow = document.getElementById("vehicle-row");
   const travelModeSelect = document.getElementById("travel_mode");
 
