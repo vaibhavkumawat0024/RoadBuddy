@@ -948,12 +948,6 @@
 <script>
   // ─── STATE ───────────────────────────────────────────────
   const currentUserId = parseInt("{{ user.id }}");
-  
-  const bookedBus = {% if booked_bus %} {{ booked_bus | tojson | safe }} {% else %} null {% endif %};
-  const bookedTrain = {% if booked_train %} {{ booked_train | tojson | safe }} {% else %} null {% endif %};
-  const bookedFlight = {% if booked_flight %} {{ booked_flight | tojson | safe }} {% else %} null {% endif %};
-  const bookedCab = {% if booked_cab %} {{ booked_cab | tojson | safe }} {% else %} null {% endif %};
-  const tripId = "{{ trip_id|default('') }}";
   const prefillOrigin = "{{ origin|default('') }}";
   const prefillDestination = "{{ destination|default('') }}";
   const prefillDate = "{{ date|default('') }}";
@@ -1479,6 +1473,7 @@
     } else {
       const originInput = document.getElementById('origin-manual');
       const originVal = originInput.value.trim();
+
       let originCoords = (originInput.dataset.lat && originInput.dataset.lon) ? 
         { lat: parseFloat(originInput.dataset.lat), lon: parseFloat(originInput.dataset.lon) } : await geocode(originVal);
       
@@ -1512,174 +1507,258 @@
     }
   }
 
-  function renderConfirmedTicket(wrap, booking, mode) {
-    let themeColor = "#1d9e75";
-    let titleText = "RoadBuddy Transit";
-    let icon = "🚌";
-    
-    if (mode === "bus") {
-      themeColor = "#f59e0b";
-      titleText = "RoadBuddy Bus Ticket";
-      icon = "🚌";
-    } else if (mode === "train") {
-      themeColor = "#6366f1";
-      titleText = "RoadBuddy Train Ticket";
-      icon = "🚂";
-    } else if (mode === "flight") {
-      themeColor = "#0ea5e9";
-      titleText = "RoadBuddy Flight Ticket";
-      icon = "✈️";
-    } else if (mode === "cab") {
-      themeColor = "#ec4899";
-      titleText = "RoadBuddy Cab Ticket";
-      icon = "🚖";
-    }
-    
-    let detailsHtml = "";
-    if (mode === "cab") {
-      detailsHtml = `
-        <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-          <div>
-            <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Vehicle</div>
-            <div style="font-size: 13px; font-weight: 600; color: #0f172a;">${booking.vehicle_name}</div>
-          </div>
-          <div style="text-align: right;">
-            <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Seats</div>
-            <div style="font-size: 13px; font-weight: 700; color: #1d9e75;">${booking.selected_seats || booking.num_seats + ' Seat(s)'}</div>
-          </div>
-        </div>
-        <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-          <div>
-            <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Pickup</div>
-            <div style="font-size: 13px; font-weight: 600; color: #0f172a;">${booking.pickup_location || 'Origin'}</div>
-          </div>
-          <div style="text-align: right;">
-            <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Drop-off</div>
-            <div style="font-size: 13px; font-weight: 600; color: #0f172a;">${booking.dropoff_location || 'Destination'}</div>
-          </div>
-        </div>
-      `;
-    } else {
-      detailsHtml = `
-        <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-          <div>
-            <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Class</div>
-            <div style="font-size: 13px; font-weight: 600; color: #0f172a;">${booking.travel_class || 'Standard'}</div>
-          </div>
-          <div style="text-align: right;">
-            <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Seat / Berth</div>
-            <div style="font-size: 13px; font-weight: 700; color: #1d9e75;">${booking.selected_seats || 'Auto-Assigned'}</div>
-          </div>
-        </div>
-        <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-          <div>
-            <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Timing</div>
-            <div style="font-size: 13px; font-weight: 600; color: #0f172a;">Departs: ${booking.departure_time || '10:00 AM'}</div>
-          </div>
-          <div style="text-align: right;">
-            <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Arrival</div>
-            <div style="font-size: 13px; font-weight: 600; color: #0f172a;">Arrives: ${booking.arrival_time || '06:00 PM'}</div>
-          </div>
-        </div>
-      `;
-    }
-    
-    wrap.innerHTML = `
-      <div class="booking-ticket-card" style="background: #fff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; overflow: hidden; margin-top: 12px; text-align: left;">
-        <div style="background: ${themeColor}; color: #fff; padding: 16px; text-align: center; position: relative;">
-          <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9;">Boarding Pass / Confirmed Ticket</div>
-          <div style="font-size: 18px; font-weight: 800; margin-top: 4px;">${icon} ${titleText}</div>
-          <div style="position: absolute; bottom: -8px; left: -8px; width: 16px; height: 16px; background: #f8fafc; border-radius: 50%;"></div>
-          <div style="position: absolute; bottom: -8px; right: -8px; width: 16px; height: 16px; background: #f8fafc; border-radius: 50%;"></div>
-        </div>
-        <div style="padding: 16px; background: #fff; position: relative;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-            <div>
-              <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Operator / Provider</div>
-              <div style="font-size: 14px; font-weight: 700; color: #0f172a;">${booking.operator || booking.transport_option_operator || booking.provider_name || 'RoadBuddy Partner'}</div>
-            </div>
-            <div style="text-align: right;">
-              <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Reference ID</div>
-              <div style="font-size: 12px; font-weight: 700; color: ${themeColor}; font-family: monospace;">RB-${booking.id}</div>
-            </div>
-          </div>
-          
-          <div style="border-top: 1px dashed #e2e8f0; margin: 12px 0;"></div>
-          
-          <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-            <div>
-              <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Passenger</div>
-              <div style="font-size: 13px; font-weight: 600; color: #0f172a;">${booking.passenger_name}</div>
-            </div>
-            <div style="text-align: right;">
-              <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Travel Date</div>
-              <div style="font-size: 13px; font-weight: 600; color: #0f172a;">${booking.travel_date}</div>
-            </div>
-          </div>
-          
-          ${detailsHtml}
-          
-          <div style="border-top: 1px dashed #e2e8f0; margin: 12px 0;"></div>
-          
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div>
-              <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Total Fare Paid</div>
-              <div style="font-size: 15px; font-weight: 800; color: #0f172a;">₹${parseFloat(booking.total_fare_inr || booking.fare_inr).toLocaleString('en-IN')}</div>
-            </div>
-            <div style="font-size: 11px; font-weight: 700; color: #10b981; background: #ecfdf5; border: 1.5px solid #a7f3d0; padding: 4px 8px; border-radius: 6px;">
-              ✓ CONFIRMED
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
+  // ─── CAB SERVICES (real provider listings) ───────────────────
   async function loadCabServices(originVal, destVal) {
     const wrap = document.getElementById('directions-wrap');
-    wrap.innerHTML = '';
-    
-    if (bookedCab) {
-      renderConfirmedTicket(wrap, bookedCab, 'cab');
-      return;
+    const loadingCard = document.createElement('div');
+    loadingCard.id = 'cab-loading-card';
+    loadingCard.style.cssText = 'padding:14px;font-size:13px;color:#64748b;';
+    loadingCard.textContent = 'Loading cab services from providers...';
+    wrap.appendChild(loadingCard);
+
+    let services = [];
+    try {
+      const dateVal = document.getElementById('travel-date-input')?.value || new Date().toISOString().slice(0, 10);
+      const params = new URLSearchParams({ origin: originVal, destination: destVal, user_id: currentUserId, travel_date: dateVal });
+      const res = await fetch(`/api/provider/services?${params.toString()}`);
+      if (res.ok) services = await res.json();
+    } catch (e) {
+      console.warn('Cab services fetch failed', e);
     }
-    
-    const empty = document.createElement('div');
-    empty.style.cssText = 'padding:20px;font-size:13px;color:#64748b;text-align:center;background:#f8fafc;border-radius:12px;border:1px dashed #cbd5e1;margin-top:10px;';
-    empty.innerHTML = `
-      <div style="font-weight:700; color:#0f172a; margin-bottom:6px;">🚖 Cab Not Booked</div>
-      <div style="margin-bottom:12px;">You must book your cab in the Trip Booking Center on the Trip Itinerary page before you can start the trip.</div>
-      <a href="/my-trips/${tripId}/itinerary" style="display:inline-block; padding:8px 16px; background:var(--primary); color:#fff; font-weight:700; border-radius:8px; text-decoration:none; font-size:12px;">Go to Itinerary</a>
-    `;
-    wrap.appendChild(empty);
+
+    const loadCard = document.getElementById('cab-loading-card');
+    if (loadCard) loadCard.remove();
+
+    renderCabServices(services);
   }
 
   function renderCabServices(services) {
-    // Read-only map page does not list services
-  }
-
-  async function loadTransitOptions(mode, originVal, destVal) {
     const wrap = document.getElementById('directions-wrap');
-    wrap.innerHTML = '';
-    
-    const activeBooking = (mode === 'bus' ? bookedBus : (mode === 'train' ? bookedTrain : (mode === 'flight' ? bookedFlight : null)));
-    if (activeBooking) {
-      renderConfirmedTicket(wrap, activeBooking, mode);
+    const categoryLabels = { private: '🚖 Private Cab', company: '🏢 Company / Operator', rental: '🔑 Self-Drive Rental' };
+
+    if (!services.length) {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'padding:14px;font-size:13px;color:#64748b;';
+      empty.textContent = 'No registered cab providers found for this route yet.';
+      wrap.appendChild(empty);
       return;
     }
-    
-    const empty = document.createElement('div');
-    empty.style.cssText = 'padding:20px;font-size:13px;color:#64748b;text-align:center;background:#f8fafc;border-radius:12px;border:1px dashed #cbd5e1;margin-top:10px;';
-    empty.innerHTML = `
-      <div style="font-weight:700; color:#0f172a; margin-bottom:6px;">🎫 Ticket Not Booked</div>
-      <div style="margin-bottom:12px;">You must book your ${mode} ticket in the Trip Booking Center on the Trip Itinerary page before you can start the trip.</div>
-      <a href="/my-trips/${tripId}/itinerary" style="display:inline-block; padding:8px 16px; background:var(--primary); color:#fff; font-weight:700; border-radius:8px; text-decoration:none; font-size:12px;">Go to Itinerary</a>
+
+    const list = document.createElement('div');
+    list.id = 'cab-services-list';
+    list.innerHTML = `
+      <div class="dir-header" style="margin-top:10px;">
+        <span class="dir-header-title">Available Cab Services (${services.length})</span>
+      </div>
+      ${services.map(s => {
+        const isPrivate = s.destination === 'Private';
+        const dist = transitDistanceKm || 100;
+        const calculatedFare = isPrivate 
+          ? Math.round(dist * (s.price_per_km_inr || 0) * (s.total_seats || 4))
+          : (s.fixed_fare_inr || (s.price_per_km_inr ? Math.round(s.price_per_km_inr * 12) : 250));
+
+        const fareText = isPrivate
+          ? `₹${calculatedFare} (approx)`
+          : (s.fixed_fare_inr ? `₹${s.fixed_fare_inr}` : (s.price_per_km_inr ? `₹${s.price_per_km_inr}/km` : 'Price on request'));
+
+        const isFullyBooked = (s.seats_available === 0);
+
+        const routeLine = isPrivate
+          ? `<div class="stop-line"><div class="stop-dot" style="background:#ec4899;"></div><span>📍 Available at: ${s.origin} (Private Rental)</span></div>`
+          : `
+          <div class="stop-line"><div class="stop-dot" style="background:#ec4899;"></div><span>${s.origin}${s.departure_time ? ' · ' + s.departure_time : ''}</span></div>
+          <div class="stop-line-v"></div>
+          <div class="stop-line"><div class="stop-dot" style="background:#ef4444;"></div><span>${s.destination}</span></div>`;
+
+        const headerTitleText = isFullyBooked 
+          ? `${categoryLabels[s.cab_category] || s.cab_category} · ${s.provider_name} — <strong style="color:#ef4444;">fully booked</strong>`
+          : `${categoryLabels[s.cab_category] || s.cab_category} · ${s.provider_name}`;
+
+        const priceDisplay = isFullyBooked ? '—' : fareText;
+
+        const availabilityChip = isFullyBooked
+          ? `<span class="trc-chip" style="background:#fee2e2;color:#ef4444;border-color:#fca5a5;">Fully Booked</span>`
+          : `<span class="trc-chip">${s.seats_available} seat(s) available</span>`;
+
+        let stopsDetailsHTML = "";
+        if (s.pickup_points) {
+          const pPoints = s.pickup_points.split(';').join(', ');
+          stopsDetailsHTML += `<div style="font-size:11.5px;color:#d97706;margin-top:4px;">📥 <strong>Stops:</strong> ${pPoints}</div>`;
+        }
+        if (s.dropoff_points) {
+          const dPoints = s.dropoff_points.split(';').join(', ');
+          stopsDetailsHTML += `<div style="font-size:11.5px;color:#2563eb;margin-top:2px;">📤 <strong>Drop-offs:</strong> ${dPoints}</div>`;
+        }
+
+        const actionButton = isFullyBooked
+          ? `<button class="get-routes-btn" style="margin-top:8px;background:#cbd5e1;color:#94a3b8;border-color:#cbd5e1;cursor:not-allowed;" disabled>Fully Booked</button>`
+          : `<button class="get-routes-btn" style="margin-top:8px;" 
+                  data-id="${s.id}"
+                  data-vehicle-type="${s.vehicle_type}"
+                  data-vehicle-name="${s.vehicle_name}"
+                  data-total-seats="${s.total_seats}"
+                  data-fare="${calculatedFare}"
+                  data-destination="${s.destination}"
+                  data-pickup-points="${s.pickup_points || ''}"
+                  data-dropoff-points="${s.dropoff_points || ''}"
+                  onclick="bookCabFromButton(this)">
+            Book this cab
+          </button>`;
+
+        return `
+        <div class="transit-route-card">
+          <div class="trc-header">
+            <div class="trc-mode">${headerTitleText}</div>
+            <div class="trc-price">${priceDisplay}</div>
+          </div>
+          <div class="trc-meta">
+            <span class="trc-chip chip-time">${s.vehicle_name} (${s.vehicle_type})</span>
+            <span class="trc-chip chip-book">${s.driver_included ? 'Driver included' : 'Self-drive'}</span>
+            ${availabilityChip}
+          </div>
+          <div class="trc-stops">
+            ${routeLine}
+            ${stopsDetailsHTML}
+          </div>
+          ${actionButton}
+        </div>`;
+      }).join('')}
     `;
-    wrap.appendChild(empty);
+    wrap.appendChild(list);
+
+    // Smoothly scroll down to the cabs list header
+    setTimeout(() => {
+      const cabsHeader = list.querySelector('.dir-header');
+      if (cabsHeader) {
+        cabsHeader.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 150);
+  }
+    // ─── TRANSIT SERVICES (seeded database options) ───────────────
+  async function loadTransitOptions(mode, originVal, destVal) {
+    const wrap = document.getElementById('directions-wrap');
+    const loadingCard = document.createElement('div');
+    loadingCard.id = 'transit-loading-card';
+    loadingCard.style.cssText = 'padding:14px;font-size:13px;color:#64748b;';
+    loadingCard.textContent = `Loading available ${mode}s...`;
+    wrap.appendChild(loadingCard);
+
+    let travelDate = "";
+    const dateInput = document.getElementById("travel-date-input");
+    if (dateInput && dateInput.value) {
+      travelDate = dateInput.value;
+    } else {
+      travelDate = new Date().toISOString().slice(0, 10);
+    }
+
+    let options = [];
+    try {
+      const res = await fetch(`/api/transport/search`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer {{ token }}'
+        },
+        body: JSON.stringify({ origin: originVal, destination: destVal, mode: mode, travel_date: travelDate })
+      });
+      if (res.ok) {
+        options = await res.json();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        console.warn('Transit options search failed:', err.detail || res.status);
+      }
+    } catch (e) {
+      console.warn('Transit options fetch failed', e);
+    }
+
+    const loadCard = document.getElementById('transit-loading-card');
+    if (loadCard) loadCard.remove();
+
+    renderTransitOptions(mode, options, originVal, destVal);
   }
 
   function renderTransitOptions(mode, options, originVal, destVal) {
-    // Read-only map page does not list options
+    const wrap = document.getElementById('directions-wrap');
+    const modeLabels = { bus: '🚌 Bus', train: '🚂 Train', flight: '✈️ Flight' };
+    const modeColors = { bus: '#f59e0b', train: '#6366f1', flight: '#0ea5e9' };
+    const themeColor = modeColors[mode] || '#1d9e75';
+
+    loadedTransitOptions = options;
+
+    if (!options.length) {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'padding:20px;font-size:13px;color:#64748b;text-align:center;background:#f8fafc;border-radius:12px;border:1px dashed #cbd5e1;margin-top:10px;';
+      empty.innerHTML = `<div>🔍 No scheduled ${mode}s found for this route today.</div>`;
+      wrap.appendChild(empty);
+      return;
+    }
+
+    const list = document.createElement('div');
+    list.id = 'transit-options-list';
+    list.style.cssText = 'display:flex;flex-direction:column;gap:12px;margin-top:10px;';
+    list.innerHTML = `
+      <div class="dir-header" style="margin-top:10px;">
+        <span class="dir-header-title">Scheduled ${modeLabels[mode]}s (${options.length})</span>
+      </div>
+      ${options.map(opt => {
+        const isFullyBooked = opt.seats_available <= 0;
+        const priceDisplay = `₹${opt.fare_inr}`;
+        const availabilityChip = isFullyBooked
+          ? `<span class="trc-chip" style="background:#fee2e2;color:#ef4444;border-color:#fca5a5;">Fully Booked</span>`
+          : `<span class="trc-chip" style="background:#ecfdf5;color:#10b981;border-color:#a7f3d0;">${opt.seats_available} seat(s) available</span>`;
+
+        const actionButton = isFullyBooked
+          ? `<button class="get-routes-btn" style="margin-top:8px;background:#cbd5e1;color:#94a3b8;border-color:#cbd5e1;cursor:not-allowed;" disabled>Fully Booked</button>`
+          : `<button class="get-routes-btn" style="margin-top:8px;background:${themeColor};border-color:${themeColor};" 
+                    onclick="event.stopPropagation(); bookTransitFromMap('${opt.id}', '${opt.operator}', '${mode}', ${opt.fare_inr})">
+                Book Ticket
+              </button>`;
+
+        return `
+        <div class="transit-route-card" style="border-left:4px solid ${themeColor};" onclick="selectTransitOptionCard(this, '${opt.id}')">
+          <div class="trc-header">
+            <div class="trc-mode" style="font-weight:700;color:#0f172a;">${opt.operator}</div>
+            <div class="trc-price" style="color:${themeColor};font-weight:800;">${priceDisplay}</div>
+          </div>
+          <div class="trc-meta" style="margin:6px 0;">
+            <span class="trc-chip chip-time">⏱️ ${opt.duration_hrs} hrs</span>
+            ${availabilityChip}
+          </div>
+          <div class="trc-stops" style="margin-top:10px;padding:8px;background:#f8fafc;border-radius:8px;">
+            <div class="stop-line" style="font-size:12px;color:#475569;margin-bottom:4px;">
+              <span style="font-weight:600;color:${themeColor};">Departs:</span> ${opt.departure_time} from ${opt.origin_station_name || opt.origin}
+            </div>
+            ${opt.intermediate_stops && opt.intermediate_stops.length > 0 ? `
+              <div style="font-size:11px;color:#475569;margin:6px 0;padding-left:8px;border-left:2px dashed #cbd5e1;">
+                <strong>Stops:</strong>
+                ${opt.intermediate_stops.map(st => `
+                  <div style="margin-top:2px;">📍 ${st.name} (${st.duration_mins} mins stop)</div>
+                `).join('')}
+              </div>
+            ` : ''}
+            <div class="stop-line" style="font-size:12px;color:#475569;">
+              <span style="font-weight:600;color:#ef4444;">Arrives:</span> ${opt.arrival_time} at ${opt.destination_station_name || opt.destination}
+            </div>
+          </div>
+          ${opt.complimentary_items && opt.complimentary_items.length > 0 ? `
+            <div style="margin-top:8px;margin-bottom:4px;font-size:11px;color:#0d9488;display:flex;flex-wrap:wrap;gap:4px;">
+              ${opt.complimentary_items.map(item => `<span style="background:#f0fdfa;border:1px solid #99f6e4;padding:2px 6px;border-radius:4px;">🎁 ${item}</span>`).join('')}
+            </div>
+          ` : ''}
+          ${actionButton}
+        </div>`;
+      }).join('')}
+    `;
+    wrap.appendChild(list);
+
+    if (options.length > 0) {
+      setTimeout(() => {
+        const firstCard = list.querySelector('.transit-route-card');
+        if (firstCard) {
+          selectTransitOptionCard(firstCard, options[0].id);
+        }
+      }, 200);
+    }
   }
 
   function selectTransitOptionCard(cardElement, optionId) {
