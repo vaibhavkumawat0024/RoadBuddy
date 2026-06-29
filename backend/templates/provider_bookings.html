@@ -116,6 +116,43 @@
   .leaflet-routing-container {
     display: none !important;
   }
+
+  @media (max-width: 768px) {
+    .confirm-modal.map-modal {
+      width: 100% !important;
+      height: 100vh !important;
+      max-height: 100vh !important;
+      border-radius: 0 !important;
+      border: none !important;
+    }
+    
+    #booking-hud {
+      bottom: 12px !important;
+      left: 12px !important;
+      right: 12px !important;
+      padding: 10px !important;
+    }
+    
+    #booking-hud div {
+      gap: 6px !important;
+    }
+    
+    #booking-hud button {
+      padding: 8px 12px !important;
+      font-size: 11px !important;
+    }
+
+    #nav-banner {
+      top: 12px !important;
+      left: 12px !important;
+      right: 12px !important;
+      padding: 8px 12px !important;
+    }
+
+    #nav-banner-instruction {
+      font-size: 12px !important;
+    }
+  }
 </style>
 
 <div class="dashboard-header" style="margin-bottom: 24px;">
@@ -314,6 +351,11 @@
       startTripBtn.style.display = "none";
     }
     document.getElementById("map-modal-overlay").classList.add("show");
+    setTimeout(() => {
+      if (map) {
+        map.invalidateSize();
+      }
+    }, 250);
 
     
     // Reset state machine
@@ -966,6 +1008,11 @@
     activeVehicleId = vehicleId;
     activeBookingId = null;
     document.getElementById("map-modal-overlay").classList.add("show");
+    setTimeout(() => {
+      if (map) {
+        map.invalidateSize();
+      }
+    }, 250);
     
     // Reset state machine
     currentLeg = "multi_waypoint";
