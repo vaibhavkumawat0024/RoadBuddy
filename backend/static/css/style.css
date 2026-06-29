@@ -1654,8 +1654,12 @@ h2 {
     padding: 12px 16px;
   }
   
-  .nav-menu {
-    display: none !important; /* Hide horizontal nav links on mobile, sidebar drawer is the cleaner UI */
+  .nav-menu a {
+    display: none !important; /* Hide only text nav links on mobile */
+  }
+  
+  .sidebar-toggle {
+    display: flex !important; /* Ensure hamburger button is visible */
   }
 
   main {
