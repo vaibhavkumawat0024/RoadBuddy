@@ -65,23 +65,50 @@ def get_budget_breakdown(budget_inr: float, num_people: int, fuel_type: str, tra
         )
 
 
+def calculate_haversine_distance(lat1, lon1, lat2, lon2):
+    import math
+    if not (lat1 and lon1 and lat2 and lon2):
+        return 320.0
+    R = 6371.0 # Earth radius in km
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat / 2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    distance = R * c
+    # Multiply by 1.3 to get realistic road distance (since roads are not straight lines)
+    return round(distance * 1.3, 1)
+
+
 def build_own_vehicle_prompt(trip: TripCreate, vehicle_info: dict) -> str:
     fuel_type = vehicle_info.get("fuel_type", "petrol")
     category  = vehicle_info.get("category", "car")
+    mileage   = vehicle_info.get("mileage_kmpl", 15.0)
     season    = get_season(trip.start_date)
+    
+    lat1, lon1 = trip.origin_lat, trip.origin_lon
+    lat2, lon2 = trip.destination_lat, trip.destination_lon
+    dist = calculate_haversine_distance(lat1, lon1, lat2, lon2)
+    
     return f"""You are RoadBuddy AI, India's expert road trip planner.
 
 Trip: {trip.origin} to {trip.destination} | {trip.start_date} to {trip.end_date}
-Vehicle: {fuel_type} {category} | Season: {season.upper()}
+Distance: Approximately {dist} km one-way (so total round-trip distance is {dist * 2} km).
+Vehicle Selected by User: {category.upper()} running on {fuel_type.upper()} with an efficiency/mileage of {mileage} KMPL.
+Season: {season.upper()}
 {get_budget_breakdown(trip.budget_inr, trip.num_people, fuel_type, "own_vehicle")}
 Group: {get_group_tips(trip.group_type, trip.num_people)}
 Season tip: {get_season_tips(season, trip.destination)}
 
 Generate a complete road trip covering GOING ROUTE, DESTINATION, and RETURN ROUTE.
+IMPORTANT: Calculate the fuel cost based on:
+1. Round-trip distance of {dist * 2} km.
+2. Vehicle mileage of {mileage} KMPL.
+3. Average fuel prices in India: Petrol (~104 INR/L), Diesel (~94 INR/L), CNG (~85 INR/L), Electric (Rs 2.5 per km).
 Use real Indian town names and NH highway numbers.
+
 Return ONLY valid JSON, no markdown:
 {{
-  "total_distance_km": 400,
+  "total_distance_km": {dist * 2},
   "fuel_cost_inr": 2400,
   "toll_cost_inr": 680,
   "return_toll_cost_inr": 680,
@@ -178,29 +205,74 @@ async def call_groq(prompt: str) -> dict:
     raise RuntimeError("All Groq retry attempts failed.")
 
 
-def mock_own_vehicle(trip: TripCreate) -> dict:
+def mock_own_vehicle(trip: TripCreate, vehicle_info: dict = None) -> dict:
     season = get_season(trip.start_date)
+    
+    fuel_type = vehicle_info.get("fuel_type", "petrol") if vehicle_info else "petrol"
+    category = vehicle_info.get("category", "car") if vehicle_info else "car"
+    mileage_kmpl = vehicle_info.get("mileage_kmpl", 15.0) if vehicle_info else 15.0
+    
+    # Calculate road distance
+    lat1, lon1 = trip.origin_lat, trip.origin_lon
+    lat2, lon2 = trip.destination_lat, trip.destination_lon
+    dist = calculate_haversine_distance(lat1, lon1, lat2, lon2)
+    
+    # Calculate fuel cost one-way
+    fuel_price = 105.0
+    if fuel_type == "diesel":
+        fuel_price = 90.0
+    elif fuel_type == "cng":
+        fuel_price = 85.0
+
+    if fuel_type == "electric":
+        if mileage_kmpl > 50:
+            fuel_cost = (dist / mileage_kmpl) * 300.0
+        else:
+            fuel_cost = (dist / max(mileage_kmpl, 1.0)) * 8.0
+    else:
+        fuel_cost = (dist / max(mileage_kmpl, 1.0)) * fuel_price
+        
+    fuel_cost = round(fuel_cost, 2)
+    return_fuel_cost = fuel_cost
+    
+    # Toll cost estimation based on distance (approx 1.5 INR per km for highways)
+    toll_cost = round(dist * 1.5, 2)
+    return_toll_cost = toll_cost
+    
+    # Hotel and food costs based on budget and duration
+    hotel_cost = round(trip.budget_inr * 0.35, 2)
+    food_cost = round(trip.budget_inr * 0.20, 2)
+    
+    total_est = round(fuel_cost + return_fuel_cost + toll_cost + return_toll_cost + hotel_cost + food_cost, 2)
+    
+    stops = [
+        {"day": 1, "time_slot": "morning", "place_name": f"HP Petrol Pump, NH-48, {trip.origin}",
+         "place_type": "fuel", "description": f"Fill up your {fuel_type} vehicle.", "estimated_cost_inr": fuel_cost, "highway": "NH-48", "lat": None, "lng": None},
+        {"day": 1, "time_slot": "afternoon", "place_name": "Apna Dhaba — Highway Lunch",
+         "place_type": "food", "description": "Popular highway dhaba.", "estimated_cost_inr": 400, "highway": "NH-48", "lat": None, "lng": None},
+        {"day": 1, "time_slot": "evening", "place_name": f"Hotel Shree Palace, {trip.destination}",
+         "place_type": "hotel", "description": "Confirmed stay at destination.", "estimated_cost_inr": hotel_cost, "highway": None, "lat": None, "lng": None},
+        {"day": 2, "time_slot": "morning", "place_name": f"Main Attraction, {trip.destination}",
+         "place_type": "sightseeing", "description": "Top must-visit attraction.", "estimated_cost_inr": 200, "highway": None, "lat": None, "lng": None},
+        {"day": 3, "time_slot": "morning", "place_name": f"Indian Oil Pump, {trip.destination}",
+         "place_type": "fuel", "description": "Fill up before heading back.", "estimated_cost_inr": return_fuel_cost, "highway": None, "lat": None, "lng": None},
+        {"day": 3, "time_slot": "evening", "place_name": f"Home — {trip.origin}",
+         "place_type": "return_route", "description": "Trip complete! Welcome home.", "estimated_cost_inr": 0, "highway": None, "lat": None, "lng": None},
+    ]
+    
     return {
-        "total_distance_km": 320, "fuel_cost_inr": 2400, "toll_cost_inr": 680,
-        "return_fuel_cost_inr": 2400, "return_toll_cost_inr": 680,
-        "hotel_cost_inr": 2500, "food_cost_inr": 1200,
-        "total_estimated_cost_inr": round(trip.budget_inr * 0.85, 2),
-        "season": season, "season_tip": "Check road conditions before leaving.",
-        "ai_summary": f"A wonderful road trip from {trip.origin} to {trip.destination} and back.",
-        "stops": [
-            {"day": 1, "time_slot": "morning", "place_name": f"HP Petrol Pump, NH-48, {trip.origin}",
-             "place_type": "fuel", "description": "Fill up before leaving.", "estimated_cost_inr": 2400, "highway": "NH-48", "lat": None, "lng": None},
-            {"day": 1, "time_slot": "afternoon", "place_name": "Apna Dhaba — Highway Lunch",
-             "place_type": "food", "description": "Popular highway dhaba.", "estimated_cost_inr": 400, "highway": "NH-48", "lat": None, "lng": None},
-            {"day": 1, "time_slot": "evening", "place_name": f"Hotel Shree Palace, {trip.destination}",
-             "place_type": "hotel", "description": "Budget hotel, clean rooms.", "estimated_cost_inr": 1200, "highway": None, "lat": None, "lng": None},
-            {"day": 2, "time_slot": "morning", "place_name": f"Main Attraction, {trip.destination}",
-             "place_type": "sightseeing", "description": "Top must-visit attraction.", "estimated_cost_inr": 200, "highway": None, "lat": None, "lng": None},
-            {"day": 3, "time_slot": "morning", "place_name": f"Indian Oil Pump, {trip.destination}",
-             "place_type": "fuel", "description": "Fill up before heading back.", "estimated_cost_inr": 2400, "highway": None, "lat": None, "lng": None},
-            {"day": 3, "time_slot": "evening", "place_name": f"Home — {trip.origin}",
-             "place_type": "return_route", "description": "Trip complete! Welcome home.", "estimated_cost_inr": 0, "highway": None, "lat": None, "lng": None},
-        ],
+        "total_distance_km": dist * 2,
+        "fuel_cost_inr": fuel_cost,
+        "toll_cost_inr": toll_cost,
+        "return_fuel_cost_inr": return_fuel_cost,
+        "return_toll_cost_inr": return_toll_cost,
+        "hotel_cost_inr": hotel_cost,
+        "food_cost_inr": food_cost,
+        "total_estimated_cost_inr": total_est,
+        "season": season,
+        "season_tip": "Check road conditions and tyre pressure before leaving.",
+        "ai_summary": f"A customized road trip from {trip.origin} to {trip.destination} in your {fuel_type} {category} (Mileage: {mileage_kmpl} KMPL).",
+        "stops": stops
     }
 
 
@@ -230,9 +302,9 @@ async def generate_itinerary(trip: TripCreate, vehicle_info: dict) -> TripOut:
                     data = await call_groq(build_own_vehicle_prompt(trip, vehicle_info))
                 except Exception as e:
                     print(f"Groq itinerary failed: {e}. Falling back to mock.")
-                    data = mock_own_vehicle(trip)
+                    data = mock_own_vehicle(trip, vehicle_info)
             else:
-                data = mock_own_vehicle(trip)
+                data = mock_own_vehicle(trip, vehicle_info)
         else:
             if settings.groq_api_key:
                 try:

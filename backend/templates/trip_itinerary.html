@@ -2,7 +2,27 @@
 {% block title %}Trip Itinerary — RoadBuddy{% endblock %}
 
 {% block navbar_menu %}
-  <a href="/dashboard">Dashboard</a>
+  <div style="display: flex; align-items: center; gap: 8px;">
+    <a href="/dashboard">Dashboard</a>
+    
+    <!-- Notification Dropdown -->
+    <div style="position: relative; display: inline-block; margin-left: 4px;">
+      <button id="nav-notification-btn" class="material-symbols-outlined" style="position: relative; background: none; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-main); font-size: 20px; padding: 4px;">
+        notifications
+        <span id="nav-notification-badge" class="hidden" style="position: absolute; top: 1px; right: 1px; display: block; width: 8px; height: 8px; border-radius: 50%; background-color: #ef4444; border: 1px solid white;"></span>
+      </button>
+      
+      <div id="nav-notification-dropdown" class="hidden" style="position: absolute; right: 0; top: 100%; margin-top: 8px; width: 300px; background: white; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); z-index: 9999; padding: 12px; max-height: 380px; overflow-y: auto; text-align: left; color: #334155;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px; margin-bottom: 10px;">
+          <h4 style="font-size: 11px; font-weight: 700; color: #1e293b; text-transform: uppercase; margin: 0;">Live Updates</h4>
+          <button onclick="clearNotifications()" style="background: none; border: none; cursor: pointer; font-size: 10px; color: #94a3b8; font-weight: 600;">Mark read</button>
+        </div>
+        <div id="nav-notification-list" style="display: flex; flex-direction: column; gap: 10px;">
+          <div style="text-align: center; padding: 16px 0; font-size: 12px; color: #94a3b8; font-style: italic;">No new notifications.</div>
+        </div>
+      </div>
+    </div>
+  </div>
 {% endblock %}
 
 {% block page_overlay %}
@@ -375,6 +395,80 @@
                   Day {{ day }}
                 </h4>
                 <div class="relative border-l border-slate-200 ml-3 pl-5 space-y-4">
+                  <!-- Booked transit/cab/hotel items integrated dynamically into user timeline -->
+                  {% if day == 1 %}
+                    {% if booked_cab %}
+                      <div class="relative text-left bg-emerald-50/70 p-3.5 rounded-xl border border-emerald-100/80 mb-3">
+                        <span class="absolute -left-[26px] top-4 bg-emerald-600 border-2 border-white w-3 h-3 rounded-full flex items-center justify-center"></span>
+                        <div class="space-y-1">
+                          <div class="flex items-center gap-2">
+                            <span class="bg-emerald-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">Booked Cab</span>
+                            <strong class="text-xs text-slate-800">{{ booked_cab.vehicle_name }}</strong>
+                          </div>
+                          <p class="text-[10px] text-slate-600">
+                            <strong>Pickup:</strong> {{ booked_cab.pickup_location }} | <strong>Seats:</strong> {{ booked_cab.selected_seats or booked_cab.num_seats }} for {{ booked_cab.passenger_name }}
+                          </p>
+                        </div>
+                      </div>
+                    {% endif %}
+                    {% if booked_train %}
+                      <div class="relative text-left bg-emerald-50/70 p-3.5 rounded-xl border border-emerald-100/80 mb-3">
+                        <span class="absolute -left-[26px] top-4 bg-emerald-600 border-2 border-white w-3 h-3 rounded-full flex items-center justify-center"></span>
+                        <div class="space-y-1">
+                          <div class="flex items-center gap-2">
+                            <span class="bg-emerald-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">Booked Train</span>
+                            <strong class="text-xs text-slate-800">{{ booked_train.operator }}</strong>
+                          </div>
+                          <p class="text-[10px] text-slate-600">
+                            <strong>Departure:</strong> {{ booked_train.departure_time }} &rarr; {{ booked_train.arrival_time }} | <strong>Seats:</strong> {{ booked_train.selected_seats }} ({{ booked_train.travel_class }})
+                          </p>
+                        </div>
+                      </div>
+                    {% endif %}
+                    {% if booked_bus %}
+                      <div class="relative text-left bg-emerald-50/70 p-3.5 rounded-xl border border-emerald-100/80 mb-3">
+                        <span class="absolute -left-[26px] top-4 bg-emerald-600 border-2 border-white w-3 h-3 rounded-full flex items-center justify-center"></span>
+                        <div class="space-y-1">
+                          <div class="flex items-center gap-2">
+                            <span class="bg-emerald-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">Booked Bus</span>
+                            <strong class="text-xs text-slate-800">{{ booked_bus.operator }}</strong>
+                          </div>
+                          <p class="text-[10px] text-slate-600">
+                            <strong>Departure:</strong> {{ booked_bus.departure_time }} &rarr; {{ booked_bus.arrival_time }} | <strong>Seats:</strong> {{ booked_bus.selected_seats }}
+                          </p>
+                        </div>
+                      </div>
+                    {% endif %}
+                    {% if booked_flight %}
+                      <div class="relative text-left bg-emerald-50/70 p-3.5 rounded-xl border border-emerald-100/80 mb-3">
+                        <span class="absolute -left-[26px] top-4 bg-emerald-600 border-2 border-white w-3 h-3 rounded-full flex items-center justify-center"></span>
+                        <div class="space-y-1">
+                          <div class="flex items-center gap-2">
+                            <span class="bg-emerald-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">Booked Flight</span>
+                            <strong class="text-xs text-slate-800">{{ booked_flight.operator }}</strong>
+                          </div>
+                          <p class="text-[10px] text-slate-600">
+                            <strong>Departure:</strong> {{ booked_flight.departure_time }} &rarr; {{ booked_flight.arrival_time }} | <strong>Seats:</strong> {{ booked_flight.selected_seats }}
+                          </p>
+                        </div>
+                      </div>
+                    {% endif %}
+                    {% if booked_hotel %}
+                      <div class="relative text-left bg-emerald-50/70 p-3.5 rounded-xl border border-emerald-100/80 mb-3">
+                        <span class="absolute -left-[26px] top-4 bg-emerald-600 border-2 border-white w-3 h-3 rounded-full flex items-center justify-center"></span>
+                        <div class="space-y-1">
+                          <div class="flex items-center gap-2">
+                            <span class="bg-emerald-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">Hotel Check-in</span>
+                            <strong class="text-xs text-slate-800">{{ booked_hotel.hotel_name }}</strong>
+                          </div>
+                          <p class="text-[10px] text-slate-600">
+                            <strong>Check-in:</strong> {{ booked_hotel.check_in_date }} | <strong>Rooms:</strong> {{ booked_hotel.num_rooms }} reserved
+                          </p>
+                        </div>
+                      </div>
+                    {% endif %}
+                  {% endif %}
+
                   {% for s in grouped_stops[day] %}
                     <div class="relative text-left">
                       <span class="absolute -left-[26px] top-1 bg-white border-2 border-emerald-600 w-3 h-3 rounded-full"></span>
@@ -631,6 +725,10 @@
 
 
 <style>
+  /* Hide chatbot widget only on this page */
+  .chatbot-fab { display: none !important; }
+  .floating-chatbot-card { display: none !important; }
+
   /* Tab / panel animations & hidden helper */
   .booking-panel.hidden { display: none !important; }
   
@@ -2203,13 +2301,15 @@
   // ─── EDIT TRIP MODAL LOGIC ────────────────────────────────
   function openEditTripModal() {
     const modal = document.getElementById('edit-trip-modal');
-    modal.style.display = 'flex';
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
     document.body.style.overflow = "hidden";
   }
 
   function closeEditTripModal() {
     const modal = document.getElementById('edit-trip-modal');
-    modal.style.display = 'none';
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
     document.body.style.overflow = "";
   }
 
@@ -2290,9 +2390,7 @@
       const tripId = "{{ trip.id }}";
       const response = await fetch(`/api/trips/${tripId}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: getHeaders(),
         body: JSON.stringify(payload)
       });
 
@@ -2499,7 +2597,7 @@
     try {
       const res = await fetch("/api/food/orders", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getHeaders(),
         body: JSON.stringify(payload)
       });
 
@@ -2547,7 +2645,7 @@
     try {
       const res = await fetch(`/api/food/menu-items/${dishId}/review`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getHeaders(),
         body: JSON.stringify(payload)
       });
 
@@ -2602,7 +2700,9 @@
     if (!tracker || !list) return;
 
     try {
-      const res = await fetch("/api/food/my-orders");
+      const res = await fetch("/api/food/my-orders", {
+        headers: getHeaders()
+      });
       if (res.ok) {
         const allOrders = await res.json();
         
@@ -2690,7 +2790,7 @@
     try {
       const res = await fetch(`/api/food/orders/${orderId}/arrival`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getHeaders(),
         body: JSON.stringify({ arrival_time_mins: val })
       });
       if (res.ok) {
@@ -2722,6 +2822,173 @@
       loadRestaurants();
       loadActiveFoodOrders();
     }
+  });
+
+  // Live Notifications System
+  async function checkNotifications() {
+    const isBackend = window.location.port === "8000";
+    const foodUrl = isBackend ? "/api/food/my-orders" : "/food/my-orders";
+    const cabUrl = isBackend ? "/api/provider/bookings/user" : "/provider/bookings/user";
+
+    try {
+      const [foodRes, cabRes] = await Promise.all([
+        fetch(foodUrl, { headers: getHeaders() }).catch(() => null),
+        fetch(cabUrl, { headers: getHeaders() }).catch(() => null)
+      ]);
+
+      let foodOrders = [];
+      if (foodRes && foodRes.ok) {
+        foodOrders = await foodRes.json();
+      }
+
+      let cabBookings = [];
+      if (cabRes && cabRes.ok) {
+        cabBookings = await cabRes.json();
+      }
+
+      const notifications = [];
+      
+      // Food orders: pending, preparing, ready, completed, declined
+      foodOrders.forEach(o => {
+        if (o.status === "preparing") {
+          notifications.push({
+            id: `food_${o.id}_preparing`,
+            icon: "restaurant",
+            title: "Order Accepted",
+            message: `🍔 ${o.restaurant_name} has accepted your order #${o.id} and started preparation!`,
+            time: o.created_at,
+            type: "success"
+          });
+        } else if (o.status === "ready") {
+          notifications.push({
+            id: `food_${o.id}_ready`,
+            icon: "restaurant",
+            title: "Order Ready",
+            message: `✅ ${o.restaurant_name} marked your order #${o.id} ready for pickup!`,
+            time: o.created_at,
+            type: "success"
+          });
+        } else if (o.status === "declined") {
+          notifications.push({
+            id: `food_${o.id}_declined`,
+            icon: "restaurant",
+            title: "Order Rejected",
+            message: `❌ ${o.restaurant_name} declined/rejected your order #${o.id}.`,
+            time: o.created_at,
+            type: "error"
+          });
+        }
+      });
+
+      // Cab bookings: pending, confirmed, cancelled
+      cabBookings.forEach(b => {
+        if (b.status === "confirmed") {
+          notifications.push({
+            id: `cab_${b.id}_confirmed`,
+            icon: "local_taxi",
+            title: "Cab Confirmed",
+            message: `🚖 Your booking #${b.id} with ${b.vehicle_name || 'Cab Operator'} has been confirmed!`,
+            time: b.created_at,
+            type: "success"
+          });
+        } else if (b.status === "cancelled") {
+          notifications.push({
+            id: `cab_${b.id}_cancelled`,
+            icon: "local_taxi",
+            title: "Cab Cancelled",
+            message: `❌ Your booking #${b.id} has been cancelled.`,
+            time: b.created_at,
+            type: "error"
+          });
+        }
+      });
+
+      let unreadCount = 0;
+      notifications.forEach(n => {
+        if (!localStorage.getItem(`read_notif_${n.id}`)) {
+          unreadCount++;
+        }
+      });
+
+      const badge = document.getElementById("nav-notification-badge");
+      if (badge) {
+        if (unreadCount > 0) {
+          badge.classList.remove("hidden");
+        } else {
+          badge.classList.add("hidden");
+        }
+      }
+
+      const list = document.getElementById("nav-notification-list");
+      if (list) {
+        if (notifications.length === 0) {
+          list.innerHTML = `<div style="text-align: center; padding: 16px 0; font-size: 12px; color: #94a3b8; font-style: italic;">No new updates.</div>`;
+          return;
+        }
+
+        list.innerHTML = notifications.map(n => {
+          const isRead = localStorage.getItem(`read_notif_${n.id}`);
+          const fontStyle = isRead ? "color: #64748b;" : "font-weight: 600; color: #1e293b;";
+          const bgStyle = isRead ? "" : "background-color: #f8fafc;";
+          
+          return `
+            <div class="p-2.5 rounded-xl border border-slate-100 flex gap-2.5 items-start text-xs transition-all hover:bg-slate-50" style="${bgStyle} cursor: pointer; margin-bottom: 6px;" onclick="markAsRead('${n.id}')">
+              <span class="material-symbols-outlined" style="font-size: 18px; color: ${n.type === 'success' ? '#10b981' : '#ef4444'};">${n.icon}</span>
+              <div style="flex: 1; min-width: 0;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                  <strong style="${fontStyle}">${n.title}</strong>
+                  <span style="font-size: 9px; color: #94a3b8;">Active</span>
+                </div>
+                <p style="color: #475569; font-size: 11px; line-height: 1.3; margin: 0;">${n.message}</p>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  function markAsRead(id) {
+    localStorage.setItem(`read_notif_${id}`, "true");
+    checkNotifications();
+  }
+
+  function clearNotifications() {
+    const list = document.getElementById("nav-notification-list");
+    if (list) {
+      const cards = list.querySelectorAll("[onclick]");
+      cards.forEach(c => {
+        const onclickAttr = c.getAttribute("onclick");
+        const match = onclickAttr.match(/'([^']+)'/);
+        if (match && match[1]) {
+          localStorage.setItem(`read_notif_${match[1]}`, "true");
+        }
+      });
+    }
+    checkNotifications();
+  }
+
+  // Toggle dropdown on load
+  document.addEventListener("DOMContentLoaded", () => {
+    const btn = document.getElementById("nav-notification-btn");
+    const dropdown = document.getElementById("nav-notification-dropdown");
+    if (btn && dropdown) {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        dropdown.classList.toggle("hidden");
+      });
+      document.addEventListener("click", () => {
+        dropdown.classList.add("hidden");
+      });
+      dropdown.addEventListener("click", (e) => {
+        e.stopPropagation();
+      });
+    }
+    
+    checkNotifications();
+    setInterval(checkNotifications, 10000);
   });
 </script>
 {% endblock %}
