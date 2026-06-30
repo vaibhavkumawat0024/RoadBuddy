@@ -134,19 +134,26 @@
 
       <div class="setup-group">
         <label>Service Type *</label>
-        <div class="service-type-options custom-grid">
+        <div class="service-type-options custom-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px;">
           <label class="radio-card">
             <input type="radio" name="service_type" value="cabs_buses" checked />
             <div class="radio-card-content">
               <span class="rc-icon">🚐</span>
-              <span class="rc-label">Cabs, Buses & Travellers</span>
+              <span class="rc-label">Cabs & Buses</span>
             </div>
           </label>
           <label class="radio-card">
             <input type="radio" name="service_type" value="self_drive_rentals" />
             <div class="radio-card-content">
               <span class="rc-icon">🏢</span>
-              <span class="rc-label">Self Drive + Rentals</span>
+              <span class="rc-label">Self Drive</span>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="service_type" value="restaurant" />
+            <div class="radio-card-content">
+              <span class="rc-icon">🍳</span>
+              <span class="rc-label">Restaurant</span>
             </div>
           </label>
         </div>
@@ -264,26 +271,33 @@
   function updateBookingModeUI(serviceType) {
     const optsStandard = document.getElementById("opts-standard");
     const optsRentals = document.getElementById("opts-rentals");
+    const section = document.getElementById("booking-mode-section");
     
-    if (serviceType === "self_drive_rentals") {
-      optsStandard.style.display = "none";
-      optsStandard.querySelectorAll("input").forEach(i => { i.disabled = true; i.checked = false; });
-      
-      optsRentals.style.display = "flex";
-      optsRentals.querySelectorAll("input").forEach(i => i.disabled = false);
-      const checked = optsRentals.querySelector("input:checked");
-      if (!checked) {
-        optsRentals.querySelector("input").checked = true;
-      }
+    if (serviceType === "restaurant") {
+      section.style.display = "none";
+      section.querySelectorAll("input").forEach(i => i.disabled = true);
     } else {
-      optsRentals.style.display = "none";
-      optsRentals.querySelectorAll("input").forEach(i => { i.disabled = true; i.checked = false; });
-      
-      optsStandard.style.display = "flex";
-      optsStandard.querySelectorAll("input").forEach(i => i.disabled = false);
-      const checked = optsStandard.querySelector("input:checked");
-      if (!checked) {
-        optsStandard.querySelector("input").checked = true;
+      section.style.display = "block";
+      if (serviceType === "self_drive_rentals") {
+        optsStandard.style.display = "none";
+        optsStandard.querySelectorAll("input").forEach(i => { i.disabled = true; i.checked = false; });
+        
+        optsRentals.style.display = "flex";
+        optsRentals.querySelectorAll("input").forEach(i => i.disabled = false);
+        const checked = optsRentals.querySelector("input:checked");
+        if (!checked) {
+          optsRentals.querySelector("input").checked = true;
+        }
+      } else {
+        optsRentals.style.display = "none";
+        optsRentals.querySelectorAll("input").forEach(i => { i.disabled = true; i.checked = false; });
+        
+        optsStandard.style.display = "flex";
+        optsStandard.querySelectorAll("input").forEach(i => i.disabled = false);
+        const checked = optsStandard.querySelector("input:checked");
+        if (!checked) {
+          optsStandard.querySelector("input").checked = true;
+        }
       }
     }
   }

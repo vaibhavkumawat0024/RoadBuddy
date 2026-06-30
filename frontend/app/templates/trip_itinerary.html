@@ -70,10 +70,12 @@
             <span class="text-on-surface-variant font-semibold">Fuel & Toll:</span>
             <span class="font-bold text-on-surface">₹{{ "%.0f"|format((trip.fuel_cost_inr or 0) + (trip.toll_cost_inr or 0)) }}</span>
           </div>
+          {% if trip.travel_mode != 'own_vehicle' %}
           <div class="flex justify-between text-xs bg-slate-50 p-2 rounded-lg">
             <span class="text-on-surface-variant font-semibold">Transit Transport:</span>
             <span class="font-bold text-on-surface">₹{{ "%.0f"|format(trip.transport_fare_inr or 0) }}</span>
           </div>
+          {% endif %}
           <div class="flex justify-between text-xs bg-slate-50 p-2 rounded-lg">
             <span class="text-on-surface-variant font-semibold">Hotel Cost:</span>
             <span class="font-bold text-on-surface">₹{{ "%.0f"|format(trip.hotel_cost_inr or 0) }}</span>
@@ -188,6 +190,35 @@
           </div>
         </div>
       </section>
+
+      {% if trip.travel_mode == 'own_vehicle' or trip.travel_mode == 'cab_service' %}
+      <!-- Food & Dining Orders Section -->
+      <section class="bg-white border border-outline-variant rounded-2xl p-6 shadow-sm space-y-6 text-left mt-6 animate-fade-in-up">
+        <div class="flex justify-between items-center border-b border-outline-variant/40 pb-3">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary">restaurant</span>
+            <h3 class="font-bold text-on-surface text-base">Highway Food & Dining</h3>
+          </div>
+          <span class="text-[10px] bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded-full">Pre-pay & Arrive</span>
+        </div>
+
+        <!-- Active Food Orders Tracker -->
+        <div id="active-food-orders" class="space-y-4 hidden">
+          <h4 class="text-xs font-bold text-on-surface uppercase tracking-wider">Active Food Orders</h4>
+          <div id="active-orders-list" class="space-y-3"></div>
+        </div>
+
+        <!-- Restaurants List -->
+        <div class="space-y-4">
+          <h4 class="text-xs font-bold text-on-surface uppercase tracking-wider">Discover Restaurants in {{ trip.destination }}</h4>
+          <div id="restaurants-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="col-span-full text-center py-6 text-on-surface-variant text-xs">
+              Loading restaurants...
+            </div>
+          </div>
+        </div>
+      </section>
+      {% endif %}
     </div>
   </div>
 </div>
@@ -253,6 +284,90 @@
         </button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- Food Ordering Modal -->
+<div id="food-ordering-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-2xl shadow-xl border border-outline-variant max-w-2xl w-full overflow-hidden text-left animate-fade-in-up flex flex-col max-h-[85vh]">
+    <!-- Header -->
+    <div class="bg-slate-900 text-white p-6 relative flex-shrink-0">
+      <h3 class="text-xl font-bold" id="modal-rest-name">Restaurant Menu</h3>
+      <p class="text-white/70 text-xs mt-1" id="modal-rest-address">Address</p>
+      <button onclick="closeFoodModal()" class="absolute top-6 right-6 text-white/70 hover:text-white">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    
+    <!-- Body (Menu + Cart + Reviews) -->
+    <div class="p-6 overflow-y-auto flex-1 space-y-6">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Menu list -->
+        <div class="md:col-span-2 space-y-4">
+          <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Dishes</h4>
+          <div id="menu-items-container" class="space-y-3">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+        
+        <!-- Cart & Checkout -->
+        <div class="md:col-span-1 bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col justify-between max-h-[400px]">
+          <div>
+            <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Order Cart</h4>
+            <div id="cart-items" class="space-y-2 text-xs overflow-y-auto max-h-[180px]">
+              <div class="text-slate-400 italic">Cart is empty</div>
+            </div>
+          </div>
+          
+          <div class="pt-4 border-t border-slate-200 mt-4 space-y-3">
+            <div class="flex justify-between font-bold text-sm">
+              <span>Total:</span>
+              <span id="cart-total">₹0</span>
+            </div>
+            
+            <div class="space-y-1">
+              <label class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Payment Option</label>
+              <select id="food-payment-method" class="w-full text-xs border border-slate-200 rounded p-1.5 bg-white">
+                <option value="prepaid_wallet">Prepay via Wallet</option>
+                <option value="prepaid_card">Prepay via Credit Card</option>
+              </select>
+            </div>
+            
+            <button onclick="submitFoodOrder()" id="btn-submit-order" class="w-full bg-primary hover:bg-primary-container text-white text-xs font-semibold py-2.5 rounded-lg transition-colors shadow">
+              Pre-pay & Place Order
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dish Reviews & Ratings Section -->
+      <div class="border-t border-slate-200 pt-6">
+        <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Add a Review for a Dish</h4>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+          <div class="space-y-2">
+            <label class="block text-[10px] font-bold text-slate-500 uppercase">Select Dish</label>
+            <select id="review-dish-select" class="w-full text-xs border border-slate-200 rounded p-2 bg-white"></select>
+          </div>
+          <div class="space-y-2">
+            <label class="block text-[10px] font-bold text-slate-500 uppercase">Rating</label>
+            <div class="flex gap-1 text-slate-300" id="star-rating-selector">
+              <span onclick="setReviewRating(1)" class="material-symbols-outlined cursor-pointer star-selector-btn text-xl text-amber-400" data-rating="1">star</span>
+              <span onclick="setReviewRating(2)" class="material-symbols-outlined cursor-pointer star-selector-btn text-xl text-amber-400" data-rating="2">star</span>
+              <span onclick="setReviewRating(3)" class="material-symbols-outlined cursor-pointer star-selector-btn text-xl text-amber-400" data-rating="3">star</span>
+              <span onclick="setReviewRating(4)" class="material-symbols-outlined cursor-pointer star-selector-btn text-xl text-amber-400" data-rating="4">star</span>
+              <span onclick="setReviewRating(5)" class="material-symbols-outlined cursor-pointer star-selector-btn text-xl text-amber-400" data-rating="5">star</span>
+            </div>
+          </div>
+          <div class="sm:col-span-2 space-y-2">
+            <label class="block text-[10px] font-bold text-slate-500 uppercase">Review Comment</label>
+            <textarea id="review-comment-textarea" rows="2" class="w-full text-xs border border-slate-200 rounded p-2" placeholder="Tell us how the food was..."></textarea>
+          </div>
+          <button onclick="submitDishReview()" id="btn-submit-review" class="sm:col-span-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold py-2.5 rounded-lg transition-colors">
+            Submit Review
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -550,6 +665,374 @@
     }
   }
 
-  document.addEventListener('DOMContentLoaded', loadAllHotels);
+  // ── Food & Dining Ordering System JS ──────────────────────────────────────────
+
+  let currentRestId = null;
+  let currentRestMenu = [];
+  let foodCart = {}; // {item_id: {name, qty, price}}
+  let selectedReviewRating = 5;
+
+  async function loadRestaurants() {
+    const dest = "{{ trip.destination }}";
+    const container = document.getElementById("restaurants-container");
+    if (!container) return;
+    try {
+      const res = await fetch(`/food/restaurants?city=${encodeURIComponent(dest)}`);
+      if (!res.ok) throw new Error("Failed to load restaurants");
+      const data = await res.json();
+      
+      if (data.length === 0) {
+        container.innerHTML = `<div class="col-span-full text-center py-6 text-on-surface-variant text-xs italic">No restaurants found in ${dest}.</div>`;
+        return;
+      }
+      
+      container.innerHTML = data.map(r => `
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 hover:shadow-md transition-all flex flex-col justify-between">
+          <div class="space-y-1">
+            <div class="flex justify-between items-start">
+              <h4 class="font-bold text-slate-800 text-xs">${r.name}</h4>
+              <span class="bg-amber-50 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                ⭐ ${(r.rating || 4.0).toFixed(1)}
+              </span>
+            </div>
+            <p class="text-[10px] text-slate-500 leading-tight mt-1">${r.address}</p>
+            <p class="text-[9px] text-slate-400">📞 ${r.contact_number || 'N/A'}</p>
+          </div>
+          <button onclick="openFoodModal(${r.id})" class="mt-3 w-full bg-slate-800 hover:bg-slate-900 text-white text-[10px] font-semibold py-2 rounded transition-all">
+            View Menu & Order
+          </button>
+        </div>
+      `).join('');
+    } catch (err) {
+      console.error(err);
+      container.innerHTML = `<div class="col-span-full text-center py-6 text-red-500 text-xs">Error loading restaurants.</div>`;
+    }
+  }
+
+  function setReviewRating(rating) {
+    selectedReviewRating = rating;
+    document.querySelectorAll(".star-selector-btn").forEach(btn => {
+      const btnRating = parseInt(btn.dataset.rating);
+      if (btnRating <= rating) {
+        btn.classList.add("text-amber-400");
+        btn.classList.remove("text-slate-300");
+      } else {
+        btn.classList.remove("text-amber-400");
+        btn.classList.add("text-slate-300");
+      }
+    });
+  }
+
+  async function openFoodModal(restId) {
+    currentRestId = restId;
+    foodCart = {};
+    updateCartUI();
+    setReviewRating(5);
+    document.getElementById("review-comment-textarea").value = "";
+    
+    const modal = document.getElementById("food-ordering-modal");
+    modal.style.display = "flex";
+    
+    try {
+      const res = await fetch(`/food/restaurants/${restId}/menu`);
+      if (!res.ok) throw new Error("Failed to load menu");
+      const data = await res.json();
+      
+      document.getElementById("modal-rest-name").textContent = data.restaurant.name;
+      document.getElementById("modal-rest-address").textContent = data.restaurant.address;
+      
+      currentRestMenu = data.menu_items;
+      
+      // Populate reviews dropdown
+      const select = document.getElementById("review-dish-select");
+      select.innerHTML = currentRestMenu.map(item => `
+        <option value="${item.id}">${item.name}</option>
+      `).join('');
+      
+      // Populate dishes list
+      const menuContainer = document.getElementById("menu-items-container");
+      if (currentRestMenu.length === 0) {
+        menuContainer.innerHTML = `<div class="text-center text-slate-400 text-xs italic">No menu items added.</div>`;
+        return;
+      }
+      
+      menuContainer.innerHTML = currentRestMenu.map(item => {
+        const isVeg = item.category === "Veg";
+        const catBadge = isVeg 
+          ? `<span class="border border-green-600 text-green-600 text-[8px] font-bold px-1 rounded">VEG</span>`
+          : `<span class="border border-red-600 text-red-600 text-[8px] font-bold px-1 rounded">NON-VEG</span>`;
+          
+        const reviewsHTML = item.reviews.length > 0
+          ? `
+            <div class="mt-2 pl-4 border-l-2 border-slate-100 text-[9px] text-slate-500 space-y-1">
+              <strong>Reviews:</strong>
+              ${item.reviews.slice(0, 2).map(r => `
+                <div>⭐ ${r.rating} - "${r.comment}" <span class="text-slate-400">by ${r.user_name}</span></div>
+              `).join('')}
+            </div>
+          `
+          : "";
+
+        return `
+          <div class="bg-white border border-slate-200 p-3 rounded-lg flex flex-col justify-between gap-2 shadow-sm">
+            <div class="flex justify-between items-start gap-4">
+              <div>
+                <div class="flex items-center gap-1.5">
+                  ${catBadge}
+                  <strong class="text-xs text-slate-800">${item.name}</strong>
+                  <span class="text-slate-400 text-[10px]">⭐ ${item.rating.toFixed(1)}</span>
+                </div>
+                <p class="text-[10px] text-slate-500 mt-0.5">${item.description || ''}</p>
+              </div>
+              <div class="text-right">
+                <span class="text-xs font-bold text-slate-700">₹${item.price_inr}</span>
+              </div>
+            </div>
+            
+            <div class="flex justify-between items-center mt-1 pt-1.5 border-t border-slate-50">
+              <div class="text-[9px] text-slate-400">${item.category}</div>
+              <div class="flex items-center gap-2">
+                <button onclick="changeCartQty(${item.id}, -1)" class="w-6 h-6 rounded bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold flex items-center justify-center">-</button>
+                <span class="text-xs font-bold w-4 text-center" id="qty-item-${item.id}">0</span>
+                <button onclick="changeCartQty(${item.id}, 1)" class="w-6 h-6 rounded bg-slate-800 text-white hover:bg-slate-700 font-bold flex items-center justify-center">+</button>
+              </div>
+            </div>
+            ${reviewsHTML}
+          </div>
+        `;
+      }).join('');
+    } catch (err) {
+      console.error(err);
+      alert("Error opening food modal.");
+    }
+  }
+
+  function changeCartQty(itemId, offset) {
+    const item = currentRestMenu.find(m => m.id === itemId);
+    if (!item) return;
+    
+    if (!foodCart[itemId]) {
+      foodCart[itemId] = { name: item.name, price: item.price_inr, qty: 0 };
+    }
+    
+    foodCart[itemId].qty += offset;
+    if (foodCart[itemId].qty <= 0) {
+      delete foodCart[itemId];
+      document.getElementById(`qty-item-${itemId}`).textContent = 0;
+    } else {
+      document.getElementById(`qty-item-${itemId}`).textContent = foodCart[itemId].qty;
+    }
+    updateCartUI();
+  }
+
+  function updateCartUI() {
+    const cartContainer = document.getElementById("cart-items");
+    const totalDisplay = document.getElementById("cart-total");
+    
+    const keys = Object.keys(foodCart);
+    if (keys.length === 0) {
+      cartContainer.innerHTML = `<div class="text-slate-400 italic">Cart is empty</div>`;
+      totalDisplay.textContent = "₹0";
+      return;
+    }
+    
+    let total = 0;
+    cartContainer.innerHTML = keys.map(k => {
+      const c = foodCart[k];
+      const sub = c.price * c.qty;
+      total += sub;
+      return `
+        <div class="flex justify-between items-center text-xs my-1">
+          <span class="truncate max-w-[80px]">${c.name} (x${c.qty})</span>
+          <span class="font-semibold">₹${sub}</span>
+        </div>
+      `;
+    }).join('');
+    totalDisplay.textContent = "₹" + total;
+  }
+
+  async function submitFoodOrder() {
+    const keys = Object.keys(foodCart);
+    if (keys.length === 0) {
+      alert("Cart is empty. Add some food first!");
+      return;
+    }
+    
+    const submitBtn = document.getElementById("btn-submit-order");
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Placing Order...";
+    
+    const items = keys.map(k => ({
+      menu_item_id: parseInt(k),
+      name: foodCart[k].name,
+      quantity: foodCart[k].qty,
+      price: foodCart[k].price
+    }));
+    
+    let total = 0;
+    items.forEach(i => total += i.price * i.quantity);
+    
+    const payment = document.getElementById("food-payment-method").value;
+    
+    const payload = {
+      restaurant_id: currentRestId,
+      items: items,
+      total_amount: total,
+      payment_method: payment
+    };
+    
+    try {
+      const res = await fetch("/food/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      
+      if (res.ok) {
+        alert("Prepayment successful! Food order placed.");
+        closeFoodModal();
+        loadActiveFoodOrders();
+      } else {
+        const err = await res.json();
+        alert("Failed to place order: " + (err.detail || "Unknown error"));
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Pre-pay & Place Order";
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error placing food order.");
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Pre-pay & Place Order";
+    }
+  }
+
+  async function submitDishReview() {
+    const itemId = parseInt(document.getElementById("review-dish-select").value);
+    const comment = document.getElementById("review-comment-textarea").value.trim();
+    if (!comment) {
+      alert("Please write a review comment.");
+      return;
+    }
+    
+    const submitBtn = document.getElementById("btn-submit-review");
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Submitting Review...";
+    
+    try {
+      const res = await fetch(`/food/menu-items/${itemId}/review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rating: selectedReviewRating, comment: comment })
+      });
+      
+      if (res.ok) {
+        alert("Review submitted successfully!");
+        document.getElementById("review-comment-textarea").value = "";
+        // Refresh menu inside modal
+        openFoodModal(currentRestId);
+      } else {
+        alert("Failed to submit review.");
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Submit Review";
+    }
+  }
+
+  async function loadActiveFoodOrders() {
+    const ordersDiv = document.getElementById("active-food-orders");
+    const list = document.getElementById("active-orders-list");
+    if (!list) return;
+    
+    try {
+      const res = await fetch("/food/my-orders");
+      if (!res.ok) throw new Error("Failed to load orders");
+      const data = await res.json();
+      
+      // Filter active orders (paid, preparing, ready)
+      const active = data.filter(o => ["paid", "preparing", "ready"].includes(o.status));
+      
+      if (active.length === 0) {
+        ordersDiv.classList.add("hidden");
+        return;
+      }
+      
+      ordersDiv.classList.remove("hidden");
+      list.innerHTML = active.map(o => {
+        let statusBadge = "";
+        if (o.status === "paid") statusBadge = `<span class="bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded">PAID</span>`;
+        else if (o.status === "preparing") statusBadge = `<span class="bg-amber-50 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded animate-pulse">PREPARING</span>`;
+        else if (o.status === "ready") statusBadge = `<span class="bg-green-50 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded">READY FOR PICKUP</span>`;
+        
+        return `
+          <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+            <div class="flex justify-between items-start">
+              <div>
+                <h5 class="font-bold text-xs text-slate-800">${o.restaurant_name} (${o.restaurant_city})</h5>
+                <p class="text-[10px] text-slate-500 mt-0.5">${o.items.map(i => `${i.name} (x${i.quantity})`).join(', ')}</p>
+              </div>
+              <div class="text-right">
+                ${statusBadge}
+                <div class="text-slate-700 font-bold text-xs mt-1">₹${o.total_amount}</div>
+              </div>
+            </div>
+            
+            <div class="flex flex-wrap justify-between items-center pt-2.5 border-t border-slate-200/60 gap-3 text-xs">
+              <div class="flex items-center gap-1">
+                <span>⏳ Prep Time:</span>
+                <strong class="font-bold text-slate-800">${o.preparation_time_mins} mins</strong>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span>⏰ I will arrive in:</span>
+                <input type="number" id="arrival-time-${o.id}" value="${o.user_arrival_time_mins}" min="5" max="180" class="w-12 border border-slate-200 rounded p-1 text-xs text-center font-bold" />
+                <span>mins</span>
+                <button onclick="updateArrivalOffset(${o.id})" class="bg-slate-800 hover:bg-slate-900 text-white text-[10px] px-2.5 py-1 rounded font-semibold transition-all">Update</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function updateArrivalOffset(orderId) {
+    const mins = parseInt(document.getElementById(`arrival-time-${orderId}`).value);
+    if (isNaN(mins) || mins < 5) {
+      alert("Minimum arrival offset is 5 minutes.");
+      return;
+    }
+    
+    try {
+      const res = await fetch(`/food/orders/${orderId}/arrival`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ arrival_time_mins: mins })
+      });
+      
+      if (res.ok) {
+        alert("Arrival time updated and shared with the restaurant!");
+        loadActiveFoodOrders();
+      } else {
+        alert("Failed to update arrival time.");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  function closeFoodModal() {
+    document.getElementById("food-ordering-modal").style.display = "none";
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    loadAllHotels();
+    loadRestaurants();
+    loadActiveFoodOrders();
+    setInterval(loadActiveFoodOrders, 10000);
+  });
 </script>
 {% endblock %}

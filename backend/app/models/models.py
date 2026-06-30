@@ -472,3 +472,73 @@ class ProviderBooking(Base):
             except Exception:
                 pass
         return []
+
+
+# ── Food & Restaurants ────────────────────────────────────────────────────────
+
+class Restaurant(Base):
+    __tablename__ = "restaurants"
+
+    id              = Column(Integer, primary_key=True, index=True)
+    provider_id     = Column(Integer, ForeignKey("providers.id"), nullable=True)
+    name            = Column(String, nullable=False)
+    city            = Column(String, nullable=False, index=True)
+    address         = Column(String, nullable=False)
+    rating          = Column(Float, default=4.0)
+    reviews_count   = Column(Integer, default=0)
+    latitude        = Column(Float, nullable=True)
+    longitude       = Column(Float, nullable=True)
+    contact_number  = Column(String, nullable=True)
+    image_url       = Column(String, nullable=True)
+    created_at      = Column(DateTime, server_default=func.now())
+
+    menu_items = relationship("MenuItem", back_populates="restaurant", cascade="all, delete-orphan")
+    orders = relationship("FoodOrder", back_populates="restaurant", cascade="all, delete-orphan")
+
+
+class MenuItem(Base):
+    __tablename__ = "menu_items"
+
+    id              = Column(Integer, primary_key=True, index=True)
+    restaurant_id   = Column(Integer, ForeignKey("restaurants.id"), nullable=False)
+    name            = Column(String, nullable=False)
+    description     = Column(String, nullable=True)
+    price_inr       = Column(Float, nullable=False)
+    category        = Column(String, default="Veg")  # Veg, Non-Veg, Egg, Beverage, Dessert
+    rating          = Column(Float, default=4.0)
+    created_at      = Column(DateTime, server_default=func.now())
+
+    restaurant = relationship("Restaurant", back_populates="menu_items")
+    reviews = relationship("FoodReview", back_populates="menu_item", cascade="all, delete-orphan")
+
+
+class FoodOrder(Base):
+    __tablename__ = "food_orders"
+
+    id              = Column(Integer, primary_key=True, index=True)
+    user_id         = Column(Integer, ForeignKey("users.id"), nullable=False)
+    restaurant_id   = Column(Integer, ForeignKey("restaurants.id"), nullable=False)
+    items_json      = Column(String, nullable=False)  # JSON list of {menu_item_id, name, quantity, price}
+    total_amount    = Column(Float, nullable=False)
+    status          = Column(String, default="paid")  # paid, preparing, ready, completed
+    preparation_time_mins = Column(Integer, default=20)  # Provider set time
+    user_arrival_time_mins = Column(Integer, default=30)  # User arrival offset in minutes
+    payment_method   = Column(String, default="prepaid")  # prepaid (wallet/card)
+    created_at      = Column(DateTime, server_default=func.now())
+
+    restaurant = relationship("Restaurant", back_populates="orders")
+    user = relationship("User")
+
+
+class FoodReview(Base):
+    __tablename__ = "food_reviews"
+
+    id              = Column(Integer, primary_key=True, index=True)
+    user_id         = Column(Integer, ForeignKey("users.id"), nullable=False)
+    menu_item_id    = Column(Integer, ForeignKey("menu_items.id"), nullable=False)
+    rating          = Column(Integer, default=5)  # 1 to 5 stars
+    comment         = Column(String, nullable=True)
+    created_at      = Column(DateTime, server_default=func.now())
+
+    menu_item = relationship("MenuItem", back_populates="reviews")
+    user = relationship("User")

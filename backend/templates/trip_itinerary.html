@@ -239,6 +239,7 @@
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <!-- Left Column: Transport & Hotel Booking -->
     <div class="lg:col-span-1 space-y-6">
+      {% if trip.travel_mode != 'own_vehicle' %}
       <!-- 🎫 Transport Booking Section -->
       <section class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6 text-left animate-fade-in-up">
         {% if trip.travel_mode == 'bus' %}
@@ -283,6 +284,7 @@
           </div>
         {% endif %}
       </section>
+      {% endif %}
 
       <!-- 🏨 Hotel Booking Section -->
       <section class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6 text-left animate-fade-in-up">
@@ -307,6 +309,35 @@
           </div>
         </div>
       </section>
+
+      {% if trip.travel_mode == 'own_vehicle' or trip.travel_mode == 'cab_service' %}
+      <!-- Food & Dining Orders Section -->
+      <section class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6 text-left mt-6 animate-fade-in-up">
+        <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-emerald-600 text-xl">restaurant</span>
+            <h3 class="font-extrabold text-slate-800 text-lg tracking-tight">Highway Food & Dining</h3>
+          </div>
+          <span class="text-[10px] bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded-full">Pre-pay & Arrive</span>
+        </div>
+
+        <!-- Active Food Orders Tracker -->
+        <div id="active-food-orders" class="space-y-4 hidden">
+          <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Active Food Orders</h4>
+          <div id="active-orders-list" class="space-y-3"></div>
+        </div>
+
+        <!-- Restaurants List -->
+        <div class="space-y-4">
+          <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Discover Restaurants in {{ trip.destination }}</h4>
+          <div id="restaurants-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="col-span-full text-center py-6 text-slate-400 text-xs">
+              Loading restaurants...
+            </div>
+          </div>
+        </div>
+      </section>
+      {% endif %}
     </div>
 
     <!-- Right Column: Itinerary Stops & Parameters -->
@@ -425,10 +456,12 @@
             <span class="text-slate-500 font-semibold">Fuel & Toll:</span>
             <span class="font-bold text-slate-800">₹{{ "%.0f"|format((trip.fuel_cost_inr or 0) + (trip.toll_cost_inr or 0)) }}</span>
           </div>
+          {% if trip.travel_mode != 'own_vehicle' %}
           <div class="flex justify-between text-xs bg-slate-50 p-2 rounded-lg">
             <span class="text-slate-500 font-semibold">Transit Transport:</span>
             <span class="font-bold text-slate-800">₹{{ "%.0f"|format(trip.transport_fare_inr or 0) }}</span>
           </div>
+          {% endif %}
           <div class="flex justify-between text-xs bg-slate-50 p-2 rounded-lg">
             <span class="text-slate-500 font-semibold">Hotel Cost:</span>
             <span class="font-bold text-slate-800">₹{{ "%.0f"|format(trip.hotel_cost_inr or 0) }}</span>
@@ -508,6 +541,90 @@
         </button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- Food Ordering Modal -->
+<div id="food-ordering-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-2xl w-full overflow-hidden text-left animate-fade-in-up flex flex-col max-h-[85vh]">
+    <!-- Header -->
+    <div class="bg-slate-900 text-white p-6 relative flex-shrink-0">
+      <h3 class="text-xl font-bold" id="modal-rest-name">Restaurant Menu</h3>
+      <p class="text-white/70 text-xs mt-1" id="modal-rest-address">Address</p>
+      <button onclick="closeFoodModal()" class="absolute top-6 right-6 text-white/70 hover:text-white">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    
+    <!-- Body (Menu + Cart + Reviews) -->
+    <div class="p-6 overflow-y-auto flex-1 space-y-6">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Menu list -->
+        <div class="md:col-span-2 space-y-4">
+          <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Dishes</h4>
+          <div id="menu-items-container" class="space-y-3">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+        
+        <!-- Cart & Checkout -->
+        <div class="md:col-span-1 bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col justify-between max-h-[400px]">
+          <div>
+            <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Order Cart</h4>
+            <div id="cart-items" class="space-y-2 text-xs overflow-y-auto max-h-[180px]">
+              <div class="text-slate-400 italic">Cart is empty</div>
+            </div>
+          </div>
+          
+          <div class="pt-4 border-t border-slate-200 mt-4 space-y-3">
+            <div class="flex justify-between font-bold text-sm">
+              <span>Total:</span>
+              <span id="cart-total">₹0</span>
+            </div>
+            
+            <div class="space-y-1">
+              <label class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Payment Option</label>
+              <select id="food-payment-method" class="w-full text-xs border border-slate-200 rounded p-1.5 bg-white">
+                <option value="prepaid_wallet">Prepay via Wallet</option>
+                <option value="prepaid_card">Prepay via Credit Card</option>
+              </select>
+            </div>
+            
+            <button onclick="submitFoodOrder()" id="btn-submit-order" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-2.5 rounded-lg transition-colors shadow">
+              Pre-pay & Place Order
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dish Reviews & Ratings Section -->
+      <div class="border-t border-slate-200 pt-6">
+        <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Add a Review for a Dish</h4>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+          <div class="space-y-2">
+            <label class="block text-[10px] font-bold text-slate-500 uppercase">Select Dish</label>
+            <select id="review-dish-select" class="w-full text-xs border border-slate-200 rounded p-2 bg-white"></select>
+          </div>
+          <div class="space-y-2">
+            <label class="block text-[10px] font-bold text-slate-500 uppercase">Rating</label>
+            <div class="flex gap-1 text-slate-300" id="star-rating-selector">
+              <span onclick="setReviewRating(1)" class="material-symbols-outlined cursor-pointer star-selector-btn text-xl text-amber-400" data-rating="1">star</span>
+              <span onclick="setReviewRating(2)" class="material-symbols-outlined cursor-pointer star-selector-btn text-xl text-amber-400" data-rating="2">star</span>
+              <span onclick="setReviewRating(3)" class="material-symbols-outlined cursor-pointer star-selector-btn text-xl text-amber-400" data-rating="3">star</span>
+              <span onclick="setReviewRating(4)" class="material-symbols-outlined cursor-pointer star-selector-btn text-xl text-amber-400" data-rating="4">star</span>
+              <span onclick="setReviewRating(5)" class="material-symbols-outlined cursor-pointer star-selector-btn text-xl text-amber-400" data-rating="5">star</span>
+            </div>
+          </div>
+          <div class="sm:col-span-2 space-y-2">
+            <label class="block text-[10px] font-bold text-slate-500 uppercase">Review Comment</label>
+            <textarea id="review-comment-textarea" rows="2" class="w-full text-xs border border-slate-200 rounded p-2" placeholder="Tell us how the food was..."></textarea>
+          </div>
+          <button onclick="submitDishReview()" id="btn-submit-review" class="sm:col-span-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold py-2.5 rounded-lg transition-colors">
+            Submit Review
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -2159,6 +2276,326 @@
     }
   }
 
+  // ── Food Ordering JS ──────────────────────────────────────────────────────
+  let currentRestId = null;
+  let currentMenu = [];
+  let foodCart = {};
+  let currentReviewRating = 5;
+
+  async function loadRestaurants() {
+    const dest = "{{ trip.destination }}";
+    const container = document.getElementById("restaurants-container");
+    if (!container) return;
+
+    try {
+      const res = await fetch(`/api/food/restaurants?city=${encodeURIComponent(dest)}`);
+      if (res.ok) {
+        const restaurants = await res.json();
+        if (restaurants.length === 0) {
+          container.innerHTML = `<div class="col-span-full text-center py-6 text-slate-400 text-xs italic">No highway partner restaurants found in ${dest}.</div>`;
+          return;
+        }
+
+        container.innerHTML = restaurants.map(r => `
+          <div class="border border-slate-200 rounded-xl p-4 space-y-3 bg-slate-50 hover:bg-slate-100 transition-colors text-left flex flex-col justify-between">
+            <div>
+              <div class="flex justify-between items-start">
+                <h5 class="font-bold text-slate-800 text-xs">${r.name}</h5>
+                <span class="text-[10px] bg-amber-50 text-amber-700 font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                  <span class="material-symbols-outlined text-[10px] fill-current">star</span>
+                  ${(r.rating || 4.0).toFixed(1)}
+                </span>
+              </div>
+              <p class="text-[10px] text-slate-500 mt-1">${r.address}</p>
+            </div>
+            <button onclick="openFoodMenu(${r.id}, '${r.name.replace(/'/g, "\\'")}', '${r.address.replace(/'/g, "\\'")}')" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold py-2 rounded transition-colors mt-2">
+              View Menu & Order
+            </button>
+          </div>
+        `).join("");
+      } else {
+        container.innerHTML = `<div class="col-span-full text-center py-6 text-red-500 text-xs italic">Error loading restaurants.</div>`;
+      }
+    } catch (err) {
+      container.innerHTML = `<div class="col-span-full text-center py-6 text-red-500 text-xs italic">Error connecting to food service.</div>`;
+    }
+  }
+
+  async function openFoodMenu(restId, restName, restAddress) {
+    currentRestId = restId;
+    document.getElementById("modal-rest-name").textContent = restName;
+    document.getElementById("modal-rest-address").textContent = restAddress;
+    foodCart = {};
+    updateCartDisplay();
+
+    const menuContainer = document.getElementById("menu-items-container");
+    menuContainer.innerHTML = `<div class="text-xs text-slate-400">Loading menu...</div>`;
+
+    const modal = document.getElementById("food-ordering-modal");
+    modal.classList.remove("hidden");
+    modal.classList.add("flex");
+
+    try {
+      const res = await fetch(`/api/food/restaurants/${restId}/menu`);
+      if (res.ok) {
+        const data = await res.json();
+        currentMenu = data.menu_items;
+        
+        // Pop review select
+        const reviewSelect = document.getElementById("review-dish-select");
+        reviewSelect.innerHTML = currentMenu.map(item => `
+          <option value="${item.id}">${item.name}</option>
+        `).join("");
+
+        if (currentMenu.length === 0) {
+          menuContainer.innerHTML = `<div class="text-xs text-slate-400 italic">No menu items added yet by this provider.</div>`;
+          return;
+        }
+
+        menuContainer.innerHTML = currentMenu.map(item => `
+          <div class="border border-slate-100 rounded-xl p-3 flex justify-between items-center bg-slate-50">
+            <div>
+              <div class="flex items-center gap-1.5">
+                <strong class="text-xs text-slate-800">${item.name}</strong>
+                <span class="text-[8px] font-bold px-1 rounded ${item.category === 'Veg' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">${item.category.toUpperCase()}</span>
+              </div>
+              <p class="text-[10px] text-slate-500 mt-0.5">${item.description || 'No description'}</p>
+              <div class="text-[10px] text-amber-600 font-bold mt-1">₹${item.price_inr}</div>
+            </div>
+            <button onclick="addToCart(${item.id})" class="bg-slate-800 hover:bg-slate-900 text-white text-[10px] font-bold px-3 py-1.5 rounded">
+              Add
+            </button>
+          </div>
+        `).join("");
+      } else {
+        menuContainer.innerHTML = `<div class="text-xs text-red-500">Failed to load menu.</div>`;
+      }
+    } catch (err) {
+      menuContainer.innerHTML = `<div class="text-xs text-red-500">Error connecting to food service.</div>`;
+    }
+  }
+
+  function closeFoodModal() {
+    const modal = document.getElementById("food-ordering-modal");
+    modal.classList.add("hidden");
+    modal.classList.remove("flex");
+  }
+
+  function addToCart(itemId) {
+    const item = currentMenu.find(i => i.id === itemId);
+    if (!item) return;
+    if (foodCart[itemId]) {
+      foodCart[itemId].quantity += 1;
+    } else {
+      foodCart[itemId] = { id: item.id, name: item.name, price: item.price_inr, quantity: 1 };
+    }
+    updateCartDisplay();
+  }
+
+  function updateCartQuantity(itemId, delta) {
+    if (!foodCart[itemId]) return;
+    foodCart[itemId].quantity += delta;
+    if (foodCart[itemId].quantity <= 0) {
+      delete foodCart[itemId];
+    }
+    updateCartDisplay();
+  }
+
+  function updateCartDisplay() {
+    const container = document.getElementById("cart-items");
+    const totalEl = document.getElementById("cart-total");
+    const items = Object.values(foodCart);
+
+    if (items.length === 0) {
+      container.innerHTML = `<div class="text-slate-400 italic text-center">Cart is empty</div>`;
+      totalEl.textContent = "₹0";
+      return;
+    }
+
+    let total = 0;
+    container.innerHTML = items.map(item => {
+      const lineTotal = item.price * item.quantity;
+      total += lineTotal;
+      return `
+        <div class="flex justify-between items-center text-xs">
+          <div>
+            <div>${item.name}</div>
+            <div class="text-[9px] text-slate-400">₹${item.price} each</div>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <button onclick="updateCartQuantity(${item.id}, -1)" class="w-5 h-5 bg-slate-200 rounded flex items-center justify-center font-bold text-xs">-</button>
+            <span>${item.quantity}</span>
+            <button onclick="updateCartQuantity(${item.id}, 1)" class="w-5 h-5 bg-slate-200 rounded flex items-center justify-center font-bold text-xs">+</button>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    totalEl.textContent = `₹${total}`;
+  }
+
+  async function submitFoodOrder() {
+    const items = Object.values(foodCart);
+    if (items.length === 0) {
+      alert("Your cart is empty!");
+      return;
+    }
+
+    let total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const payMethod = document.getElementById("food-payment-method").value;
+
+    const payload = {
+      restaurant_id: currentRestId,
+      items: items.map(i => ({ menu_item_id: i.id, name: i.name, quantity: i.quantity, price: i.price })),
+      total_amount: total,
+      payment_method: payMethod
+    };
+
+    try {
+      const res = await fetch("/api/food/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        alert("Pre-payment successful! Your order has been placed.");
+        closeFoodModal();
+        loadActiveFoodOrders();
+      } else {
+        const errData = await res.json();
+        alert(`Order failed: ${errData.detail || "Internal Server Error"}`);
+      }
+    } catch (err) {
+      alert("Connection error. Could not place order.");
+    }
+  }
+
+  function setReviewRating(rating) {
+    currentReviewRating = rating;
+    const stars = document.querySelectorAll("#star-rating-selector .star-selector-btn");
+    stars.forEach((s, idx) => {
+      if (idx < rating) {
+        s.classList.add("text-amber-400");
+        s.classList.remove("text-slate-300");
+      } else {
+        s.classList.add("text-slate-300");
+        s.classList.remove("text-amber-400");
+      }
+    });
+  }
+
+  async function submitDishReview() {
+    const dishId = document.getElementById("review-dish-select").value;
+    const comment = document.getElementById("review-comment-textarea").value.trim();
+
+    if (!dishId) {
+      alert("Please select a dish first.");
+      return;
+    }
+
+    const payload = {
+      rating: currentReviewRating,
+      comment: comment || "Good food!"
+    };
+
+    try {
+      const res = await fetch(`/api/food/menu-items/${dishId}/review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        alert("Thank you for your rating & review!");
+        document.getElementById("review-comment-textarea").value = "";
+        setReviewRating(5);
+        openFoodMenu(currentRestId, document.getElementById("modal-rest-name").textContent, document.getElementById("modal-rest-address").textContent);
+      } else {
+        alert("Failed to submit review.");
+      }
+    } catch (err) {
+      alert("Connection error.");
+    }
+  }
+
+  async function loadActiveFoodOrders() {
+    const tracker = document.getElementById("active-food-orders");
+    const list = document.getElementById("active-orders-list");
+    if (!tracker || !list) return;
+
+    try {
+      const res = await fetch("/api/food/my-orders");
+      if (res.ok) {
+        const allOrders = await res.json();
+        const orders = allOrders.filter(o => ["paid", "preparing", "ready"].includes(o.status));
+        if (orders.length === 0) {
+          tracker.classList.add("hidden");
+          return;
+        }
+
+        tracker.classList.remove("hidden");
+        list.innerHTML = orders.map(o => {
+          let statusColor = "bg-blue-50 text-blue-700 border-blue-200";
+          if (o.status === "preparing") statusColor = "bg-amber-50 text-amber-700 border-amber-200";
+          if (o.status === "ready") statusColor = "bg-green-50 text-green-700 border-green-200";
+
+          return `
+            <div class="border border-slate-200 rounded-xl p-4 bg-slate-50 text-left space-y-3">
+              <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+                <div>
+                  <strong class="text-xs text-slate-800">${o.restaurant_name}</strong>
+                  <span class="text-[9px] text-slate-400 block">Order #${o.id}</span>
+                </div>
+                <span class="text-[9px] font-bold px-2 py-0.5 rounded-full border ${statusColor} uppercase">${o.status}</span>
+              </div>
+              <div class="text-[10px] text-slate-600">
+                ${o.items.map(i => `${i.name} (x${i.quantity})`).join(", ")}
+              </div>
+              <div class="flex justify-between items-center text-[10px] pt-1">
+                <span>Prep Time: <strong>${o.preparation_time_mins} mins</strong></span>
+                <span class="text-slate-500 font-bold">Total: ₹${o.total_amount}</span>
+              </div>
+
+              <!-- Arrival coordinate form -->
+              <div class="pt-2 border-t border-slate-100 flex gap-2 items-center">
+                <span class="text-[9px] font-bold text-slate-500 uppercase">Tell Provider Arrival Time:</span>
+                <input type="number" id="arrival-mins-${o.id}" value="${o.user_arrival_time_mins || 30}" min="5" max="180" class="w-12 text-center text-xs border border-slate-200 rounded p-1">
+                <span class="text-[9px] text-slate-400">mins</span>
+                <button onclick="updateArrivalOffset(${o.id})" class="bg-slate-800 hover:bg-slate-900 text-white text-[9px] font-bold px-2.5 py-1.5 rounded transition-all">
+                  Notify
+                </button>
+              </div>
+            </div>
+          `;
+        }).join("");
+      }
+    } catch (err) {
+      console.error("Error loading active food orders:", err);
+    }
+  }
+
+  async function updateArrivalOffset(orderId) {
+    const input = document.getElementById(`arrival-mins-${orderId}`);
+    const val = parseInt(input.value);
+
+    try {
+      const res = await fetch(`/api/food/orders/${orderId}/arrival`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ arrival_time_mins: val })
+      });
+      if (res.ok) {
+        alert("Arrival time notification sent to the restaurant!");
+        loadActiveFoodOrders();
+      } else {
+        alert("Failed to send arrival notice.");
+      }
+    } catch (err) {
+      alert("Error connecting to server.");
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     loadAllHotels();
     
@@ -2171,6 +2608,11 @@
       loadTransitOptions('flight', 'flights-container');
     } else {
       loadCabServices();
+    }
+
+    if (travelMode === 'own_vehicle' || travelMode === 'cab_service') {
+      loadRestaurants();
+      loadActiveFoodOrders();
     }
   });
 </script>

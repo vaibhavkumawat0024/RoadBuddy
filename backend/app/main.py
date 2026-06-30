@@ -3,9 +3,10 @@ from fastapi.staticfiles import StaticFiles
 from app.provider.router import router as provider_router
 from fastapi.middleware.cors import CORSMiddleware
 from app.provider.pages import router as provider_pages_router
+from app.provider.food_pages import router as food_provider_pages_router
 from app.routers import booking
 
-from app.routers import trips, fuel, users, community, journal, transport
+from app.routers import trips, fuel, users, community, journal, transport, food
 from app.pages import auth_pages, dashboard_pages
 from app.core.database import engine
 from sqlalchemy import text
@@ -20,6 +21,8 @@ app = FastAPI(
 # Run schema updates on startup
 @app.on_event("startup")
 async def run_migrations():
+    from app.models.models import Base
+    Base.metadata.create_all(bind=engine)
     statements = [
         "ALTER TABLE providers ADD COLUMN IF NOT EXISTS alternate_email VARCHAR;",
         "ALTER TABLE providers ADD COLUMN IF NOT EXISTS booking_mode VARCHAR;",
@@ -98,6 +101,15 @@ async def run_migrations():
             if "duplicate column name" not in str(e).lower() and "already exists" not in str(e).lower():
                 print(f"Failed to add vehicle_asset_id to provider_vehicles: {e}")
 
+        if dialect != "sqlite":
+            try:
+                connection.execute(text("SELECT setval(pg_get_serial_sequence('restaurants', 'id'), coalesce(max(id), 1)) FROM restaurants;"))
+                connection.execute(text("SELECT setval(pg_get_serial_sequence('menu_items', 'id'), coalesce(max(id), 1)) FROM menu_items;"))
+                connection.execute(text("SELECT setval(pg_get_serial_sequence('food_orders', 'id'), coalesce(max(id), 1)) FROM food_orders;"))
+                connection.execute(text("SELECT setval(pg_get_serial_sequence('food_reviews', 'id'), coalesce(max(id), 1)) FROM food_reviews;"))
+            except Exception as seq_err:
+                print(f"Failed to reset postgres sequences: {seq_err}")
+
 
 
 
@@ -122,7 +134,9 @@ app.include_router(journal.router,   prefix="/api/journal",   tags=["Trip Journa
 app.include_router(transport.router, prefix="/api/transport", tags=["Transport"])
 app.include_router(provider_router, prefix="/api/provider", tags=["Provider"])
 app.include_router(provider_pages_router)
+app.include_router(food_provider_pages_router)
 app.include_router(booking.router, prefix="/api/booking", tags=["Booking"])
+app.include_router(food.router, prefix="/api/food", tags=["Food & Restaurant"])
 
 # UI page routes
 app.include_router(auth_pages.router)

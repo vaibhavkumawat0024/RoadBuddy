@@ -238,6 +238,56 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
     # Show setup popup if provider hasn't completed their profile
     show_setup = not provider.company_name
 
+    if provider.service_type == "restaurant":
+        from app.models.models import Restaurant, MenuItem, FoodOrder
+        # Find or create restaurant
+        restaurant = db.query(Restaurant).filter(Restaurant.provider_id == provider.id).first()
+        if not restaurant:
+            restaurant = Restaurant(
+                provider_id=provider.id,
+                name=provider.company_name or "My Restaurant",
+                city=provider.city or "Jaipur",
+                address="Main Street",
+                rating=4.0,
+                reviews_count=0
+            )
+            db.add(restaurant)
+            db.commit()
+            db.refresh(restaurant)
+            
+        orders = db.query(FoodOrder).filter(FoodOrder.restaurant_id == restaurant.id).order_by(FoodOrder.created_at.desc()).all()
+        menu_items = db.query(MenuItem).filter(MenuItem.restaurant_id == restaurant.id).all()
+        
+        # Calculate stats
+        total_sales = sum(o.total_amount for o in orders if o.status != "cancelled")
+        active_orders = len([o for o in orders if o.status in ("paid", "preparing", "ready")])
+        completed_orders = len([o for o in orders if o.status == "completed"])
+        
+        import json
+        parsed_orders = []
+        for o in orders:
+            parsed_orders.append({
+                "id": o.id,
+                "user_name": o.user.name if o.user else "Passenger",
+                "items": json.loads(o.items_json),
+                "total_amount": o.total_amount,
+                "status": o.status,
+                "preparation_time_mins": o.preparation_time_mins,
+                "user_arrival_time_mins": o.user_arrival_time_mins,
+                "created_at": o.created_at
+            })
+            
+        return templates.TemplateResponse(request, "provider_restaurant_dashboard.html", {
+            "provider": provider,
+            "restaurant": restaurant,
+            "orders": parsed_orders,
+            "menu_items": menu_items,
+            "total_sales": total_sales,
+            "active_orders": active_orders,
+            "completed_orders": completed_orders,
+            "show_setup": show_setup
+        })
+
     vehicles = db.query(ProviderVehicle).filter(
         ProviderVehicle.provider_id == provider.id
     ).all()

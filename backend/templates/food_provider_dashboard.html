@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ restaurant.name if restaurant else 'Restaurant Setup' }} — Restaurant Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+  
+  <style>
+    :root {
+      --primary: #1e293b;
+      --primary-light: #334155;
+      --accent: #10b981;
+      --accent-hover: #059669;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --font: 'Outfit', sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font);
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    /* Header */
+    header {
+      background-color: var(--primary);
+      color: white;
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    }
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .logo-container h1 {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+    }
+
+    .logo-badge {
+      background-color: var(--accent);
+      color: white;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.2rem 0.5rem;
+      border-radius: 9999px;
+      text-transform: uppercase;
+    }
+
+    .user-menu {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .user-menu span {
+      font-size: 0.875rem;
+      color: #cbd5e1;
+    }
+
+    .btn-logout {
+      color: #f1f5f9;
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      transition: color 0.2s;
+    }
+
+    .btn-logout:hover {
+      color: #ef4444;
+    }
+
+    /* Container */
+    .container {
+      max-width: 1200px;
+      margin: 2rem auto;
+      padding: 0 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    /* Restaurant Profile Card */
+    .profile-card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+    }
+
+    .profile-info h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+
+    .profile-info p {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    .profile-badges {
+      display: flex;
+      gap: 1rem;
+      font-size: 0.875rem;
+    }
+
+    .badge-rating {
+      background-color: #fef3c7;
+      color: #d97706;
+      font-weight: 700;
+      padding: 0.35rem 0.75rem;
+      border-radius: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .stat-card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .stat-icon {
+      background-color: #f1f5f9;
+      color: var(--primary);
+      width: 3rem;
+      height: 3rem;
+      border-radius: 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .stat-card:nth-child(1) .stat-icon {
+      background-color: #ecfdf5;
+      color: var(--accent);
+    }
+
+    .stat-card:nth-child(2) .stat-icon {
+      background-color: #eff6ff;
+      color: #3b82f6;
+    }
+
+    .stat-info span {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .stat-info strong {
+      font-size: 1.5rem;
+      font-weight: 800;
+    }
+
+    /* Main Dashboard Layout */
+    .dashboard-layout {
+      display: grid;
+      grid-template-columns: 3fr 2fr;
+      gap: 2rem;
+    }
+
+    @media (max-width: 900px) {
+      .dashboard-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .section-title {
+      font-size: 1.125rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    /* Orders Queue */
+    .orders-container {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .order-card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      transition: box-shadow 0.2s;
+    }
+
+    .order-card:hover {
+      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
+    }
+
+    .order-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      border-b: 1px solid var(--border);
+      padding-bottom: 0.75rem;
+    }
+
+    .order-id {
+      font-size: 0.875rem;
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .order-user {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.1rem;
+    }
+
+    .status-badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.375rem;
+      text-transform: uppercase;
+    }
+
+    .status-paid { background-color: #eff6ff; color: #1d4ed8; }
+    .status-preparing { background-color: #fffbeb; color: #b45309; }
+    .status-ready { background-color: #ecfdf5; color: #047857; }
+    .status-completed { background-color: #f1f5f9; color: #475569; }
+
+    .order-items {
+      font-size: 0.875rem;
+    }
+
+    .order-items ul {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    .order-items li {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.25rem;
+    }
+
+    .order-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 0.75rem;
+      border-t: 1px solid var(--border);
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .order-arrival-alert {
+      background-color: #fef2f2;
+      border: 1px solid #fee2e2;
+      color: #b91c1c;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.4rem 0.75rem;
+      border-radius: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .order-arrival-calm {
+      background-color: #f0fdf4;
+      border: 1px solid #dcfce7;
+      color: #15803d;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.4rem 0.75rem;
+      border-radius: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .order-actions {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .action-btn {
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      padding: 0.4rem 0.75rem;
+      border-radius: 0.375rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .action-btn:hover {
+      background-color: var(--primary-light);
+    }
+
+    .btn-green {
+      background-color: var(--accent);
+    }
+
+    .btn-green:hover {
+      background-color: var(--accent-hover);
+    }
+
+    /* Prep Time Controls */
+    .prep-time-control {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      padding: 0.15rem;
+      background-color: #f8fafc;
+    }
+
+    .prep-btn {
+      background: none;
+      border: none;
+      width: 1.5rem;
+      height: 1.5rem;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 0.25rem;
+    }
+
+    .prep-btn:hover {
+      background-color: #cbd5e1;
+    }
+
+    .prep-val {
+      font-size: 0.75rem;
+      font-weight: 700;
+      min-width: 1.5rem;
+      text-align: center;
+    }
+
+    /* Menu Section */
+    .menu-container {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    /* Menu Editor Form */
+    .menu-form {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      background-color: #f8fafc;
+      padding: 1rem;
+      border-radius: 0.75rem;
+      border: 1px solid var(--border);
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .form-group label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .form-group input, .form-group select, .form-group textarea {
+      padding: 0.5rem;
+      border: 1px solid var(--border);
+      border-radius: 0.375rem;
+      font-family: var(--font);
+      font-size: 0.875rem;
+    }
+
+    .btn-add-item {
+      background-color: var(--accent);
+      color: white;
+      border: none;
+      padding: 0.6rem;
+      border-radius: 0.375rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .btn-add-item:hover {
+      background-color: var(--accent-hover);
+    }
+
+    /* Menu List */
+    .menu-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .menu-item-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #f1f5f9;
+      padding-bottom: 0.75rem;
+    }
+
+    .menu-item-info h5 {
+      font-size: 0.875rem;
+      font-weight: 700;
+    }
+
+    .menu-item-info p {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .item-cat-veg {
+      color: #16a34a;
+      font-weight: 700;
+      font-size: 0.65rem;
+      border: 1px solid #16a34a;
+      padding: 0.05rem 0.2rem;
+      border-radius: 0.25rem;
+      margin-left: 0.5rem;
+    }
+
+    .item-cat-nonveg {
+      color: #dc2626;
+      font-weight: 700;
+      font-size: 0.65rem;
+      border: 1px solid #dc2626;
+      padding: 0.05rem 0.2rem;
+      border-radius: 0.25rem;
+      margin-left: 0.5rem;
+    }
+
+    .menu-item-actions {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .menu-item-price {
+      font-size: 0.875rem;
+      font-weight: 700;
+    }
+
+    .btn-delete-item {
+      background: none;
+      border: none;
+      color: #ef4444;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+    }
+
+    .btn-delete-item:hover {
+      color: #b91c1c;
+    }
+
+    /* Overlay */
+    .setup-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(15, 23, 42, 0.8);
+      backdrop-filter: blur(8px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+
+    .setup-card {
+      background: white;
+      border-radius: 1.5rem;
+      padding: 2.5rem;
+      max-width: 500px;
+      width: 100%;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+    }
+
+    .setup-card h2 {
+      font-size: 1.5rem;
+      font-weight: 800;
+      margin-bottom: 0.5rem;
+    }
+
+    .setup-card p {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-bottom: 1.5rem;
+    }
+
+    .setup-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      margin-bottom: 1rem;
+    }
+
+    .setup-group label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .setup-group input {
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      font-family: var(--font);
+      font-size: 0.875rem;
+    }
+
+    .btn-setup {
+      width: 100%;
+      background-color: var(--accent);
+      color: white;
+      border: none;
+      padding: 0.75rem;
+      border-radius: 0.5rem;
+      font-weight: 700;
+      font-size: 0.875rem;
+      cursor: pointer;
+      margin-top: 1rem;
+      transition: background-color 0.2s;
+    }
+
+    .btn-setup:hover {
+      background-color: var(--accent-hover);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="logo-container">
+      <span class="material-symbols-outlined">restaurant</span>
+      <h1>RoadBuddy Partner</h1>
+      <span class="logo-badge">Restaurant</span>
+    </div>
+    <div class="user-menu">
+      <span>Logged in as <strong>{{ provider.email }}</strong></span>
+      <a href="/food-provider/logout" class="btn-logout">
+        <span class="material-symbols-outlined">logout</span> Logout
+      </a>
+    </div>
+  </header>
+
+  <div class="container">
+    {% if not show_setup %}
+    <!-- Profile summary -->
+    <div class="profile-card">
+      <div class="profile-info">
+        <h2>{{ restaurant.name }}</h2>
+        <p>📍 {{ restaurant.address }}, {{ restaurant.city }} | 📞 {{ restaurant.contact_number or 'N/A' }}</p>
+      </div>
+      <div class="profile-badges">
+        <div class="badge-rating">
+          <span class="material-symbols-outlined" style="font-size:1.1rem; fill: currentColor;">star</span>
+          {{ restaurant.rating | default(4.0) }} ({{ restaurant.reviews_count | default(0) }} reviews)
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats summary widgets -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">
+          <span class="material-symbols-outlined">payments</span>
+        </div>
+        <div class="stat-info">
+          <span>Total Revenue</span>
+          <strong>₹{{ "%.2f"|format(total_sales) }}</strong>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">
+          <span class="material-symbols-outlined">pending_actions</span>
+        </div>
+        <div class="stat-info">
+          <span>Active Orders</span>
+          <strong id="active-orders-count">{{ active_orders }}</strong>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">
+          <span class="material-symbols-outlined">check_circle</span>
+        </div>
+        <div class="stat-info">
+          <span>Completed Orders</span>
+          <strong>{{ completed_orders }}</strong>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">
+          <span class="material-symbols-outlined">restaurant_menu</span>
+        </div>
+        <div class="stat-info">
+          <span>Menu Items</span>
+          <strong>{{ menu_items|length }}</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Layout Grid -->
+    <div class="dashboard-layout">
+      
+      <!-- Left Column: Orders Queue -->
+      <div>
+        <h3 class="section-title">
+          <span class="material-symbols-outlined">receipt_long</span> Orders Queue
+        </h3>
+        <div class="orders-container" id="orders-queue">
+          {% if orders|length == 0 %}
+            <div style="background: white; border: 1px solid var(--border); padding: 3rem; text-align: center; border-radius: 1rem; color: var(--text-muted);">
+              <span class="material-symbols-outlined" style="font-size: 3rem; margin-bottom: 1rem; display: block; color: #cbd5e1;">inbox</span>
+              <p>No orders placed yet.</p>
+            </div>
+          {% else %}
+            {% for o in orders %}
+              <div class="order-card" id="order-card-{{ o.id }}">
+                <div class="order-header">
+                  <div>
+                    <span class="order-id">Order #{{ o.id }}</span>
+                    <div class="order-user">Ordered by: <strong>{{ o.user_name }}</strong></div>
+                  </div>
+                  <span class="status-badge status-{{ o.status }}" id="order-status-badge-{{ o.id }}">{{ o.status }}</span>
+                </div>
+                
+                <div class="order-items">
+                  <ul>
+                    {% for item in o.items %}
+                      <li>
+                        <span>{{ item.name }} <strong>x{{ item.quantity }}</strong></span>
+                        <span>₹{{ item.price * item.quantity }}</span>
+                      </li>
+                    {% endfor %}
+                  </ul>
+                </div>
+                
+                <div class="order-footer">
+                  {% if o.status in ['paid', 'preparing', 'ready'] %}
+                    {% if o.user_arrival_time_mins <= 15 %}
+                      <div class="order-arrival-alert">
+                        <span class="material-symbols-outlined" style="font-size: 1rem;">alarm</span>
+                        Traveler arriving in {{ o.user_arrival_time_mins }} mins!
+                      </div>
+                    {% else %}
+                      <div class="order-arrival-calm">
+                        <span class="material-symbols-outlined" style="font-size: 1rem;">schedule</span>
+                        Traveler arriving in {{ o.user_arrival_time_mins }} mins
+                      </div>
+                    {% endif %}
+                  {% else %}
+                    <div style="font-size: 0.75rem; color: var(--text-muted)">Order completed</div>
+                  {% endif %}
+                  
+                  <div class="order-actions">
+                    {% if o.status in ['paid', 'preparing', 'ready'] %}
+                      <!-- Prep Time controller -->
+                      <div class="prep-time-control">
+                        <button onclick="changeOrderPrepTime({{ o.id }}, -5)" class="prep-btn">-</button>
+                        <span class="prep-val" id="prep-val-{{ o.id }}">{{ o.preparation_time_mins }}m</span>
+                        <button onclick="changeOrderPrepTime({{ o.id }}, 5)" class="prep-btn">+</button>
+                      </div>
+                    {% endif %}
+                    
+                    <div id="action-buttons-{{ o.id }}">
+                      {% if o.status == 'paid' %}
+                        <button onclick="updateOrderStatus({{ o.id }}, 'preparing')" class="action-btn">Start Preparing</button>
+                      {% elif o.status == 'preparing' %}
+                        <button onclick="updateOrderStatus({{ o.id }}, 'ready')" class="action-btn btn-green">Mark Ready</button>
+                      {% elif o.status == 'ready' %}
+                        <button onclick="updateOrderStatus({{ o.id }}, 'completed')" class="action-btn btn-green">Complete Pickup</button>
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          {% endif %}
+        </div>
+      </div>
+      
+      <!-- Right Column: Menu Editor -->
+      <div>
+        <h3 class="section-title">
+          <span class="material-symbols-outlined">menu_book</span> Menu Editor
+        </h3>
+        <div class="menu-container">
+          
+          <!-- Add Item Form -->
+          <form onsubmit="addMenuItem(event)" class="menu-form">
+            <h4 style="font-size: 0.875rem; font-weight: 700;">Add New Dish</h4>
+            <div class="form-group">
+              <label for="item-name">Dish Name</label>
+              <input type="text" id="item-name" required placeholder="e.g. Kadhi Pakora" />
+            </div>
+            <div class="form-group">
+              <label for="item-desc">Description</label>
+              <textarea id="item-desc" rows="2" placeholder="e.g. Traditional Rajasthani recipe..."></textarea>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="item-price">Price (INR)</label>
+                <input type="number" id="item-price" required min="10" placeholder="e.g. 180" />
+              </div>
+              <div class="form-group">
+                <label for="item-cat">Category</label>
+                <select id="item-cat">
+                  <option value="Veg">Veg</option>
+                  <option value="Non-Veg">Non-Veg</option>
+                  <option value="Beverage">Beverage</option>
+                  <option value="Dessert">Dessert</option>
+                </select>
+              </div>
+            </div>
+            <button type="submit" class="btn-add-item">Add Dish to Menu</button>
+          </form>
+          
+          <!-- Menu Items List -->
+          <div class="menu-list">
+            <h4 style="font-size: 0.875rem; font-weight: 700; margin-bottom: 0.5rem;">Current Menu</h4>
+            {% for item in menu_items %}
+              <div class="menu-item-row" id="menu-item-row-{{ item.id }}">
+                <div class="menu-item-info">
+                  <h5 class="flex items-center">
+                    {{ item.name }}
+                    {% if item.category == 'Veg' %}
+                      <span class="item-cat-veg">VEG</span>
+                    {% elif item.category == 'Non-Veg' %}
+                      <span class="item-cat-nonveg">NON-VEG</span>
+                    {% else %}
+                      <span style="font-size:0.65rem; border:1px solid #64748b; padding:0.05rem 0.2rem; border-radius:0.25rem; margin-left:0.5rem; color:#64748b;">{{ item.category }}</span>
+                    {% endif %}
+                  </h5>
+                  <p>{{ item.description or 'No description' }}</p>
+                </div>
+                <div class="menu-item-actions">
+                  <span class="menu-item-price">₹{{ item.price_inr }}</span>
+                  <button onclick="deleteMenuItem({{ item.id }})" class="btn-delete-item" title="Delete from menu">
+                    <span class="material-symbols-outlined" style="font-size: 1.25rem;">delete</span>
+                  </button>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+          
+        </div>
+      </div>
+      
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Setup Overlay popup -->
+  {% if show_setup %}
+  <div class="setup-overlay" id="setup-overlay">
+    <div class="setup-card">
+      <h2>Complete Restaurant Setup</h2>
+      <p>Fill out your restaurant details to get activated on the highway search grid.</p>
+      
+      <form method="POST" action="/food-provider/setup">
+        <div class="setup-group">
+          <label for="setup-company">Restaurant Name *</label>
+          <input type="text" id="setup-company" name="company_name" required placeholder="e.g. Grand Highway Dhaba" />
+        </div>
+        <div class="setup-group">
+          <label for="setup-contact">Contact Person *</label>
+          <input type="text" id="setup-contact" name="contact_person" required placeholder="e.g. Ramesh Kumar" />
+        </div>
+        <div class="setup-group">
+          <label for="setup-phone">Phone Number *</label>
+          <input type="text" id="setup-phone" name="phone" required placeholder="e.g. +91 9876543210" />
+        </div>
+        <div class="setup-group">
+          <label for="setup-city">City *</label>
+          <input type="text" id="setup-city" name="city" required placeholder="e.g. Jaipur" />
+        </div>
+        <div class="setup-group">
+          <label for="setup-address">Highway Address *</label>
+          <input type="text" id="setup-address" name="address" required placeholder="e.g. NH-8, Mile 45, near Toll Plaza" />
+        </div>
+        <button type="submit" class="btn-setup">Activate Restaurant Dashboard</button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  <script>
+    // Update order prep time in real-time
+    async function changeOrderPrepTime(orderId, offset) {
+      const display = document.getElementById(`prep-val-${orderId}`);
+      let currentVal = parseInt(display.textContent);
+      let newVal = currentVal + offset;
+      if (newVal < 5) newVal = 5; // Min 5 mins
+      
+      try {
+        const res = await fetch(`/api/food/provider/orders/${orderId}/prep-time`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prep_time_mins: newVal })
+        });
+        if (res.ok) {
+          display.textContent = newVal + "m";
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // Update order status in real-time
+    async function updateOrderStatus(orderId, newStatus) {
+      try {
+        const res = await fetch(`/api/food/provider/orders/${orderId}/status`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: newStatus })
+        });
+        
+        if (res.ok) {
+          // Update status badge
+          const badge = document.getElementById(`order-status-badge-${orderId}`);
+          badge.textContent = newStatus;
+          badge.className = `status-badge status-${newStatus}`;
+          
+          // Update action buttons
+          const actionsDiv = document.getElementById(`action-buttons-${orderId}`);
+          if (newStatus === "preparing") {
+            actionsDiv.innerHTML = `<button onclick="updateOrderStatus(${orderId}, 'ready')" class="action-btn btn-green">Mark Ready</button>`;
+          } else if (newStatus === "ready") {
+            actionsDiv.innerHTML = `<button onclick="updateOrderStatus(${orderId}, 'completed')" class="action-btn btn-green">Complete Pickup</button>`;
+          } else if (newStatus === "completed") {
+            actionsDiv.innerHTML = "";
+            const card = document.getElementById(`order-card-${orderId}`);
+            const footer = card.querySelector(".order-footer");
+            footer.innerHTML = `<div style="font-size: 0.75rem; color: var(--text-muted)">Order completed</div>`;
+            
+            // Decr active count
+            const activeCounter = document.getElementById("active-orders-count");
+            activeCounter.textContent = Math.max(0, parseInt(activeCounter.textContent) - 1);
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // Add Menu Item
+    async function addMenuItem(event) {
+      event.preventDefault();
+      const name = document.getElementById("item-name").value;
+      const desc = document.getElementById("item-desc").value;
+      const price = parseFloat(document.getElementById("item-price").value);
+      const cat = document.getElementById("item-cat").value;
+      
+      try {
+        const res = await fetch("/api/food/provider/menu", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: name, description: desc, price_inr: price, category: cat })
+        });
+        
+        if (res.ok) {
+          alert("Dish added to menu successfully!");
+          window.location.reload();
+        } else {
+          alert("Failed to add dish.");
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // Delete Menu Item
+    async function deleteMenuItem(itemId) {
+      if (!confirm("Are you sure you want to delete this menu item?")) return;
+      
+      try {
+        const res = await fetch(`/api/food/provider/menu/${itemId}`, {
+          method: "DELETE"
+        });
+        if (res.ok) {
+          document.getElementById(`menu-item-row-${itemId}`).remove();
+        } else {
+          alert("Failed to delete menu item.");
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // Poll for new orders every 10 seconds to keep queues active
+    setInterval(async () => {
+      try {
+        const res = await fetch("/api/food/provider/orders");
+        if (res.ok) {
+          const data = await res.json();
+          data.forEach(o => {
+            const card = document.getElementById(`order-card-${o.id}`);
+            if (card) {
+              const footer = card.querySelector(".order-footer");
+              if (footer && ["paid", "preparing", "ready"].includes(o.status)) {
+                let alertHtml = "";
+                if (o.user_arrival_time_mins <= 15) {
+                  alertHtml = `
+                    <div class="order-arrival-alert">
+                      <span class="material-symbols-outlined" style="font-size: 1rem;">alarm</span>
+                      Traveler arriving in ${o.user_arrival_time_mins} mins!
+                    </div>
+                  `;
+                } else {
+                  alertHtml = `
+                    <div class="order-arrival-calm">
+                      <span class="material-symbols-outlined" style="font-size: 1rem;">schedule</span>
+                      Traveler arriving in ${o.user_arrival_time_mins} mins
+                    </div>
+                  `;
+                }
+                const oldAlert = footer.querySelector(".order-arrival-alert, .order-arrival-calm");
+                if (oldAlert) {
+                  oldAlert.outerHTML = alertHtml;
+                }
+              }
+            }
+          });
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }, 10000);
+  </script>
+</body>
+</html>

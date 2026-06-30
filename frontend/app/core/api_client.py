@@ -471,3 +471,40 @@ async def update_provider_vehicle_location(token: str, vehicle_id: int, lat: flo
         json={"lat": lat, "lon": lon},
         headers=_auth_headers(token),
     )
+
+
+# ── Food & Restaurant API Client Methods ────────────────────────────────────────
+
+async def get_restaurants(token: str, city: str):
+    return await _request("GET", f"/api/food/restaurants?city={city}", headers=_auth_headers(token))
+
+async def get_restaurant_menu(token: str, restaurant_id: int):
+    return await _request("GET", f"/api/food/restaurants/{restaurant_id}/menu", headers=_auth_headers(token))
+
+async def create_food_order(token: str, payload: dict):
+    return await _request("POST", "/api/food/orders", json=payload, headers=_auth_headers(token))
+
+async def update_food_order_arrival(token: str, order_id: int, payload: dict):
+    return await _request("POST", f"/api/food/orders/{order_id}/arrival", json=payload, headers=_auth_headers(token))
+
+async def add_menu_item_review(token: str, item_id: int, payload: dict):
+    return await _request("POST", f"/api/food/menu-items/{item_id}/review", json=payload, headers=_auth_headers(token))
+
+async def get_my_food_orders(token: str):
+    return await _request("GET", "/api/food/my-orders", headers=_auth_headers(token))
+
+# Provider-specific food methods:
+async def get_provider_food_orders(token: str):
+    return await _request("GET", "/api/food/provider/orders", headers=_auth_headers(token))
+
+async def update_provider_food_order_status(token: str, order_id: int, status: str):
+    return await _request("PATCH", f"/api/food/provider/orders/{order_id}/status", json={"status": status}, headers=_auth_headers(token))
+
+async def update_provider_food_order_prep_time(token: str, order_id: int, prep_time_mins: int):
+    return await _request("PATCH", f"/api/food/provider/orders/{order_id}/prep-time", json={"prep_time_mins": prep_time_mins}, headers=_auth_headers(token))
+
+async def add_provider_menu_item(token: str, payload: dict):
+    return await _request("POST", "/api/food/provider/menu", json=payload, headers=_auth_headers(token))
+
+async def delete_provider_menu_item(token: str, item_id: int):
+    return await _request("DELETE", f"/api/food/provider/menu/{item_id}", headers=_auth_headers(token))

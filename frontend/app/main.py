@@ -5,7 +5,7 @@ from fastapi.templating import Jinja2Templates
 from app.routers import (
     auth, dashboard, trips, my_trips, start_trip,
     settings, vehicles, community, fuel, journal, booking,
-    provider,
+    provider, food,
 )
 
 app = FastAPI(title="RoadBuddy Frontend")
@@ -25,6 +25,7 @@ app.include_router(fuel.router)
 app.include_router(journal.router)
 app.include_router(booking.router)
 app.include_router(provider.router)
+app.include_router(food.router)
 
 
 @app.get("/", response_class=HTMLResponse)

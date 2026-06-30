@@ -1,0 +1,50 @@
+{% extends "provider_base.html" %}
+{% block title %}Food Partner Login — RoadBuddy{% endblock %}
+{% block content %}
+
+<div class="auth-card provider-auth">
+  <div class="auth-logo">🍳</div>
+  <h1>Restaurant Partner Login</h1>
+  <p class="subtitle">Access your restaurant dashboard and manage orders</p>
+
+  {% if error %}<div class="error" style="color: #ef4444; background: #fee2e2; border: 1px solid #fecaca; padding: 0.75rem; border-radius: 0.5rem; margin-bottom: 1rem; text-align: center; font-size: 0.875rem;">{{ error }}</div>{% endif %}
+  {% if success %}<div class="success" style="color: #047857; background: #ecfdf5; border: 1px solid #a7f3d0; padding: 0.75rem; border-radius: 0.5rem; margin-bottom: 1rem; text-align: center; font-size: 0.875rem;">{{ success }}</div>{% endif %}
+
+  <form method="POST" action="/food-provider/login">
+    <label for="login-email">Email Address</label>
+    <input type="email" id="login-email" name="email" placeholder="restaurant@company.com" required style="width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 0.5rem; margin-bottom: 1rem; font-family: inherit;" />
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px; margin-bottom: 6px;">
+      <label for="login-password" style="margin: 0; text-transform: uppercase; color: #a0a0c0; font-size: 11px; font-weight: 700; letter-spacing: 0.5px;">Password</label>
+    </div>
+    <div class="password-wrapper" style="position: relative; margin-top: 0; margin-bottom: 1rem;">
+      <input type="password" id="login-password" name="password" placeholder="Your password" required style="width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 0.5rem; font-family: inherit;" />
+      <button type="button" class="toggle-pw" onclick="togglePw('login-password', this)" style="position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer;">👁</button>
+    </div>
+
+    <button type="submit" style="width: 100%; background: #1e293b; color: white; border: none; padding: 0.75rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer; transition: background 0.2s;">Login</button>
+  </form>
+
+  <div class="auth-footer">
+    <p>New restaurant partner? <a href="/food-provider/register" style="color: #10b981; font-weight: 600;">Register here</a></p>
+  </div>
+</div>
+
+<script>
+  function togglePw(id, btn) {
+    const inp = document.getElementById(id);
+    if (inp.type === "password") { inp.type = "text"; btn.textContent = "🙈"; }
+    else { inp.type = "password"; btn.textContent = "👁"; }
+  }
+
+  document.querySelectorAll('.provider-auth form input').forEach(inp => {
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        e.target.form.submit();
+      }
+    });
+  });
+</script>
+
+{% endblock %}
