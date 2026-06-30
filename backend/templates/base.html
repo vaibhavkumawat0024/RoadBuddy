@@ -23,6 +23,133 @@
       0%, 100% { transform: translateY(0); }
       50% { transform: translateY(-5px); }
     }
+
+    /* Floating Action Button for Inbox */
+    .inbox-fab {
+      position: fixed;
+      bottom: 92px; /* Placed exactly above chatbot-fab which is at bottom: 24px + height 56px + gap 12px */
+      right: 24px;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 99999 !important;
+      transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s;
+    }
+    .inbox-fab:hover {
+      transform: scale(1.08) rotate(-5deg);
+      box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+    }
+    .inbox-fab .material-symbols-outlined {
+      font-size: 26px;
+    }
+    .inbox-badge {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      background: #ef4444;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 800;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      display: none; /* Dynamically shown */
+      align-items: center;
+      justify-content: center;
+      border: 2px solid #fff;
+      box-shadow: 0 2px 6px rgba(239, 68, 68, 0.4);
+    }
+
+    /* Floating Inbox Panel Widget */
+    .floating-inbox-card {
+      position: fixed;
+      bottom: 164px; /* Placed exactly above chatbot card which is at bottom: 96px */
+      right: 24px;
+      width: 380px;
+      height: 480px;
+      background: var(--surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+      z-index: 99999 !important;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(20px) scale(0.95);
+      transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.3s;
+    }
+    .floating-inbox-card.active {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0) scale(1);
+    }
+    .floating-inbox-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #f8fafc;
+    }
+    .floating-inbox-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      color: var(--text-muted);
+      cursor: pointer;
+      line-height: 1;
+      transition: var(--transition);
+    }
+    .floating-inbox-close:hover {
+      color: #ef4444;
+      transform: scale(1.1);
+    }
+    .inbox-updates-list {
+      flex: 1;
+      background: #f8fafc;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      display: flex;
+      flex-direction: column;
+    }
+    .inbox-update-card:hover {
+      background: #f1f5f9 !important;
+    }
+
+    /* Force Chatbot elements to render on top too */
+    .chatbot-fab {
+      z-index: 99999 !important;
+    }
+    .floating-chatbot-card {
+      z-index: 99999 !important;
+    }
+
+    /* Mobile responsive overrides for floating inbox widget */
+    @media (max-width: 480px) {
+      .floating-inbox-card {
+        top: 0 !important;
+        left: 0 !important;
+        bottom: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        border-radius: 0 !important;
+        border: none !important;
+      }
+      body.inbox-open .inbox-fab {
+        display: none !important;
+      }
+    }
   </style>
 </head>
 <body>
@@ -87,6 +214,39 @@
   </div>
 
   {% if user %}
+  <!-- Floating Action Button for Inbox -->
+  <button class="inbox-fab" id="inbox-fab" aria-label="Open Alerts Inbox">
+    <span class="material-symbols-outlined">notifications</span>
+    <span class="inbox-badge" id="inbox-badge">0</span>
+  </button>
+
+  <!-- Floating Inbox Panel Widget -->
+  <div class="floating-inbox-card" id="floating-inbox-card">
+    <div class="floating-inbox-header">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="material-symbols-outlined" style="color: #3b82f6; font-size: 20px;">notifications</span>
+        <div style="text-align: left;">
+          <div style="font-weight: 700; font-size: 14px; color: var(--text-main); line-height: 1.2;">Trip Inbox</div>
+          <div style="font-size: 11px; color: var(--text-muted); line-height: 1.2;">Your real-time updates</div>
+        </div>
+      </div>
+      <button class="floating-inbox-close" id="floating-inbox-close" aria-label="Minimize inbox">&times;</button>
+    </div>
+    <div class="inbox-updates-list" id="inbox-updates-list">
+      <!-- Dynamically populated updates -->
+    </div>
+  </div>
+
+  <!-- Beautiful Booking Confirmation Modal -->
+  <div id="booking-success-modal" style="position: fixed; inset: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(8px); display: none; align-items: center; justify-content: center; z-index: 999999; opacity: 0; transition: opacity 0.3s ease;">
+    <div style="background: #fff; border-radius: 24px; padding: 32px; width: 90%; max-width: 400px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); transform: scale(0.9); transition: transform 0.3s ease; border: 1px solid rgba(16,185,129,0.2);" id="booking-success-card">
+      <div style="width: 72px; height: 72px; background: #ecfdf5; color: #10b981; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 36px; border: 3px solid #d1fae5; animation: bounce 2s infinite;">🎉</div>
+      <h3 style="font-size: 20px; font-weight: 800; color: #0f172a; margin-bottom: 8px;" id="success-modal-title">Booking Confirmed!</h3>
+      <p style="font-size: 13.5px; color: #64748b; line-height: 1.5; margin-bottom: 24px;" id="success-modal-message">Your ride is successfully booked. Check your inbox for updates.</p>
+      <button style="width: 100%; padding: 12px; border-radius: 12px; background: #10b981; color: #fff; font-weight: 700; border: none; cursor: pointer; font-size: 14px; box-shadow: 0 4px 12px rgba(16,185,129,0.2); transition: all 0.2s;" onclick="closeSuccessModal()">Great, Thank You</button>
+    </div>
+  </div>
+
   <!-- Floating Action Button for Chatbot -->
   <button class="chatbot-fab" id="chatbot-fab" aria-label="Open AI Chatbot">
     <span class="material-symbols-outlined">smart_toy</span>
@@ -189,8 +349,7 @@
   </div>
 
   <script>
-    // Sidebar toggle logic
-    document.addEventListener("DOMContentLoaded", () => {
+    function initSidebar() {
       const toggleBtn = document.getElementById("sidebar-toggle");
       const closeBtn = document.getElementById("sidebar-close");
       const sidebarMenu = document.getElementById("sidebar-menu");
@@ -231,18 +390,32 @@
           link.classList.add("active");
         }
       });
-    });
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", initSidebar);
+    } else {
+      initSidebar();
+    }
 
     {% if user %}
     // Floating Chatbot Widget Toggle and API handlers
-    document.addEventListener("DOMContentLoaded", () => {
+    function initFloatingWidgets() {
       const chatbotFab = document.getElementById("chatbot-fab");
       const chatbotCard = document.getElementById("floating-chatbot-card");
       const chatbotClose = document.getElementById("floating-chatbot-close");
 
+      const inboxFab = document.getElementById("inbox-fab");
+      const inboxCard = document.getElementById("floating-inbox-card");
+      const inboxClose = document.getElementById("floating-inbox-close");
+
       if (chatbotFab && chatbotCard && chatbotClose) {
         chatbotFab.addEventListener("click", (e) => {
           e.stopPropagation();
+          if (inboxCard) {
+            inboxCard.classList.remove("active");
+            document.body.classList.remove("inbox-open");
+          }
           chatbotCard.classList.toggle("active");
           document.body.classList.toggle("chatbot-open", chatbotCard.classList.contains("active"));
         });
@@ -260,6 +433,33 @@
         });
       }
 
+      if (inboxFab && inboxCard && inboxClose) {
+        inboxFab.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (chatbotCard) {
+            chatbotCard.classList.remove("active");
+            document.body.classList.remove("chatbot-open");
+          }
+          inboxCard.classList.toggle("active");
+          document.body.classList.toggle("inbox-open", inboxCard.classList.contains("active"));
+          if (inboxCard.classList.contains("active")) {
+            refreshInbox();
+          }
+        });
+
+        inboxClose.addEventListener("click", () => {
+          inboxCard.classList.remove("active");
+          document.body.classList.remove("inbox-open");
+        });
+
+        document.addEventListener("click", (e) => {
+          if (!inboxCard.contains(e.target) && !inboxFab.contains(e.target)) {
+            inboxCard.classList.remove("active");
+            document.body.classList.remove("inbox-open");
+          }
+        });
+      }
+
       // Input Enter key press listener
       const chatInput = document.getElementById('chat-input');
       if (chatInput) {
@@ -267,7 +467,13 @@
           if (e.key === 'Enter') sendChat();
         });
       }
-    });
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", initFloatingWidgets);
+    } else {
+      initFloatingWidgets();
+    }
 
     const API = '';
     let chatHistory = [];
@@ -472,8 +678,12 @@
     // Check for enroute bookings on page load and poll periodically
     window.addEventListener("DOMContentLoaded", () => {
       checkEnrouteBookings();
-      // Poll every 10 seconds for driver status
-      setInterval(checkEnrouteBookings, 10000);
+      refreshInbox();
+      // Poll every 10 seconds for driver status and inbox updates
+      setInterval(() => {
+        checkEnrouteBookings();
+        refreshInbox();
+      }, 10000);
     });
     {% endif %}
 
@@ -838,6 +1048,198 @@
       }
       clearTrackingLayers();
     }
+
+    async function refreshInbox() {
+      if (!currentUserId) return;
+      const listContainer = document.getElementById("inbox-updates-list");
+      const badge = document.getElementById("inbox-badge");
+      if (!listContainer) return;
+
+      try {
+        // Fetch provider cab bookings
+        const cabRes = await fetch("/api/provider/bookings/user");
+        let cabs = [];
+        if (cabRes.ok) {
+          cabs = await cabRes.json();
+        }
+
+        // Fetch transit bookings
+        const transitRes = await fetch("/api/transport/bookings");
+        let transits = [];
+        if (transitRes.ok) {
+          transits = await transitRes.json();
+        }
+
+        let allUpdates = [];
+
+        // Format cab updates
+        cabs.forEach(b => {
+          if (b.status === 'cancelled') return;
+          
+          let update = {
+            id: b.id,
+            type: 'cab',
+            created_at: b.created_at || new Date().toISOString(),
+            title: '',
+            body: '',
+            status: b.navigation_status,
+            trackable: (b.navigation_status === 'enroute' || b.navigation_status === 'trip_started'),
+            timeStr: b.travel_date
+          };
+
+          if (b.navigation_status === 'trip_started') {
+            update.title = "🚖 Vehicle is Ready!";
+            update.body = `Your vehicle <strong>${b.vehicle_name || 'Cab'}</strong> is ready to depart. Please proceed to your pickup point.`;
+          } else if (b.navigation_status === 'enroute') {
+            update.title = "🚖 Driver is En Route";
+            update.body = `Your driver for <strong>${b.vehicle_name || 'Cab'}</strong> is on the way to pick you up. Track live location below.`;
+          } else {
+            update.title = "✅ Cab Booking Confirmed";
+            update.body = `Your ride with <strong>${b.vehicle_name || 'Cab'}</strong> is confirmed from ${b.pickup_location?.split('|||')[0] || 'Origin'} to ${b.dropoff_location?.split('|||')[0] || 'Destination'}.`;
+          }
+          allUpdates.push(update);
+        });
+
+        // Format transit updates
+        transits.forEach(b => {
+          if (b.status === 'cancelled') return;
+
+          let modeIcon = b.mode === 'flight' ? '✈️' : b.mode === 'train' ? '🚂' : '🚌';
+          let title = `${modeIcon} ${b.mode.toUpperCase()} Ticket Confirmed`;
+          let body = `Your ticket with <strong>${b.transport_option_operator || 'Operator'}</strong> is confirmed. Seats: ${b.selected_seats || 'Auto-Assigned'}.`;
+
+          allUpdates.push({
+            id: b.id,
+            type: 'transit',
+            created_at: b.created_at || new Date().toISOString(),
+            title: title,
+            body: body,
+            trackable: false,
+            timeStr: b.travel_date || ''
+          });
+        });
+
+        // Sort by created_at desc (prioritizing enroute)
+        allUpdates.sort((a, b) => {
+          if (a.trackable && !b.trackable) return -1;
+          if (!a.trackable && b.trackable) return 1;
+          return new Date(b.created_at) - new Date(a.created_at);
+        });
+
+        // Read seen status from localStorage
+        let readIds = JSON.parse(localStorage.getItem("read_booking_ids") || "[]");
+        let unreadCount = 0;
+
+        // Render list
+        if (allUpdates.length === 0) {
+          listContainer.innerHTML = `
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-muted);padding:40px;text-align:center;gap:12px;">
+              <span class="material-symbols-outlined" style="font-size: 48px; color: #cbd5e1;">notifications_off</span>
+              <div style="font-weight:700;font-size:14px;">Your inbox is clean</div>
+              <div style="font-size:11px;">No active booking confirmations or travel updates at the moment.</div>
+            </div>
+          `;
+          if (badge) badge.style.display = "none";
+        } else {
+          let html = "";
+          allUpdates.forEach(up => {
+            let key = `${up.type}_${up.id}`;
+            let isUnread = !readIds.includes(key);
+            if (isUnread) {
+              unreadCount++;
+            }
+
+            let unreadDot = isUnread ? `
+              <span class="unread-dot-badge" style="width: 8px; height: 8px; background: #3b82f6; border-radius: 50%; display: inline-block; margin-left: 6px; box-shadow: 0 0 8px #3b82f6;"></span>
+            ` : "";
+
+            let buttonHTML = up.trackable ? `
+              <button class="btn-primary" style="margin-top: 10px; padding: 6px 12px; font-size: 11px; border-radius: 6px; background: #10b981; border: none; font-weight: 700; color: #fff; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" onclick="openTrackingModal(${up.id})">
+                <span class="material-symbols-outlined" style="font-size: 14px;">distance</span> Track Cab
+              </button>
+            ` : "";
+
+            let badgeBg = up.trackable ? 'rgba(16,185,129,0.1)' : 'var(--primary-light)';
+            let badgeColor = up.trackable ? '#10b981' : 'var(--primary)';
+
+            html += `
+              <div class="inbox-update-card" style="padding: 16px; border-bottom: 1px solid var(--border-color); background: ${isUnread ? '#f8fafc' : 'var(--surface)'}; display: flex; flex-direction: column; gap: 4px; transition: var(--transition); border-left: 4px solid ${isUnread ? '#3b82f6' : 'transparent'};">
+                <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+                  <span style="font-weight: 700; font-size: 13px; color: var(--text-main); display: flex; align-items: center;">${up.title}${unreadDot}</span>
+                  <span style="font-size: 10px; font-weight: 700; padding: 2px 6px; background: ${badgeBg}; color: ${badgeColor}; border-radius: 4px;">${up.timeStr || 'Active'}</span>
+                </div>
+                <p style="font-size: 12px; color: var(--text-muted); margin: 0; line-height: 1.4;">${up.body}</p>
+                ${buttonHTML}
+              </div>
+            `;
+          });
+          listContainer.innerHTML = html;
+
+          if (badge) {
+            if (unreadCount > 0) {
+              badge.textContent = unreadCount;
+              badge.style.display = "flex";
+            } else {
+              badge.style.display = "none";
+            }
+          }
+
+          // If inbox card is active, automatically mark all as read
+          const inboxCard = document.getElementById("floating-inbox-card");
+          if (inboxCard && inboxCard.classList.contains("active")) {
+            setTimeout(() => {
+              let updatedReadIds = JSON.parse(localStorage.getItem("read_booking_ids") || "[]");
+              let newlyRead = false;
+              allUpdates.forEach(up => {
+                let key = `${up.type}_${up.id}`;
+                if (!updatedReadIds.includes(key)) {
+                  updatedReadIds.push(key);
+                  newlyRead = true;
+                }
+              });
+              if (newlyRead) {
+                localStorage.setItem("read_booking_ids", JSON.stringify(updatedReadIds));
+                // Clear the count badge immediately
+                if (badge) badge.style.display = "none";
+              }
+            }, 1500); // 1.5s delay to let user see new updates before marking as read
+          }
+        }
+
+      } catch (e) {
+        console.error("Error refreshing inbox:", e);
+      }
+    }
+
+    window.showBookingConfirmationModal = function(title, message) {
+      const modal = document.getElementById("booking-success-modal");
+      const card = document.getElementById("booking-success-card");
+      document.getElementById("success-modal-title").textContent = title;
+      document.getElementById("success-modal-message").innerHTML = message;
+      
+      modal.style.display = "flex";
+      setTimeout(() => {
+        modal.style.opacity = "1";
+        if (card) card.style.transform = "scale(1)";
+      }, 50);
+
+      // Trigger inbox refresh immediately
+      refreshInbox();
+    };
+
+    window.closeSuccessModal = function() {
+      const modal = document.getElementById("booking-success-modal");
+      const card = document.getElementById("booking-success-card");
+      modal.style.opacity = "0";
+      if (card) card.style.transform = "scale(0.9)";
+      setTimeout(() => {
+        modal.style.display = "none";
+        if (typeof window.onSuccessModalClose === 'function') {
+          window.onSuccessModalClose();
+          window.onSuccessModalClose = null;
+        }
+      }, 300);
+    };
   </script>
 </body>
 </html>
