@@ -397,7 +397,7 @@
                 <div class="relative border-l border-slate-200 ml-3 pl-5 space-y-4">
                   <!-- Booked transit/cab/hotel items integrated dynamically into user timeline -->
                   {% if day == 1 %}
-                    {% if booked_cab %}
+                    {% if booked_cab and (trip.travel_mode == 'cab_service' or (trip.travel_mode | string) == 'cab_service') %}
                       <div class="relative text-left bg-emerald-50/70 p-3.5 rounded-xl border border-emerald-100/80 mb-3">
                         <span class="absolute -left-[26px] top-4 bg-emerald-600 border-2 border-white w-3 h-3 rounded-full flex items-center justify-center"></span>
                         <div class="space-y-1">
@@ -411,7 +411,7 @@
                         </div>
                       </div>
                     {% endif %}
-                    {% if booked_train %}
+                    {% if booked_train and (trip.travel_mode == 'train' or (trip.travel_mode | string) == 'train') %}
                       <div class="relative text-left bg-emerald-50/70 p-3.5 rounded-xl border border-emerald-100/80 mb-3">
                         <span class="absolute -left-[26px] top-4 bg-emerald-600 border-2 border-white w-3 h-3 rounded-full flex items-center justify-center"></span>
                         <div class="space-y-1">
@@ -425,7 +425,7 @@
                         </div>
                       </div>
                     {% endif %}
-                    {% if booked_bus %}
+                    {% if booked_bus and (trip.travel_mode == 'bus' or (trip.travel_mode | string) == 'bus') %}
                       <div class="relative text-left bg-emerald-50/70 p-3.5 rounded-xl border border-emerald-100/80 mb-3">
                         <span class="absolute -left-[26px] top-4 bg-emerald-600 border-2 border-white w-3 h-3 rounded-full flex items-center justify-center"></span>
                         <div class="space-y-1">
@@ -439,7 +439,7 @@
                         </div>
                       </div>
                     {% endif %}
-                    {% if booked_flight %}
+                    {% if booked_flight and (trip.travel_mode == 'flight' or (trip.travel_mode | string) == 'flight') %}
                       <div class="relative text-left bg-emerald-50/70 p-3.5 rounded-xl border border-emerald-100/80 mb-3">
                         <span class="absolute -left-[26px] top-4 bg-emerald-600 border-2 border-white w-3 h-3 rounded-full flex items-center justify-center"></span>
                         <div class="space-y-1">

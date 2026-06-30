@@ -100,7 +100,9 @@ Group: {get_group_tips(trip.group_type, trip.num_people)}
 Season tip: {get_season_tips(season, trip.destination)}
 
 Generate a complete road trip covering GOING ROUTE, DESTINATION, and RETURN ROUTE.
-IMPORTANT: Calculate the fuel cost based on:
+IMPORTANT: Provide 4 detailed stops per day covering 'morning', 'afternoon', 'evening', and 'night' (such as dinners, night-life, night markets, or stargazing/rest tips at hotels) to ensure the itinerary is proper for the whole day and night.
+CRITICAL: Each stop description MUST be a detailed, rich paragraph (at least 3-4 sentences, minimum 40 words) providing extensive local context, what to see, what to eat, travel advice, parking info, and specific highway safety/rest recommendations. Do not return short or generic descriptions.
+Calculate the fuel cost based on:
 1. Round-trip distance of {dist * 2} km.
 2. Vehicle mileage of {mileage} KMPL.
 3. Average fuel prices in India: Petrol (~104 INR/L), Diesel (~94 INR/L), CNG (~85 INR/L), Electric (Rs 2.5 per km).
@@ -125,7 +127,7 @@ Return ONLY valid JSON, no markdown:
       "time_slot": "morning",
       "place_name": "HP Petrol Pump, NH-48, Ajmer Road, Jaipur",
       "place_type": "fuel",
-      "description": "Fill up before leaving.",
+      "description": "Stop at HP Petrol Pump, NH-48, Jaipur. This pump is known for high-quality fuel and fast service. Take this opportunity to fill up your tank, inspect tyre pressure, and check windshield cleanliness for safe highway driving. A small convenience store on-site allows purchasing mineral water and travel snacks before starting.",
       "estimated_cost_inr": 2400,
       "highway": "NH-48",
       "lat": null,
@@ -146,6 +148,8 @@ Season: {season.upper()}
 Group: {get_group_tips(trip.group_type, trip.num_people)}
 
 Generate destination-only itinerary. NO route/fuel/toll stops.
+IMPORTANT: Provide 4 detailed stops per day covering 'morning' (activities), 'afternoon' (lunch/sightseeing), 'evening' (sunset/shopping), and 'night' (dinner/night life/rest) to ensure a complete day and night plan.
+CRITICAL: Each stop description MUST be a detailed, rich paragraph (at least 3-4 sentences, minimum 40 words) providing extensive local context, what to see, what to eat, public transport guidance, and safety tips. Do not return short or generic descriptions.
 Use real place names. Realistic 2024-2025 INR prices.
 Return ONLY valid JSON, no markdown:
 {{
@@ -162,7 +166,7 @@ Return ONLY valid JSON, no markdown:
       "time_slot": "morning",
       "place_name": "Hadimba Devi Temple, Manali",
       "place_type": "sightseeing",
-      "description": "Ancient temple surrounded by cedar forest.",
+      "description": "Hadimba Devi Temple is an ancient wooden structure constructed in 1553, surrounded by a majestic cedar and deodar forest. You can view the wooden carvings on the walls and doors depicting mythological scenes, and see local artists showing rabbits and yaks. It is highly recommended to wear walking shoes as paths can be rocky and slippery, especially during monsoon season.",
       "estimated_cost_inr": 50,
       "highway": null,
       "lat": null,
@@ -246,18 +250,35 @@ def mock_own_vehicle(trip: TripCreate, vehicle_info: dict = None) -> dict:
     total_est = round(fuel_cost + return_fuel_cost + toll_cost + return_toll_cost + hotel_cost + food_cost, 2)
     
     stops = [
+        # Day 1: Travel & Arrival Day
         {"day": 1, "time_slot": "morning", "place_name": f"HP Petrol Pump, NH-48, {trip.origin}",
-         "place_type": "fuel", "description": f"Fill up your {fuel_type} vehicle.", "estimated_cost_inr": fuel_cost, "highway": "NH-48", "lat": None, "lng": None},
+         "place_type": "fuel", "description": f"Stop at the HP Petrol Pump on NH-48 in {trip.origin} to fill up your {fuel_type} tank. Ensure you check tyre pressure, engine oil level, and coolant for safety. Grab refreshing beverages and light travel snacks from the convenience store to stay energised during the initial leg of the road trip.", "estimated_cost_inr": fuel_cost, "highway": "NH-48", "lat": None, "lng": None},
         {"day": 1, "time_slot": "afternoon", "place_name": "Apna Dhaba — Highway Lunch",
-         "place_type": "food", "description": "Popular highway dhaba.", "estimated_cost_inr": 400, "highway": "NH-48", "lat": None, "lng": None},
+         "place_type": "food", "description": "Apna Dhaba is a renowned roadside stop famous for its fresh, clay-oven tandoori rotis, spicy dal fry, and traditional paneer dishes. Unwind under the shade of trees, enjoy the rustic outdoor seating, and rest your legs before continuing the drive on the highway.", "estimated_cost_inr": 400, "highway": "NH-48", "lat": None, "lng": None},
         {"day": 1, "time_slot": "evening", "place_name": f"Hotel Shree Palace, {trip.destination}",
-         "place_type": "hotel", "description": "Confirmed stay at destination.", "estimated_cost_inr": hotel_cost, "highway": None, "lat": None, "lng": None},
-        {"day": 2, "time_slot": "morning", "place_name": f"Main Attraction, {trip.destination}",
-         "place_type": "sightseeing", "description": "Top must-visit attraction.", "estimated_cost_inr": 200, "highway": None, "lat": None, "lng": None},
+         "place_type": "hotel", "description": f"Arrive at {trip.destination} and check into Hotel Shree Palace. The hotel offers clean, spacious rooms, friendly hospitality, and beautiful garden views. Unpack your bags, refresh yourself with a hot shower, and enjoy a complimentary hot masala tea in the courtyard.", "estimated_cost_inr": hotel_cost, "highway": None, "lat": None, "lng": None},
+        {"day": 1, "time_slot": "night", "place_name": f"Local Market & Traditional Dinner, {trip.destination}",
+         "place_type": "destination_food", "description": "Explore the vibrant nearby local market streets illuminated by fairy lights. Sample popular street foods like sweet rabdi or hot jalebis, and pick up local handicrafts. Settle down at a highly rated traditional restaurant to enjoy local specialties for dinner.", "estimated_cost_inr": 300, "highway": None, "lat": None, "lng": None},
+
+        # Day 2: Full Exploration Day
+        {"day": 2, "time_slot": "morning", "place_name": f"Main Sightseeing Attraction, {trip.destination}",
+         "place_type": "sightseeing", "description": f"Visit the iconic historical fort in {trip.destination}, known for its breathtaking architecture and ancient carvings. Explore the central courtyard, hire an official local guide to learn about historical battles, and take stunning panoramic photos from the high bastion towers.", "estimated_cost_inr": 200, "highway": None, "lat": None, "lng": None},
+        {"day": 2, "time_slot": "afternoon", "place_name": f"Heritage Cafe & Lunch, {trip.destination}",
+         "place_type": "destination_food", "description": "Take a midday break at the Heritage Cafe, which features a scenic rooftop terrace looking over the old town. Indulge in wood-fired pizzas, iced cold brew coffee, and local delicacies. The quiet, air-conditioned seating provides a perfect escape from the afternoon sun.", "estimated_cost_inr": 250, "highway": None, "lat": None, "lng": None},
+        {"day": 2, "time_slot": "evening", "place_name": f"Sunset View Point & Lake Walk, {trip.destination}",
+         "place_type": "sightseeing", "description": "Walk along the beautifully paved lakeside path during sunset hours. Watch the water reflect golden and orange hues as boaters glide by. Excellent location for relaxing, enjoying a cool evening breeze, and photographing the scenic landscape.", "estimated_cost_inr": 100, "highway": None, "lat": None, "lng": None},
+        {"day": 2, "time_slot": "night", "place_name": f"Night Bazar & Dinner Show, {trip.destination}",
+         "place_type": "destination_food", "description": "Witness a colorful traditional puppet show and folk music performance highlighting local cultural heritage. Following the show, enjoy an unlimited thali dinner containing multiple vegetable curries, hot flatbreads, and traditional sweets in a heritage setting.", "estimated_cost_inr": 450, "highway": None, "lat": None, "lng": None},
+
+        # Day 3: Return journey Day
         {"day": 3, "time_slot": "morning", "place_name": f"Indian Oil Pump, {trip.destination}",
-         "place_type": "fuel", "description": "Fill up before heading back.", "estimated_cost_inr": return_fuel_cost, "highway": None, "lat": None, "lng": None},
+         "place_type": "fuel", "description": f"Stop at the Indian Oil station to refuel your {fuel_type} tank before commencing the return journey. Check tyre air pressure and wash the windshield. The station has clean washrooms and a quick-service cafe to purchase beverages for the road.", "estimated_cost_inr": return_fuel_cost, "highway": None, "lat": None, "lng": None},
+        {"day": 3, "time_slot": "afternoon", "place_name": "Midway Highway Food Court",
+         "place_type": "food", "description": "Stop at the modern midway highway food court offering multiple dining choices. Relish a clean, air-conditioned dining experience with choices ranging from North Indian platters to South Indian dosas and fast food. Rest and prepare for the final drive.", "estimated_cost_inr": 350, "highway": "NH-48", "lat": None, "lng": None},
         {"day": 3, "time_slot": "evening", "place_name": f"Home — {trip.origin}",
-         "place_type": "return_route", "description": "Trip complete! Welcome home.", "estimated_cost_inr": 0, "highway": None, "lat": None, "lng": None},
+         "place_type": "return_route", "description": f"Safely complete the road trip and arrive back home in {trip.origin}. Unload all travel luggage from your vehicle, inspect the car body for any highway dust, and settle in for a relaxing evening with family.", "estimated_cost_inr": 0, "highway": None, "lat": None, "lng": None},
+        {"day": 3, "time_slot": "night", "place_name": f"Home Sweet Home, {trip.origin}",
+         "place_type": "return_route", "description": "Unwind in the comfort of your home. Share your favorite highway photos, mileage statistics, and dhaba reviews with friends on the RoadBuddy community platform, and enjoy a deep night's sleep after an incredible trip.", "estimated_cost_inr": 0, "highway": None, "lat": None, "lng": None},
     ]
     
     return {
@@ -284,12 +305,15 @@ def mock_transport_itinerary(trip: TripCreate) -> dict:
         "season": season, "season_tip": "Carry appropriate clothing.",
         "ai_summary": f"Explore the beautiful {trip.destination}.",
         "stops": [
-            {"day": 1, "time_slot": "morning", "place_name": f"Top Attraction, {trip.destination}",
-             "place_type": "sightseeing", "description": "Must-visit iconic spot.", "estimated_cost_inr": 200, "highway": None, "lat": None, "lng": None},
+            # Day 1
+            {"day": 1, "time_slot": "morning", "place_name": f"Arrival & Top Attraction, {trip.destination}",
+             "place_type": "sightseeing", "description": "Arrive at your destination and check out the top local attraction. Marvel at the stunning architecture, take pictures, and explore the museum or courtyards with local guide explanations.", "estimated_cost_inr": 200, "highway": None, "lat": None, "lng": None},
             {"day": 1, "time_slot": "afternoon", "place_name": "Local Food Street",
-             "place_type": "destination_food", "description": "Best local street food.", "estimated_cost_inr": 400, "highway": None, "lat": None, "lng": None},
+             "place_type": "destination_food", "description": "Indulge in delicious local street food for lunch. Discover regional flavors, sample traditional street desserts, and talk to local stall vendors about popular cultural eats.", "estimated_cost_inr": 400, "highway": None, "lat": None, "lng": None},
             {"day": 1, "time_slot": "evening", "place_name": "Hotel Grand Inn",
-             "place_type": "hotel", "description": "Comfortable stay near city centre.", "estimated_cost_inr": 1500, "highway": None, "lat": None, "lng": None},
+             "place_type": "hotel", "description": "Check in at Hotel Grand Inn, unpack your luggage, and refresh after your journey. The hotel offers clean rooms, modern amenities, and cozy bedding for a relaxing evening rest.", "estimated_cost_inr": 1500, "highway": None, "lat": None, "lng": None},
+            {"day": 1, "time_slot": "night", "place_name": "Main Street Bazar & Dinner",
+             "place_type": "destination_food", "description": "Walk around the lively main street bazar illuminated by colorful lights. Pick up souvenirs and local products, and settle down at a recommended local restaurant for an authentic traditional dinner.", "estimated_cost_inr": 350, "highway": None, "lat": None, "lng": None},
         ],
     }
 

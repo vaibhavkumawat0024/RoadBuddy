@@ -2092,3 +2092,201 @@ h2 {
   pointer-events: none;
   animation: fadeInBg 1.2s ease-in-out forwards;
 }
+
+/* ═══════════════════════════════════════════════════════
+   ENHANCED MOBILE RESPONSIVE OVERRIDES
+   ═══════════════════════════════════════════════════════ */
+
+/* --- Tablet / Mobile (<=768px) --- */
+@media (max-width: 768px) {
+  /* Trip detail header: stack vertically */
+  .trip-detail-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+
+  .trip-detail-route {
+    font-size: 17px !important;
+  }
+
+  .trip-detail-card {
+    padding: 16px !important;
+  }
+
+  /* Trip cost items: wrap better on mobile */
+  .trip-costs {
+    gap: 6px !important;
+  }
+
+  .trip-cost-item {
+    min-width: 70px !important;
+    padding: 8px 10px !important;
+    font-size: 11px !important;
+  }
+
+  /* Partner vehicle cards */
+  .partner-vehicle-top {
+    flex-direction: column !important;
+    text-align: center !important;
+  }
+
+  .partner-vehicle-details {
+    flex-direction: column !important;
+    gap: 6px !important;
+    text-align: center !important;
+  }
+
+  .partner-vehicle-footer {
+    flex-direction: column !important;
+    gap: 8px !important;
+    text-align: center !important;
+  }
+
+  .partner-vehicle-footer button,
+  .partner-vehicle-footer a {
+    width: 100% !important;
+    justify-content: center !important;
+    text-align: center !important;
+  }
+
+  /* Stat number sizing */
+  .stat-num {
+    font-size: 28px !important;
+  }
+
+  .stat-card {
+    min-width: unset !important;
+  }
+
+  /* Booking tabs horizontal scroll */
+  .bookings-tabs {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap !important;
+    gap: 4px !important;
+    padding-bottom: 4px !important;
+  }
+
+  .bookings-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .bookings-tabs button,
+  .bookings-tabs .booking-tab {
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    font-size: 11px !important;
+    padding: 8px 12px !important;
+  }
+
+  /* Itinerary summary */
+  .itinerary-summary {
+    max-width: 100% !important;
+    font-size: 13px !important;
+  }
+
+  /* Safety score */
+  .safety-score-row {
+    flex-direction: column !important;
+    gap: 12px !important;
+    text-align: center !important;
+  }
+}
+
+/* --- Small phones (<=480px) --- */
+@media (max-width: 480px) {
+  nav {
+    padding: 10px 12px !important;
+  }
+
+  main {
+    padding: 12px 10px !important;
+  }
+
+  .auth-card {
+    padding: 20px 16px !important;
+    margin: 20px 8px !important;
+  }
+
+  .stat-num {
+    font-size: 24px !important;
+  }
+
+  .stat-label {
+    font-size: 11px !important;
+  }
+
+  .stat-card {
+    padding: 12px 14px !important;
+  }
+
+  h2 {
+    font-size: 16px !important;
+  }
+
+  /* Trip detail route */
+  .trip-detail-route {
+    font-size: 15px !important;
+  }
+
+  .trip-detail-card {
+    padding: 12px !important;
+    border-radius: var(--radius-sm) !important;
+  }
+
+  .trip-ai-summary {
+    font-size: 12px !important;
+    padding: 10px 12px !important;
+  }
+
+  .trip-cost-item {
+    min-width: 60px !important;
+    padding: 6px 8px !important;
+    font-size: 10px !important;
+  }
+
+  .trip-cost-item span:last-child {
+    font-size: 12px !important;
+  }
+
+  /* AI card grid */
+  .ai-card {
+    padding: 16px !important;
+  }
+
+  /* Cost grid */
+  .cost-card {
+    padding: 10px !important;
+    min-width: unset !important;
+  }
+
+  /* Partner vehicle fare */
+  .partner-vehicle-fare {
+    font-size: 16px !important;
+  }
+
+  /* Form grid inputs */
+  .form-grid input,
+  .form-grid select {
+    font-size: 13px !important;
+  }
+
+  /* Brand logo text */
+  .brand {
+    font-size: 18px !important;
+  }
+
+  /* Button sizes */
+  .btn-plan {
+    padding: 10px 20px !important;
+    font-size: 13px !important;
+    width: 100% !important;
+  }
+
+  .btn-primary,
+  .btn-secondary {
+    font-size: 12px !important;
+    padding: 10px 16px !important;
+  }
+}
