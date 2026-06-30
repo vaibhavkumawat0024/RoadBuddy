@@ -963,12 +963,48 @@ body:has(.provider-nav) main {
   .service-type-options { grid-template-columns: 1fr; }
   .provider-dashboard-header { flex-direction: column; gap: 12px; align-items: flex-start; }
   .popup-card { padding: 24px 20px; }
+
+  /* Provider main content padding */
+  body:has(.provider-nav) main {
+    padding: 20px 14px;
+  }
+
+  /* Popup overlay modals */
+  .popup-overlay .popup-card {
+    width: 95% !important;
+    max-width: 95% !important;
+    max-height: 90vh !important;
+    border-radius: 16px !important;
+  }
+
+  /* Setup warning banner */
+  .setup-warning-banner {
+    flex-direction: column;
+    text-align: center;
+    gap: 10px;
+    padding: 12px 16px;
+  }
 }
 
 @media (max-width: 480px) {
   .stats-row { grid-template-columns: 1fr; }
   .provider-auth { margin: 24px 16px; padding: 28px 20px; }
   .otp-box { width: 48px !important; height: 48px; font-size: 18px; }
+
+  /* Provider sidebar full width */
+  .provider-sidebar-menu {
+    width: 100% !important;
+    border-left: none !important;
+  }
+
+  /* Provider main tighter padding */
+  body:has(.provider-nav) main {
+    padding: 12px 10px;
+  }
+
+  .provider-nav {
+    padding: 10px 12px;
+  }
 }
 
 /* ═══ Setup Warning Banner ═══ */

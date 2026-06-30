@@ -77,6 +77,63 @@
   font-size: 13px;
   color: #888;
 }
+
+/* ── Mobile Responsive Overrides ── */
+@media (max-width: 768px) {
+  .bookings-tabs {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 4px;
+    padding-bottom: 10px;
+  }
+  .bookings-tabs::-webkit-scrollbar { display: none; }
+  .booking-tab-btn {
+    white-space: nowrap;
+    flex-shrink: 0;
+    font-size: 11px;
+    padding: 6px 10px;
+  }
+  .trip-detail-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+  .trip-detail-header > div[style*="min-width: 120px"] {
+    text-align: left !important;
+    min-width: unset !important;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .trip-detail-route {
+    font-size: 14px !important;
+  }
+  .trip-detail-card {
+    padding: 14px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .booking-tab-btn {
+    font-size: 10px;
+    padding: 5px 8px;
+    gap: 4px;
+  }
+  .booking-section-header h3 {
+    font-size: 14px;
+  }
+  .trip-detail-route {
+    font-size: 13px !important;
+  }
+  .trip-detail-meta {
+    font-size: 11px !important;
+  }
+  .trip-detail-card {
+    padding: 10px !important;
+    border-radius: 8px !important;
+  }
+}
 </style>
 
 <div class="dashboard-header">

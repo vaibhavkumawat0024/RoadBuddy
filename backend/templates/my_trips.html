@@ -2,6 +2,53 @@
 {% block title %}My Trips — RoadBuddy{% endblock %}
 {% block content %}
 
+<style>
+/* ── My Trips Mobile Responsive ── */
+@media (max-width: 768px) {
+  .trip-actions {
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+  .trip-actions a {
+    width: 100% !important;
+    text-align: center !important;
+    justify-content: center !important;
+    padding: 10px 16px !important;
+    font-size: 13px !important;
+  }
+  .trip-detail-header {
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+  .trip-costs {
+    gap: 6px !important;
+  }
+  .trip-cost-item {
+    min-width: 70px !important;
+    padding: 8px 10px !important;
+    font-size: 11px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .trip-detail-route {
+    font-size: 15px !important;
+  }
+  .trip-detail-card {
+    padding: 12px !important;
+  }
+  .trip-ai-summary {
+    font-size: 12px !important;
+    padding: 10px !important;
+  }
+  .trip-cost-item {
+    min-width: 60px !important;
+    padding: 6px 8px !important;
+    font-size: 10px !important;
+  }
+}
+</style>
+
 <div class="dashboard-header">
   <h1>🗺️ My Trips</h1>
 </div>

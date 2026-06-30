@@ -235,6 +235,100 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
 
+<style>
+/* ── Trip Itinerary Mobile Responsive ── */
+@media (max-width: 768px) {
+  /* Notification dropdown */
+  #nav-notification-dropdown {
+    width: calc(100vw - 32px) !important;
+    right: -60px !important;
+    max-height: 300px !important;
+  }
+
+  /* Heading banner */
+  .max-w-6xl .relative.bg-slate-900 {
+    padding: 20px !important;
+    min-height: unset !important;
+  }
+  .max-w-6xl .relative.bg-slate-900 h2 {
+    font-size: 20px !important;
+  }
+
+  /* Seat modal fullscreen */
+  .seat-overlay {
+    padding: 0 !important;
+  }
+  .seat-modal {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Hotel tab buttons scroll */
+  .flex.bg-slate-100.p-1.rounded-lg {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-shrink: 0;
+  }
+  .flex.bg-slate-100.p-1.rounded-lg button {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* Edit trip modal */
+  #edit-trip-modal > div {
+    width: 95% !important;
+    max-width: 95% !important;
+    max-height: 90vh !important;
+    padding: 16px !important;
+    border-radius: 12px !important;
+  }
+
+  /* Main container padding */
+  .max-w-6xl {
+    padding: 8px !important;
+    margin-top: 8px !important;
+    margin-bottom: 8px !important;
+  }
+
+  /* Section card padding */
+  .bg-white.border.border-slate-200.rounded-2xl.p-6 {
+    padding: 14px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Notification dropdown */
+  #nav-notification-dropdown {
+    width: calc(100vw - 16px) !important;
+    right: -80px !important;
+    font-size: 11px !important;
+  }
+
+  /* Heading banner smaller */
+  .max-w-6xl .relative.bg-slate-900 h2 {
+    font-size: 17px !important;
+  }
+  .max-w-6xl .relative.bg-slate-900 {
+    padding: 14px !important;
+  }
+
+  /* Section card padding tighter */
+  .bg-white.border.border-slate-200.rounded-2xl.p-6 {
+    padding: 10px !important;
+    border-radius: 12px !important;
+  }
+
+  /* Smaller font for hotel/transport cards */
+  .bg-white.border.border-slate-200.rounded-2xl.p-6 h3 {
+    font-size: 14px !important;
+  }
+}
+</style>
+
 <div class="max-w-6xl mx-auto space-y-6 my-6 p-4 animate-fade-in-up">
   <!-- Edit Trip Details button -->
   <div class="text-left">

@@ -684,3 +684,23 @@ body {
     right: -100%;
   }
 }
+
+@media (max-width: 480px) {
+  .search-container {
+    width: 80%;
+  }
+  .glass-board {
+    padding: 1rem;
+    border-radius: 12px;
+    margin: 0.5rem;
+  }
+  #place-title {
+    font-size: 1.6rem;
+  }
+  #place-description {
+    font-size: 0.85rem;
+  }
+  .state-card {
+    flex: 0 0 140px !important;
+  }
+}
