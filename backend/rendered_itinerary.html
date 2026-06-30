@@ -1,11 +1,164 @@
-{% extends "base.html" %}
-{% block title %}Trip Itinerary — RoadBuddy{% endblock %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trip Itinerary — RoadBuddy</title>
+  <link rel="stylesheet" href="/static/css/style.css?v=2.6">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+  
+  <!-- Leaflet Maps CSS & JS Imports -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+  <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
-{% block navbar_menu %}
-  <a href="/dashboard">Dashboard</a>
-{% endblock %}
+  <style>
+    /* Hide Leaflet routing text control panels */
+    .leaflet-routing-container {
+      display: none !important;
+    }
+    /* Pulse keyframe for toast icon bouncing or pulsing */
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-5px); }
+    }
 
-{% block page_overlay %}
+    /* Floating Action Button for Inbox */
+    .inbox-fab {
+      position: fixed;
+      bottom: 92px; /* Placed exactly above chatbot-fab which is at bottom: 24px + height 56px + gap 12px */
+      right: 24px;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 99999 !important;
+      transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s;
+    }
+    .inbox-fab:hover {
+      transform: scale(1.08) rotate(-5deg);
+      box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+    }
+    .inbox-fab .material-symbols-outlined {
+      font-size: 26px;
+    }
+    .inbox-badge {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      background: #ef4444;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 800;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      display: none; /* Dynamically shown */
+      align-items: center;
+      justify-content: center;
+      border: 2px solid #fff;
+      box-shadow: 0 2px 6px rgba(239, 68, 68, 0.4);
+    }
+
+    /* Floating Inbox Panel Widget */
+    .floating-inbox-card {
+      position: fixed;
+      bottom: 164px; /* Placed exactly above chatbot card which is at bottom: 96px */
+      right: 24px;
+      width: 380px;
+      height: 480px;
+      background: var(--surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+      z-index: 99999 !important;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(20px) scale(0.95);
+      transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.3s;
+    }
+    .floating-inbox-card.active {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0) scale(1);
+    }
+    .floating-inbox-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #f8fafc;
+    }
+    .floating-inbox-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      color: var(--text-muted);
+      cursor: pointer;
+      line-height: 1;
+      transition: var(--transition);
+    }
+    .floating-inbox-close:hover {
+      color: #ef4444;
+      transform: scale(1.1);
+    }
+    .inbox-updates-list {
+      flex: 1;
+      background: #f8fafc;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      display: flex;
+      flex-direction: column;
+    }
+    .inbox-update-card:hover {
+      background: #f1f5f9 !important;
+    }
+
+    /* Force Chatbot elements to render on top too */
+    .chatbot-fab {
+      z-index: 99999 !important;
+    }
+    .floating-chatbot-card {
+      z-index: 99999 !important;
+    }
+
+    /* Mobile responsive overrides for floating inbox widget */
+    @media (max-width: 480px) {
+      .floating-inbox-card {
+        top: 0 !important;
+        left: 0 !important;
+        bottom: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        border-radius: 0 !important;
+        border: none !important;
+      }
+      body.inbox-open .inbox-fab {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar Backdrop Overlay -->
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+  <!-- Page level overlays (e.g. backgrounds) -->
+  
 <div class="seat-overlay" id="seat-select-overlay">
   <div class="seat-modal">
     <div class="seat-modal-header">
@@ -65,10 +218,10 @@
           <div style="font-size: 11px; font-weight: 700; color: #64748b; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px; align-self: flex-start;">Passenger Details</div>
           <div id="dynamic-passengers-container" style="display: flex; flex-direction: column; gap: 10px; width: 100%;"></div>
           <input type="tel" id="passenger-phone-input" placeholder="Enter contact phone number..." 
-                 value="{{ user.phone if user and user.phone else '' }}"
+                 value=""
                  style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; outline: none; background: #ffffff; color: #0f172a;" />
           <input type="email" id="passenger-email-input" placeholder="Enter contact email address..." 
-                 value="{{ user.email if user else '' }}"
+                 value="arjun@gmail.com"
                  style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; outline: none; background: #ffffff; color: #0f172a;" />
         </div>
       </div>
@@ -134,33 +287,33 @@
       <div class="grid grid-cols-2 gap-4">
         <div>
           <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Origin</label>
-          <input type="text" id="edit-origin" required class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:border-emerald-500" value="{{ trip.origin }}">
+          <input type="text" id="edit-origin" required class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:border-emerald-500" value="Jaipur, Rajasthan">
         </div>
         <div>
           <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Destination</label>
-          <input type="text" id="edit-destination" required class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:border-emerald-500" value="{{ trip.destination }}">
+          <input type="text" id="edit-destination" required class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:border-emerald-500" value="Udaipur, Rajasthan">
         </div>
       </div>
 
       <div class="grid grid-cols-2 gap-4">
         <div>
           <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Start Date</label>
-          <input type="date" id="edit-start-date" required class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:border-emerald-500" value="{{ trip.start_date }}">
+          <input type="date" id="edit-start-date" required class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:border-emerald-500" value="2025-12-01">
         </div>
         <div>
           <label class="block text-xs font-bold text-slate-500 uppercase mb-1">End Date</label>
-          <input type="date" id="edit-end-date" required class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:border-emerald-500" value="{{ trip.end_date }}">
+          <input type="date" id="edit-end-date" required class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:border-emerald-500" value="None">
         </div>
       </div>
 
       <div class="grid grid-cols-2 gap-4">
         <div>
           <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Budget (INR)</label>
-          <input type="number" id="edit-budget" required min="100" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:border-emerald-500" value="{{ trip.budget_inr }}">
+          <input type="number" id="edit-budget" required min="100" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:border-emerald-500" value="8000.0">
         </div>
         <div>
           <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Num People</label>
-          <input type="number" id="edit-people" required min="1" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:border-emerald-500" value="{{ trip.num_people or 1 }}">
+          <input type="number" id="edit-people" required min="1" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:border-emerald-500" value="1">
         </div>
       </div>
 
@@ -168,32 +321,28 @@
         <div>
           <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Travel Mode</label>
           <select id="edit-travel-mode" onchange="toggleEditVehicleSelector()" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:border-emerald-500">
-            <option value="own_vehicle" {% if trip.travel_mode == 'own_vehicle' %}selected{% endif %}>Own Vehicle</option>
-            <option value="bus" {% if trip.travel_mode == 'bus' %}selected{% endif %}>Bus</option>
-            <option value="train" {% if trip.travel_mode == 'train' %}selected{% endif %}>Train</option>
-            <option value="flight" {% if trip.travel_mode == 'flight' %}selected{% endif %}>Flight</option>
-            <option value="cab_service" {% if trip.travel_mode == 'cab_service' %}selected{% endif %}>Cab Service</option>
+            <option value="own_vehicle" selected>Own Vehicle</option>
+            <option value="bus" >Bus</option>
+            <option value="train" >Train</option>
+            <option value="flight" >Flight</option>
+            <option value="cab_service" >Cab Service</option>
           </select>
         </div>
         <div>
           <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Group Type</label>
           <select id="edit-group-type" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:border-emerald-500">
-            <option value="solo" {% if trip.group_type == 'solo' %}selected{% endif %}>Solo</option>
-            <option value="couple" {% if trip.group_type == 'couple' %}selected{% endif %}>Couple</option>
-            <option value="friends" {% if trip.group_type == 'friends' %}selected{% endif %}>Friends</option>
-            <option value="family" {% if trip.group_type == 'family' %}selected{% endif %}>Family</option>
+            <option value="solo" >Solo</option>
+            <option value="couple" >Couple</option>
+            <option value="friends" >Friends</option>
+            <option value="family" >Family</option>
           </select>
         </div>
       </div>
 
-      <div id="edit-vehicle-select-container" class="{% if trip.travel_mode != 'own_vehicle' %}hidden{% endif %}">
+      <div id="edit-vehicle-select-container" class="">
         <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Select Vehicle</label>
         <select id="edit-vehicle-id" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:border-emerald-500">
-          {% for v in vehicles %}
-            <option value="{{ v.id }}" {% if trip.vehicle_id == v.id %}selected{% endif %}>
-              {{ v.vehicle_name }} ({{ v.fuel_type }} · {{ v.mileage_kmpl }} km/l)
-            </option>
-          {% endfor %}
+          
         </select>
       </div>
 
@@ -208,9 +357,148 @@
     </form>
   </div>
 </div>
-{% endblock %}
 
-{% block content %}
+
+  <!-- Sliding Sidebar Drawer -->
+  <div class="sidebar-menu" id="sidebar-menu">
+    <div class="sidebar-header">
+      <h3>Menu</h3>
+      <button class="sidebar-close" id="sidebar-close" aria-label="Close sidebar">&times;</button>
+    </div>
+    <div class="sidebar-links">
+      
+      <a href="/dashboard" class="sidebar-link">
+        <span class="material-symbols-outlined">dashboard</span>
+        <span>Dashboard</span>
+      </a>
+      <a href="/my-trips" class="sidebar-link">
+        <span class="material-symbols-outlined">map</span>
+        <span>My Trips</span>
+      </a>
+      <a href="/my-bookings" class="sidebar-link" id="nav-my-bookings-link" style="position: relative;">
+        <span class="material-symbols-outlined">confirmation_number</span>
+        <span>My Bookings</span>
+        
+        <span class="unread-dot"></span>
+        
+      </a>
+      <a href="/add-vehicle" class="sidebar-link">
+        <span class="material-symbols-outlined">directions_car</span>
+        <span>My Vehicles</span>
+      </a>
+      <a href="/community" class="sidebar-link">
+        <span class="material-symbols-outlined">forum</span>
+        <span>Community</span>
+      </a>
+      <a href="/profile" class="sidebar-link">
+        <span class="material-symbols-outlined">person</span>
+        <span>Profile</span>
+      </a>
+      <div class="sidebar-divider"></div>
+      <a href="/logout" class="sidebar-link logout-link">
+        <span class="material-symbols-outlined">logout</span>
+        <span>Logout</span>
+      </a>
+      
+    </div>
+  </div>
+
+  
+  <!-- Floating Action Button for Inbox -->
+  <button class="inbox-fab" id="inbox-fab" aria-label="Open Alerts Inbox">
+    <span class="material-symbols-outlined">notifications</span>
+    <span class="inbox-badge" id="inbox-badge">0</span>
+  </button>
+
+  <!-- Floating Inbox Panel Widget -->
+  <div class="floating-inbox-card" id="floating-inbox-card">
+    <div class="floating-inbox-header">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="material-symbols-outlined" style="color: #3b82f6; font-size: 20px;">notifications</span>
+        <div style="text-align: left;">
+          <div style="font-weight: 700; font-size: 14px; color: var(--text-main); line-height: 1.2;">Trip Inbox</div>
+          <div style="font-size: 11px; color: var(--text-muted); line-height: 1.2;">Your real-time updates</div>
+        </div>
+      </div>
+      <button class="floating-inbox-close" id="floating-inbox-close" aria-label="Minimize inbox">&times;</button>
+    </div>
+    <div class="inbox-updates-list" id="inbox-updates-list">
+      <!-- Dynamically populated updates -->
+    </div>
+  </div>
+
+  <!-- Beautiful Booking Confirmation Modal -->
+  <div id="booking-success-modal" style="position: fixed; inset: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(8px); display: none; align-items: center; justify-content: center; z-index: 999999; opacity: 0; transition: opacity 0.3s ease;">
+    <div style="background: #fff; border-radius: 24px; padding: 32px; width: 90%; max-width: 400px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); transform: scale(0.9); transition: transform 0.3s ease; border: 1px solid rgba(16,185,129,0.2);" id="booking-success-card">
+      <div style="width: 72px; height: 72px; background: #ecfdf5; color: #10b981; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 36px; border: 3px solid #d1fae5; animation: bounce 2s infinite;">🎉</div>
+      <h3 style="font-size: 20px; font-weight: 800; color: #0f172a; margin-bottom: 8px;" id="success-modal-title">Booking Confirmed!</h3>
+      <p style="font-size: 13.5px; color: #64748b; line-height: 1.5; margin-bottom: 24px;" id="success-modal-message">Your ride is successfully booked. Check your inbox for updates.</p>
+      <button style="width: 100%; padding: 12px; border-radius: 12px; background: #10b981; color: #fff; font-weight: 700; border: none; cursor: pointer; font-size: 14px; box-shadow: 0 4px 12px rgba(16,185,129,0.2); transition: all 0.2s;" onclick="closeSuccessModal()">Great, Thank You</button>
+    </div>
+  </div>
+
+  <!-- Floating Action Button for Chatbot -->
+  <button class="chatbot-fab" id="chatbot-fab" aria-label="Open AI Chatbot">
+    <span class="material-symbols-outlined">smart_toy</span>
+  </button>
+
+  <!-- Floating Chatbot Widget Panel -->
+  <div class="floating-chatbot-card" id="floating-chatbot-card">
+    <div class="floating-chatbot-header">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="material-symbols-outlined" style="color: var(--primary); font-size: 20px;">smart_toy</span>
+        <div style="text-align: left;">
+          <div style="font-weight: 700; font-size: 14px; color: var(--text-main); line-height: 1.2;">RoadBuddy AI</div>
+          <div style="font-size: 11px; color: var(--text-muted); line-height: 1.2;">Your trip assistant</div>
+        </div>
+      </div>
+      <button class="floating-chatbot-close" id="floating-chatbot-close" aria-label="Minimize chatbot">&times;</button>
+    </div>
+    <div class="chat-messages" id="chat-messages">
+      <div class="chat-msg ai-msg">🚗 Hi! I'm RoadBuddy AI. Ask me to plan a trip, suggest routes, or estimate costs!</div>
+    </div>
+    <div class="chat-input-row" style="padding: 12px 16px; border-top: 1px solid var(--border-color); background: var(--surface);">
+      <input type="text" id="chat-input" placeholder="Plan a trip from Jaipur to Udaipur..." style="flex: 1; padding: 10px 14px; border: 1.5px solid var(--border-color); border-radius: var(--radius-md); font-size: 16px;" />
+      <button id="chat-send-btn" onclick="sendChat()" style="background: var(--primary); color: #fff; border: none; border-radius: var(--radius-md); padding: 0 16px; cursor: pointer; transition: var(--transition); display: flex; align-items: center; justify-content: center;">
+        <span class="material-symbols-outlined" style="font-size: 18px;">send</span>
+      </button>
+    </div>
+  </div>
+  
+
+  <nav>
+    <a href="/dashboard" class="brand-logo" style="text-decoration: none; display: flex; align-items: center; gap: 10px;">
+      <div class="logo-icon-container" style="position: relative; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, var(--primary), var(--primary-hover)); box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2); transition: var(--transition);">
+        <div style="position: absolute; inset: 2px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2);"></div>
+        <svg style="width: 18px; height: 18px; color: #fff; margin: auto; transition: var(--transition);" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2L2 22L12 18L22 22L12 2Z" fill="currentColor" stroke="currentColor" stroke-dashoffset="0" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+        </svg>
+        <span style="position: absolute; bottom: -1px; right: -1px; display: flex; width: 10px; height: 10px;">
+          <span style="position: absolute; display: inline-flex; width: 100%; height: 100%; border-radius: 9999px; background: var(--secondary); opacity: 0.75; animation: pulseGlow 2s infinite;"></span>
+          <span style="position: relative; display: inline-flex; width: 10px; height: 10px; border-radius: 9999px; background: var(--secondary);"></span>
+        </span>
+      </div>
+      <div style="display: flex; flex-direction: column;">
+        <span style="font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 800; color: var(--text-main); line-height: 1.1;">
+          Road<span style="color: var(--primary);">Buddy</span>
+        </span>
+        <span style="font-size: 8px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em;">Your Trip Pilot</span>
+      </div>
+    </a>
+    <div class="nav-menu" id="nav-menu" style="display: flex; align-items: center; gap: 8px; margin-left: auto;">
+      
+  <a href="/dashboard">Dashboard</a>
+
+      
+      <!-- Hamburger Toggle Button -->
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle navigation menu">
+        <span class="material-symbols-outlined">menu</span>
+      </button>
+    </div>
+  </nav>
+
+  <main class="animate-fade-in-up">
+    
 <!-- Load Tailwind CSS CDN locally for rich layout styling -->
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
@@ -227,10 +515,10 @@
   <div class="relative bg-slate-900 rounded-2xl overflow-hidden shadow-lg p-8 flex flex-col justify-between min-h-[160px] border border-white/5" style="background: linear-gradient(rgba(24, 29, 24, 0.5), rgba(24, 29, 24, 0.9)), url('/static/images/roadbuddy_hero.png'); background-size: cover; background-position: center;">
     <div class="max-w-xl z-10 text-left">
       <span class="text-[10px] bg-emerald-600 text-white font-mono font-bold px-2 py-0.5 rounded-full uppercase tracking-wider mb-2 inline-block">
-        {{ trip.travel_mode.replace('_', ' ') }} Mode
+        own vehicle Mode
       </span>
       <h2 class="text-white text-3xl font-extrabold tracking-tight mb-2">
-        {{ trip.origin }} &rarr; {{ trip.destination }}
+        Jaipur, Rajasthan &rarr; Udaipur, Rajasthan
       </h2>
       <p class="text-white/70 text-sm leading-relaxed">Your customized AI itinerary and trip navigation dashboard.</p>
     </div>
@@ -239,52 +527,7 @@
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <!-- Left Column: Transport & Hotel Booking -->
     <div class="lg:col-span-1 space-y-6">
-      {% if trip.travel_mode != 'own_vehicle' %}
-      <!-- 🎫 Transport Booking Section -->
-      <section class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6 text-left animate-fade-in-up">
-        {% if trip.travel_mode == 'bus' %}
-          <div class="flex items-center gap-2 border-b border-slate-100 pb-3">
-            <span class="material-symbols-outlined text-emerald-600 text-xl">directions_bus</span>
-            <h3 class="font-extrabold text-slate-800 text-lg tracking-tight">Bus Booking</h3>
-          </div>
-          <div id="buses-container" class="space-y-4">
-            <div class="text-center py-6 text-slate-400 text-xs">
-              Loading buses...
-            </div>
-          </div>
-        {% elif trip.travel_mode == 'train' %}
-          <div class="flex items-center gap-2 border-b border-slate-100 pb-3">
-            <span class="material-symbols-outlined text-emerald-600 text-xl">train</span>
-            <h3 class="font-extrabold text-slate-800 text-lg tracking-tight">Train Booking</h3>
-          </div>
-          <div id="trains-container" class="space-y-4">
-            <div class="text-center py-6 text-slate-400 text-xs">
-              Loading trains...
-            </div>
-          </div>
-        {% elif trip.travel_mode == 'flight' %}
-          <div class="flex items-center gap-2 border-b border-slate-100 pb-3">
-            <span class="material-symbols-outlined text-emerald-600 text-xl">flight</span>
-            <h3 class="font-extrabold text-slate-800 text-lg tracking-tight">Flight Booking</h3>
-          </div>
-          <div id="flights-container" class="space-y-4">
-            <div class="text-center py-6 text-slate-400 text-xs">
-              Loading flights...
-            </div>
-          </div>
-        {% else %}
-          <div class="flex items-center gap-2 border-b border-slate-100 pb-3">
-            <span class="material-symbols-outlined text-emerald-600 text-xl">local_taxi</span>
-            <h3 class="font-extrabold text-slate-800 text-lg tracking-tight">Cab Booking</h3>
-          </div>
-          <div id="cabs-container" class="space-y-4">
-            <div class="text-center py-6 text-slate-400 text-xs">
-              Loading cabs...
-            </div>
-          </div>
-        {% endif %}
-      </section>
-      {% endif %}
+      
 
       <!-- 🏨 Hotel Booking Section -->
       <section class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6 text-left animate-fade-in-up">
@@ -310,7 +553,7 @@
         </div>
       </section>
 
-      {% if trip.travel_mode == 'own_vehicle' or trip.travel_mode == 'cab_service' %}
+      
       <!-- Food & Dining Orders Section -->
       <section class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6 text-left mt-6 animate-fade-in-up">
         <div class="flex justify-between items-center border-b border-slate-100 pb-3">
@@ -329,7 +572,7 @@
 
         <!-- Restaurants List -->
         <div class="space-y-4">
-          <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Discover Restaurants Along Your Route</h4>
+          <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Discover Restaurants in Udaipur, Rajasthan</h4>
           <div id="restaurants-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="col-span-full text-center py-6 text-slate-400 text-xs">
               Loading restaurants...
@@ -337,7 +580,7 @@
           </div>
         </div>
       </section>
-      {% endif %}
+      
     </div>
 
     <!-- Right Column: Itinerary Stops & Parameters -->
@@ -349,60 +592,210 @@
           <h3 class="font-bold text-slate-800 text-base">Day-by-Day Stops & Activities</h3>
         </div>
 
-        {% if trip.ai_summary %}
+        
         <div class="bg-emerald-50/40 p-4 rounded-xl border border-emerald-100/50">
-          <p class="text-slate-700 text-xs leading-relaxed italic">💡 {{ trip.ai_summary }}</p>
+          <p class="text-slate-700 text-xs leading-relaxed italic">💡 A wonderful road trip from Jaipur, Rajasthan to Udaipur, Rajasthan and back. Includes scenic route stops, local dhabas, fuel stops and comfortable stays.</p>
         </div>
-        {% endif %}
+        
 
         <div class="space-y-6">
-          {% if trip.stops %}
-            {% set grouped_stops = {} %}
-            {% for stop in trip.stops %}
-              {% set day = stop.day %}
-              {% if day not in grouped_stops %}
-                {% set _ = grouped_stops.update({day: []}) %}
-              {% endif %}
-              {% set _ = grouped_stops[day].append(stop) %}
-            {% endfor %}
+          
+            
+            
+              
+              
+                
+              
+              
+            
+              
+              
+              
+            
+              
+              
+              
+            
+              
+              
+                
+              
+              
+            
+              
+              
+              
+            
+              
+              
+                
+              
+              
+            
+              
+              
+              
+            
+              
+              
+              
+            
 
-            {% for day in grouped_stops.keys()|sort %}
+            
               <div class="space-y-3">
                 <h4 class="font-bold text-slate-800 text-sm flex items-center gap-1.5">
                   <span class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold">
-                    {{ day }}
+                    1
                   </span>
-                  Day {{ day }}
+                  Day 1
                 </h4>
                 <div class="relative border-l border-slate-200 ml-3 pl-5 space-y-4">
-                  {% for s in grouped_stops[day] %}
+                  
                     <div class="relative text-left">
                       <span class="absolute -left-[26px] top-1 bg-white border-2 border-emerald-600 w-3 h-3 rounded-full"></span>
                       <div class="space-y-1">
                         <div class="flex flex-wrap items-center gap-2">
                           <span class="bg-emerald-50 text-emerald-700 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">
-                            {{ s.time_slot }}
+                            afternoon
                           </span>
-                          <strong class="text-xs text-slate-800">{{ s.place_name }}</strong>
-                          <span class="text-[10px] text-slate-500 capitalize">({{ s.place_type }})</span>
+                          <strong class="text-xs text-slate-800">Highway Dhaba — Lunch Stop</strong>
+                          <span class="text-[10px] text-slate-500 capitalize">(food)</span>
                         </div>
-                        {% if s.description %}
-                          <p class="text-[11px] text-slate-500 pl-1">{{ s.description }}</p>
-                        {% endif %}
+                        
                       </div>
                     </div>
-                  {% endfor %}
+                  
+                    <div class="relative text-left">
+                      <span class="absolute -left-[26px] top-1 bg-white border-2 border-emerald-600 w-3 h-3 rounded-full"></span>
+                      <div class="space-y-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <span class="bg-emerald-50 text-emerald-700 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">
+                            evening
+                          </span>
+                          <strong class="text-xs text-slate-800">Hotel Shree Palace — Udaipur, Rajasthan</strong>
+                          <span class="text-[10px] text-slate-500 capitalize">(hotel)</span>
+                        </div>
+                        
+                      </div>
+                    </div>
+                  
+                    <div class="relative text-left">
+                      <span class="absolute -left-[26px] top-1 bg-white border-2 border-emerald-600 w-3 h-3 rounded-full"></span>
+                      <div class="space-y-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <span class="bg-emerald-50 text-emerald-700 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">
+                            morning
+                          </span>
+                          <strong class="text-xs text-slate-800">Petrol Pump — Jaipur, Rajasthan</strong>
+                          <span class="text-[10px] text-slate-500 capitalize">(fuel)</span>
+                        </div>
+                        
+                      </div>
+                    </div>
+                  
                 </div>
               </div>
-            {% endfor %}
-          {% else %}
-            <p class="text-xs text-slate-500 italic">No stop waypoints recorded for this itinerary.</p>
-          {% endif %}
+            
+              <div class="space-y-3">
+                <h4 class="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                  <span class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold">
+                    2
+                  </span>
+                  Day 2
+                </h4>
+                <div class="relative border-l border-slate-200 ml-3 pl-5 space-y-4">
+                  
+                    <div class="relative text-left">
+                      <span class="absolute -left-[26px] top-1 bg-white border-2 border-emerald-600 w-3 h-3 rounded-full"></span>
+                      <div class="space-y-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <span class="bg-emerald-50 text-emerald-700 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">
+                            afternoon
+                          </span>
+                          <strong class="text-xs text-slate-800">Local Restaurant</strong>
+                          <span class="text-[10px] text-slate-500 capitalize">(destination_food)</span>
+                        </div>
+                        
+                      </div>
+                    </div>
+                  
+                    <div class="relative text-left">
+                      <span class="absolute -left-[26px] top-1 bg-white border-2 border-emerald-600 w-3 h-3 rounded-full"></span>
+                      <div class="space-y-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <span class="bg-emerald-50 text-emerald-700 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">
+                            morning
+                          </span>
+                          <strong class="text-xs text-slate-800">Top Sightseeing Spot</strong>
+                          <span class="text-[10px] text-slate-500 capitalize">(sightseeing)</span>
+                        </div>
+                        
+                      </div>
+                    </div>
+                  
+                </div>
+              </div>
+            
+              <div class="space-y-3">
+                <h4 class="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                  <span class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold">
+                    3
+                  </span>
+                  Day 3
+                </h4>
+                <div class="relative border-l border-slate-200 ml-3 pl-5 space-y-4">
+                  
+                    <div class="relative text-left">
+                      <span class="absolute -left-[26px] top-1 bg-white border-2 border-emerald-600 w-3 h-3 rounded-full"></span>
+                      <div class="space-y-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <span class="bg-emerald-50 text-emerald-700 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">
+                            afternoon
+                          </span>
+                          <strong class="text-xs text-slate-800">Highway Dhaba — Return Lunch</strong>
+                          <span class="text-[10px] text-slate-500 capitalize">(return_route)</span>
+                        </div>
+                        
+                      </div>
+                    </div>
+                  
+                    <div class="relative text-left">
+                      <span class="absolute -left-[26px] top-1 bg-white border-2 border-emerald-600 w-3 h-3 rounded-full"></span>
+                      <div class="space-y-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <span class="bg-emerald-50 text-emerald-700 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">
+                            evening
+                          </span>
+                          <strong class="text-xs text-slate-800">Reach Home — Jaipur, Rajasthan</strong>
+                          <span class="text-[10px] text-slate-500 capitalize">(return_route)</span>
+                        </div>
+                        
+                      </div>
+                    </div>
+                  
+                    <div class="relative text-left">
+                      <span class="absolute -left-[26px] top-1 bg-white border-2 border-emerald-600 w-3 h-3 rounded-full"></span>
+                      <div class="space-y-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <span class="bg-emerald-50 text-emerald-700 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">
+                            morning
+                          </span>
+                          <strong class="text-xs text-slate-800">Petrol Pump — Udaipur, Rajasthan</strong>
+                          <span class="text-[10px] text-slate-500 capitalize">(fuel)</span>
+                        </div>
+                        
+                      </div>
+                    </div>
+                  
+                </div>
+              </div>
+            
+          
         </div>
 
         <!-- Launch Navigation controls -->
         <div class="flex flex-wrap gap-3 pt-6 border-t border-slate-100">
-          <a href="/start-trip?trip_id={{ trip.id }}&origin={{ trip.origin|urlencode }}&destination={{ trip.destination|urlencode }}&date={{ trip.start_date }}" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-5 py-3 rounded-lg transition-all active:scale-95 duration-100 inline-flex items-center gap-1.5 shadow-sm">
+          <a href="/start-trip?trip_id=1&origin=Jaipur%2C%20Rajasthan&destination=Udaipur%2C%20Rajasthan&date=2025-12-01" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-5 py-3 rounded-lg transition-all active:scale-95 duration-100 inline-flex items-center gap-1.5 shadow-sm">
             <span class="material-symbols-outlined text-sm">navigation</span>
             Start Map Navigation
           </a>
@@ -423,24 +816,24 @@
           <div class="flex justify-between items-center text-xs">
             <span class="text-slate-500 font-medium">Dates:</span>
             <span class="font-bold text-slate-800">
-              {{ trip.start_date }} {% if trip.end_date %} to {{ trip.end_date }} {% endif %}
+              2025-12-01 
             </span>
           </div>
           <div class="flex justify-between items-center text-xs">
             <span class="text-slate-500 font-medium">Budget:</span>
-            <span class="font-bold text-slate-800">₹{{ "%.0f"|format(trip.budget_inr or 0) }}</span>
+            <span class="font-bold text-slate-800">₹8000</span>
           </div>
           <div class="flex justify-between items-center text-xs">
             <span class="text-slate-500 font-medium">Travelers:</span>
-            <span class="font-bold text-slate-800">{{ trip.num_people or 1 }} Person(s)</span>
+            <span class="font-bold text-slate-800">1 Person(s)</span>
           </div>
           <div class="flex justify-between items-center text-xs">
             <span class="text-slate-500 font-medium">Group Type:</span>
-            <span class="font-bold text-slate-800 capitalize">{{ trip.group_type or 'Solo' }}</span>
+            <span class="font-bold text-slate-800 capitalize">Solo</span>
           </div>
           <div class="flex justify-between items-center text-xs">
             <span class="text-slate-500 font-medium">Travel Mode:</span>
-            <span class="font-bold text-slate-800 capitalize">{{ trip.travel_mode.replace('_', ' ') }}</span>
+            <span class="font-bold text-slate-800 capitalize">own vehicle</span>
           </div>
         </div>
       </section>
@@ -454,25 +847,20 @@
         <div class="space-y-2">
           <div class="flex justify-between text-xs bg-slate-50 p-2 rounded-lg">
             <span class="text-slate-500 font-semibold">Fuel & Toll:</span>
-            <span class="font-bold text-slate-800">₹{{ "%.0f"|format((trip.fuel_cost_inr or 0) + (trip.toll_cost_inr or 0)) }}</span>
+            <span class="font-bold text-slate-800">₹3760</span>
           </div>
-          {% if trip.travel_mode != 'own_vehicle' %}
-          <div class="flex justify-between text-xs bg-slate-50 p-2 rounded-lg">
-            <span class="text-slate-500 font-semibold">Transit Transport:</span>
-            <span class="font-bold text-slate-800">₹{{ "%.0f"|format(trip.transport_fare_inr or 0) }}</span>
-          </div>
-          {% endif %}
+          
           <div class="flex justify-between text-xs bg-slate-50 p-2 rounded-lg">
             <span class="text-slate-500 font-semibold">Hotel Cost:</span>
-            <span class="font-bold text-slate-800">₹{{ "%.0f"|format(trip.hotel_cost_inr or 0) }}</span>
+            <span class="font-bold text-slate-800">₹2500</span>
           </div>
           <div class="flex justify-between text-xs bg-slate-50 p-2 rounded-lg">
             <span class="text-slate-500 font-semibold">Food Cost:</span>
-            <span class="font-bold text-slate-800">₹{{ "%.0f"|format(trip.food_cost_inr or 0) }}</span>
+            <span class="font-bold text-slate-800">₹1200</span>
           </div>
           <div class="flex justify-between text-xs bg-emerald-50/50 p-2.5 rounded-lg border border-emerald-100">
             <span class="text-emerald-700 font-extrabold">Total Estimate:</span>
-            <span class="font-extrabold text-emerald-700">₹{{ "%.0f"|format(trip.total_cost_inr or 0) }}</span>
+            <span class="font-extrabold text-emerald-700">₹6800</span>
           </div>
         </div>
       </section>
@@ -498,7 +886,7 @@
       
       <div>
         <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Guest Name</label>
-        <input type="text" value="{{ user.name if user else 'Self' }}" readonly class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-700 focus:outline-none">
+        <input type="text" value="Arjun Sharma" readonly class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-700 focus:outline-none">
       </div>
       
       <div class="grid grid-cols-2 gap-4">
@@ -598,7 +986,7 @@
       </div>
 
       <!-- Dish Reviews & Ratings Section -->
-      <div id="review-input-container" class="border-t border-slate-200 pt-6 hidden">
+      <div class="border-t border-slate-200 pt-6">
         <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Add a Review for a Dish</h4>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
           <div class="space-y-2">
@@ -904,30 +1292,39 @@
   const IS_BACKEND = true;
   const API_BASE = "";
   
-  const bookedHotel = {% if booked_hotel %} {
-    hotel_name: "{{ booked_hotel.hotel_name | replace('"', '\\"') }}",
-    check_in_date: "{{ booked_hotel.check_in_date }}",
-    check_out_date: "{{ booked_hotel.check_out_date }}",
-    num_rooms: {{ booked_hotel.num_rooms }}
-  } {% else %} null {% endif %};
+  const bookedHotel =  null ;
 
-  const bookedBus = {% if booked_bus %} {{ booked_bus | tojson | safe }} {% else %} null {% endif %};
-  const bookedTrain = {% if booked_train %} {{ booked_train | tojson | safe }} {% else %} null {% endif %};
-  const bookedFlight = {% if booked_flight %} {{ booked_flight | tojson | safe }} {% else %} null {% endif %};
-  const bookedCab = {% if booked_cab %} {{ booked_cab | tojson | safe }} {% else %} null {% endif %};
+  const bookedBus =  null ;
+  const bookedTrain =  null ;
+  const bookedFlight =  null ;
+  const bookedCab =  null ;
 
-  const currentUserId = {% if user %}{{ user.id }}{% else %}null{% endif %};
+  const currentUserId = 1;
   
   const knownHotelCities = ["Jodhpur", "Shimla", "Manali", "Chennai", "Agra", "Kolkata", "Jaipur", "Goa", "Udaipur", "Delhi", "Hyderabad", "Bangalore", "Pune", "Mumbai"];
   
-  const destinationCity = "{{ trip.destination }}".trim();
-  const originCity = "{{ trip.origin }}".trim();
-  const tripStartDate = "{{ trip.start_date }}";
-  const tripEndDate = "{{ trip.end_date }}";
+  const destinationCity = "Udaipur, Rajasthan".trim();
+  const originCity = "Jaipur, Rajasthan".trim();
+  const tripStartDate = "2025-12-01";
+  const tripEndDate = "None";
   const stops = [
-    {% for s in trip.stops %}
-      "{{ s.place_name }}",
-    {% endfor %}
+    
+      "Highway Dhaba — Lunch Stop",
+    
+      "Hotel Shree Palace — Udaipur, Rajasthan",
+    
+      "Petrol Pump — Jaipur, Rajasthan",
+    
+      "Local Restaurant",
+    
+      "Top Sightseeing Spot",
+    
+      "Highway Dhaba — Return Lunch",
+    
+      "Reach Home — Jaipur, Rajasthan",
+    
+      "Petrol Pump — Udaipur, Rajasthan",
+    
   ];
 
   const knownCitiesLower = knownHotelCities.map(c => c.toLowerCase());
@@ -970,8 +1367,8 @@
 
   function getHeaders() {
     const headers = { "Content-Type": "application/json" };
-    if (IS_BACKEND && "{{ token }}") {
-      headers["Authorization"] = "{{ token }}".startsWith("Bearer ") ? "{{ token }}" : "Bearer {{ token }}";
+    if (IS_BACKEND && "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZXhwIjoxNzgyODk2MTM3fQ.YwuSIuiqvEu5lb28myBjtpfnGhomWW0uNARMsGk94xE") {
+      headers["Authorization"] = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZXhwIjoxNzgyODk2MTM3fQ.YwuSIuiqvEu5lb28myBjtpfnGhomWW0uNARMsGk94xE".startsWith("Bearer ") ? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZXhwIjoxNzgyODk2MTM3fQ.YwuSIuiqvEu5lb28myBjtpfnGhomWW0uNARMsGk94xE" : "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZXhwIjoxNzgyODk2MTM3fQ.YwuSIuiqvEu5lb28myBjtpfnGhomWW0uNARMsGk94xE";
     }
     return headers;
   }
@@ -1443,10 +1840,10 @@
   }
 
   function calculateTripDistance() {
-    const lat1 = parseFloat("{{ trip.origin_lat or 0 }}");
-    const lon1 = parseFloat("{{ trip.origin_lon or 0 }}");
-    const lat2 = parseFloat("{{ trip.destination_lat or 0 }}");
-    const lon2 = parseFloat("{{ trip.destination_lon or 0 }}");
+    const lat1 = parseFloat("0");
+    const lon1 = parseFloat("0");
+    const lat2 = parseFloat("0");
+    const lon2 = parseFloat("0");
     
     if (lat1 && lon1 && lat2 && lon2) {
       const R = 6371; // Earth's radius in KM
@@ -1980,7 +2377,7 @@
     
     const seatsToRender = isPrivateBooking ? ["Private Booking"] : selectedSeats;
     seatsToRender.forEach((seat, index) => {
-      const prev = currentValues[seat] || { name: (index === 0 ? "{{ user.name if user else '' }}" : ""), age: "" };
+      const prev = currentValues[seat] || { name: (index === 0 ? "Arjun Sharma" : ""), age: "" };
       pContainer.innerHTML += `
         <div class="passenger-input-group" data-seat="${seat}" style="display: flex; gap: 8px; align-items: center; width: 100%; margin-bottom: 4px;">
           <div style="flex: 2; display: flex; flex-direction: column; gap: 2px;">
@@ -2099,7 +2496,7 @@
     });
     
     if (!firstPassengerName) {
-      firstPassengerName = "{{ user.name if user else 'Guest' }}";
+      firstPassengerName = "Arjun Sharma";
     }
     
     const passengerPhone = document.getElementById("passenger-phone-input").value.trim();
@@ -2287,7 +2684,7 @@
         vehicle_id: travelMode === 'own_vehicle' ? vehicleId : null
       };
 
-      const tripId = "{{ trip.id }}";
+      const tripId = "1";
       const response = await fetch(`/api/trips/${tripId}`, {
         method: 'PUT',
         headers: {
@@ -2318,16 +2715,16 @@
   let currentReviewRating = 5;
 
   async function loadRestaurants() {
-    const routeCitiesQuery = [destinationCity, originCity, ...stops].join(",");
+    const dest = "Udaipur, Rajasthan";
     const container = document.getElementById("restaurants-container");
     if (!container) return;
 
     try {
-      const res = await fetch(`/api/food/restaurants?city=${encodeURIComponent(routeCitiesQuery)}`);
+      const res = await fetch(`/api/food/restaurants?city=${encodeURIComponent(dest)}`);
       if (res.ok) {
         const restaurants = await res.json();
         if (restaurants.length === 0) {
-          container.innerHTML = `<div class="col-span-full text-center py-6 text-slate-400 text-xs italic">No highway partner restaurants found along your route.</div>`;
+          container.innerHTML = `<div class="col-span-full text-center py-6 text-slate-400 text-xs italic">No highway partner restaurants found in ${dest}.</div>`;
           return;
         }
 
@@ -2343,9 +2740,9 @@
               </div>
               <p class="text-[10px] text-slate-500 mt-1">${r.address}</p>
             </div>
-            <a href="/trips/{{ trip.id }}/restaurants/${r.id}" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold py-2 rounded transition-colors mt-2 text-center block">
+            <button onclick="openFoodMenu(${r.id}, '${r.name.replace(/'/g, "\\'")}', '${r.address.replace(/'/g, "\\'")}')" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold py-2 rounded transition-colors mt-2">
               View Menu & Order
-            </a>
+            </button>
           </div>
         `).join("");
       } else {
@@ -2369,9 +2766,6 @@
     const modal = document.getElementById("food-ordering-modal");
     modal.classList.remove("hidden");
     modal.classList.add("flex");
-    document.body.style.overflow = "hidden";
-    const modalBody = modal.querySelector(".overflow-y-auto");
-    if (modalBody) modalBody.scrollTop = 0;
 
     try {
       const res = await fetch(`/api/food/restaurants/${restId}/menu`);
@@ -2381,12 +2775,6 @@
         
         // Pop review select
         const reviewSelect = document.getElementById("review-dish-select");
-        const reviewContainer = document.getElementById("review-input-container");
-        if (data.can_review) {
-          reviewContainer.classList.remove("hidden");
-        } else {
-          reviewContainer.classList.add("hidden");
-        }
         reviewSelect.innerHTML = currentMenu.map(item => `
           <option value="${item.id}">${item.name}</option>
         `).join("");
@@ -2423,7 +2811,6 @@
     const modal = document.getElementById("food-ordering-modal");
     modal.classList.add("hidden");
     modal.classList.remove("flex");
-    document.body.style.overflow = "";
   }
 
   function addToCart(itemId) {
@@ -2564,38 +2951,6 @@
     }
   }
 
-  function showToastNotification(message, type = "success") {
-    let container = document.getElementById("toast-container");
-    if (!container) {
-      container = document.createElement("div");
-      container.id = "toast-container";
-      container.className = "fixed top-5 right-5 z-[9999] flex flex-col gap-3 pointer-events-none";
-      document.body.appendChild(container);
-    }
-    
-    const toast = document.createElement("div");
-    toast.className = `p-4 rounded-2xl shadow-xl text-white font-medium text-xs flex items-center gap-2 transform translate-y-2 opacity-0 transition-all duration-300 pointer-events-auto max-w-sm ${
-      type === "success" ? "bg-emerald-600 border border-emerald-500" : "bg-rose-600 border border-rose-500"
-    }`;
-    toast.innerHTML = `
-      <span class="material-symbols-outlined">${type === 'success' ? 'check_circle' : 'cancel'}</span>
-      <span>${message}</span>
-    `;
-    
-    container.appendChild(toast);
-    
-    // Trigger animation
-    setTimeout(() => {
-      toast.classList.remove("translate-y-2", "opacity-0");
-    }, 10);
-    
-    // Auto dismiss after 5 seconds
-    setTimeout(() => {
-      toast.classList.add("translate-y-2", "opacity-0");
-      setTimeout(() => toast.remove(), 300);
-    }, 5000);
-  }
-
   async function loadActiveFoodOrders() {
     const tracker = document.getElementById("active-food-orders");
     const list = document.getElementById("active-orders-list");
@@ -2605,25 +2960,7 @@
       const res = await fetch("/api/food/my-orders");
       if (res.ok) {
         const allOrders = await res.json();
-        
-        // Show notification toast for accepted (preparing) or declined orders
-        allOrders.forEach(o => {
-          if (o.status === "preparing") {
-            const key = `notified_order_${o.id}_preparing`;
-            if (!localStorage.getItem(key)) {
-              showToastNotification(`🎉 ${o.restaurant_name} accepted your order!`, "success");
-              localStorage.setItem(key, "true");
-            }
-          } else if (o.status === "declined") {
-            const key = `notified_order_${o.id}_declined`;
-            if (!localStorage.getItem(key)) {
-              showToastNotification(`❌ ${o.restaurant_name} rejected your order.`, "error");
-              localStorage.setItem(key, "true");
-            }
-          }
-        });
-
-        const orders = allOrders.filter(o => ["pending", "paid", "preparing", "ready"].includes(o.status));
+        const orders = allOrders.filter(o => ["paid", "preparing", "ready"].includes(o.status));
         if (orders.length === 0) {
           tracker.classList.add("hidden");
           return;
@@ -2632,21 +2969,8 @@
         tracker.classList.remove("hidden");
         list.innerHTML = orders.map(o => {
           let statusColor = "bg-blue-50 text-blue-700 border-blue-200";
-          let statusText = o.status;
-          
-          if (o.status === "pending") {
-            statusColor = "bg-indigo-50 text-indigo-700 border-indigo-200 animate-pulse";
-            statusText = "Pending Approval";
-          } else if (o.status === "preparing") {
-            statusColor = "bg-amber-50 text-amber-700 border-amber-200";
-            statusText = "Preparing Order";
-          } else if (o.status === "ready") {
-            statusColor = "bg-green-50 text-green-700 border-green-200";
-            statusText = "Ready for Pickup";
-          } else if (o.status === "paid") {
-            statusColor = "bg-sky-50 text-sky-700 border-sky-200";
-            statusText = "Accepted / Paid";
-          }
+          if (o.status === "preparing") statusColor = "bg-amber-50 text-amber-700 border-amber-200";
+          if (o.status === "ready") statusColor = "bg-green-50 text-green-700 border-green-200";
 
           return `
             <div class="border border-slate-200 rounded-xl p-4 bg-slate-50 text-left space-y-3">
@@ -2655,7 +2979,7 @@
                   <strong class="text-xs text-slate-800">${o.restaurant_name}</strong>
                   <span class="text-[9px] text-slate-400 block">Order #${o.id}</span>
                 </div>
-                <span class="text-[9px] font-bold px-2 py-0.5 rounded-full border ${statusColor} uppercase">${statusText}</span>
+                <span class="text-[9px] font-bold px-2 py-0.5 rounded-full border ${statusColor} uppercase">${o.status}</span>
               </div>
               <div class="text-[10px] text-slate-600">
                 ${o.items.map(i => `${i.name} (x${i.quantity})`).join(", ")}
@@ -2707,7 +3031,7 @@
   document.addEventListener('DOMContentLoaded', () => {
     loadAllHotels();
     
-    const travelMode = "{{ trip.travel_mode }}";
+    const travelMode = "own_vehicle";
     if (travelMode === 'bus') {
       loadTransitOptions('bus', 'buses-container');
     } else if (travelMode === 'train') {
@@ -2724,4 +3048,936 @@
     }
   });
 </script>
-{% endblock %}
+
+  </main>
+
+  <!-- Global Tracking Modal Popup -->
+  <div id="tracking-modal-overlay" style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 9999; opacity: 0; transition: opacity 0.2s ease;">
+    <div style="background: #fff; border-radius: 16px; max-width: 700px; width: 90%; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.25);">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #eee;">
+        <h3 style="margin: 0; color: #1a1a1a; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px;">🚖 Live Cab Tracking</h3>
+        <button onclick="closeTrackingModal()" style="background: none; border: none; font-size: 24px; color: #888; cursor: pointer; padding: 4px; line-height: 1;">&times;</button>
+      </div>
+      <div style="position: relative; flex: 1; min-height: 380px;">
+        <div id="tracking-map" style="width: 100%; height: 400px; background: #f8fafc;"></div>
+        
+        <!-- Live HUD Info -->
+        <div id="tracking-hud" style="position: absolute; bottom: 16px; left: 16px; right: 16px; background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border: 1px solid rgba(0,0,0,0.06); border-radius: 12px; padding: 12px 16px; z-index: 1000; box-shadow: 0 4px 20px rgba(0,0,0,0.15); display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <div id="tracking-status-title" style="font-size: 11px; color: #1D9E75; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Driver Enroute</div>
+            <div id="tracking-hud-eta" style="font-size: 14px; font-weight: 700; color: #1a1a1a; margin-top: 2px;">Calculating route...</div>
+          </div>
+          <div style="font-size: 24px; animation: bounce 1.5s infinite;">🚖</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Global Driver Alert Toast -->
+  <div id="driver-alert-toast" style="position: fixed; bottom: 24px; right: 24px; background: linear-gradient(135deg, #10b981, #059669); color: #fff; padding: 16px 20px; border-radius: 12px; display: none; align-items: center; gap: 16px; z-index: 9998; box-shadow: 0 10px 25px rgba(0,0,0,0.15); transform: translateY(100px); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s; opacity: 0; max-width: 380px;">
+    <div style="font-size: 24px; flex-shrink: 0;">🚖</div>
+    <div style="flex: 1;">
+      <div style="font-weight: 700; font-size: 13.5px; margin-bottom: 2px;" id="toast-title">Your driver is on the way!</div>
+      <div style="font-size: 12px; color: rgba(255,255,255,0.9); line-height: 1.4;" id="toast-body">Ready for a wonderful trip. Track your driver's live location now.</div>
+      <div style="margin-top: 10px; display: flex; gap: 8px;">
+        <button id="btn-toast-track" style="background: #fff; color: #059669; border: none; border-radius: 6px; padding: 6px 12px; font-size: 11.5px; font-weight: 700; cursor: pointer; transition: all 0.2s;" onclick="triggerToastTracking()">Track Cab</button>
+        <button style="background: rgba(255,255,255,0.2); color: #fff; border: none; border-radius: 6px; padding: 6px 12px; font-size: 11.5px; font-weight: 600; cursor: pointer;" onclick="closeToast()">Dismiss</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function initSidebar() {
+      const toggleBtn = document.getElementById("sidebar-toggle");
+      const closeBtn = document.getElementById("sidebar-close");
+      const sidebarMenu = document.getElementById("sidebar-menu");
+      const backdrop = document.getElementById("sidebar-backdrop");
+
+      function openSidebar() {
+        sidebarMenu.classList.add("active");
+        backdrop.classList.add("active");
+        document.body.style.overflow = "hidden";
+      }
+
+      function closeSidebar() {
+        sidebarMenu.classList.remove("active");
+        backdrop.classList.remove("active");
+        document.body.style.overflow = "";
+      }
+
+      if (toggleBtn && sidebarMenu && backdrop) {
+        toggleBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          openSidebar();
+        });
+      }
+
+      if (closeBtn) {
+        closeBtn.addEventListener("click", closeSidebar);
+      }
+
+      if (backdrop) {
+        backdrop.addEventListener("click", closeSidebar);
+      }
+
+      // Highlight active sidebar link
+      const currentPath = window.location.pathname;
+      const sidebarLinks = document.querySelectorAll(".sidebar-link");
+      sidebarLinks.forEach(link => {
+        if (link.getAttribute("href") === currentPath) {
+          link.classList.add("active");
+        }
+      });
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", initSidebar);
+    } else {
+      initSidebar();
+    }
+
+    
+    // Floating Chatbot Widget Toggle and API handlers
+    function initFloatingWidgets() {
+      const chatbotFab = document.getElementById("chatbot-fab");
+      const chatbotCard = document.getElementById("floating-chatbot-card");
+      const chatbotClose = document.getElementById("floating-chatbot-close");
+
+      const inboxFab = document.getElementById("inbox-fab");
+      const inboxCard = document.getElementById("floating-inbox-card");
+      const inboxClose = document.getElementById("floating-inbox-close");
+
+      if (chatbotFab && chatbotCard && chatbotClose) {
+        chatbotFab.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (inboxCard) {
+            inboxCard.classList.remove("active");
+            document.body.classList.remove("inbox-open");
+          }
+          chatbotCard.classList.toggle("active");
+          document.body.classList.toggle("chatbot-open", chatbotCard.classList.contains("active"));
+        });
+
+        chatbotClose.addEventListener("click", () => {
+          chatbotCard.classList.remove("active");
+          document.body.classList.remove("chatbot-open");
+        });
+
+        document.addEventListener("click", (e) => {
+          if (!chatbotCard.contains(e.target) && !chatbotFab.contains(e.target)) {
+            chatbotCard.classList.remove("active");
+            document.body.classList.remove("chatbot-open");
+          }
+        });
+      }
+
+      if (inboxFab && inboxCard && inboxClose) {
+        inboxFab.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (chatbotCard) {
+            chatbotCard.classList.remove("active");
+            document.body.classList.remove("chatbot-open");
+          }
+          inboxCard.classList.toggle("active");
+          document.body.classList.toggle("inbox-open", inboxCard.classList.contains("active"));
+          if (inboxCard.classList.contains("active")) {
+            refreshInbox();
+          }
+        });
+
+        inboxClose.addEventListener("click", () => {
+          inboxCard.classList.remove("active");
+          document.body.classList.remove("inbox-open");
+        });
+
+        document.addEventListener("click", (e) => {
+          if (!inboxCard.contains(e.target) && !inboxFab.contains(e.target)) {
+            inboxCard.classList.remove("active");
+            document.body.classList.remove("inbox-open");
+          }
+        });
+      }
+
+      // Input Enter key press listener
+      const chatInput = document.getElementById('chat-input');
+      if (chatInput) {
+        chatInput.addEventListener('keypress', function(e) {
+          if (e.key === 'Enter') sendChat();
+        });
+      }
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", initFloatingWidgets);
+    } else {
+      initFloatingWidgets();
+    }
+
+    const API = '';
+    let chatHistory = [];
+
+    function escapeHTML(str) {
+      if (str === null || str === undefined) return '';
+      return String(str).replace(/[&<>'"]/g, 
+        tag => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          "'": '&#39;',
+          '"': '&quot;'
+        }[tag] || tag)
+      );
+    }
+
+    function setButtonState(btnId, disabled, loadingText) {
+      const btn = document.getElementById(btnId);
+      if (!btn) return;
+      btn.disabled = disabled;
+      if (disabled) {
+        btn.dataset.originalText = btn.textContent;
+        btn.textContent = loadingText || 'Loading...';
+      } else if (btn.dataset.originalText) {
+        btn.textContent = btn.dataset.originalText;
+      }
+    }
+
+    function parseMarkdown(text) {
+      if (!text) return '';
+      let html = escapeHTML(text);
+      html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+      html = html.replace(/(?:^|\r?\n)\s*-\s+(.*?)(?=\r?\n|$)/g, '<div style="margin-left: 12px; padding-top: 2px;">• $1</div>');
+      html = html.replace(/\r?\n/g, '<br>');
+      return html;
+    }
+
+    function getCookie(name) {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(';').shift();
+      return null;
+    }
+
+    async function sendChat() {
+      const input = document.getElementById('chat-input');
+      const msg = input.value.trim();
+      if (!msg) return;
+
+      appendMsg(msg, 'user');
+      input.value = '';
+      appendMsg('Thinking...', 'ai', 'thinking');
+      setButtonState('chat-send-btn', true, 'Sending...');
+
+      try {
+        const token = getCookie('access_token');
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        const res = await fetch(`${API}/api/trips/chat`, {
+          method: 'POST',
+          headers: headers,
+          credentials: 'same-origin',
+          body: JSON.stringify({ message: msg, history: chatHistory })
+        });
+        if (!res.ok) {
+          throw new Error('Chat API returned error status');
+        }
+        const data = await res.json();
+        removeThinking();
+        appendMsg(data.response, 'ai');
+        chatHistory = data.history;
+      } catch (e) {
+        removeThinking();
+        appendMsg('Sorry, something went wrong. Please try again.', 'ai');
+      } finally {
+        setButtonState('chat-send-btn', false);
+      }
+    }
+
+    function appendMsg(text, role, id) {
+      const box = document.getElementById('chat-messages');
+      const div = document.createElement('div');
+      div.className = `chat-msg ${role === 'user' ? 'user-msg' : 'ai-msg'}`;
+      if (id) div.id = id;
+      if (role === 'ai') {
+        div.innerHTML = parseMarkdown(text);
+      } else {
+        div.textContent = text;
+      }
+      box.appendChild(div);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function removeThinking() {
+      const t = document.getElementById('thinking');
+      if (t) t.remove();
+    }
+    
+
+    let trackingMap = null;
+    let trackingRoutingControl = null;
+    let trackingDestRoutingControl = null;
+    let trackingDriverMarker = null;
+    let trackingPickupMarker = null;
+    let trackingDropoffMarker = null;
+    let trackingIntervalId = null;
+    let isFirstTrackingLoad = true;
+    let hasDriverReachedPickup = false;
+    
+    let activeToastBookingId = null;
+    let currentUserId = null;
+
+    function geocodeAddress(query) {
+      if (!query) return Promise.resolve(null);
+      query = query.trim();
+
+      const cacheKey = `geo_cache_${query.toLowerCase()}`;
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        try {
+          return Promise.resolve(JSON.parse(cached));
+        } catch (e) {
+          localStorage.removeItem(cacheKey);
+        }
+      }
+
+      const executeFetch = (q) => {
+        return fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}`)
+          .then(res => {
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            return res.json();
+          })
+          .then(data => {
+            if (data && data.length > 0) {
+              return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+            }
+            return null;
+          });
+      };
+
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          executeFetch(query).then(result => {
+            if (result) {
+              localStorage.setItem(cacheKey, JSON.stringify(result));
+              resolve(result);
+            } else {
+              if (query.includes(",")) {
+                const parts = query.split(",");
+                if (parts.length >= 2) {
+                  const cityContext = parts[parts.length - 1].trim();
+                  const firstPart = parts[0].trim();
+                  const fallbackQuery = `${firstPart}, ${cityContext}`;
+                  
+                  setTimeout(() => {
+                    executeFetch(fallbackQuery).then(fallbackResult => {
+                      if (fallbackResult) {
+                        localStorage.setItem(cacheKey, JSON.stringify(fallbackResult));
+                        resolve(fallbackResult);
+                      } else {
+                        if (parts.length > 2) {
+                          const secondPart = parts[1].trim();
+                          const fallbackQuery2 = `${secondPart}, ${cityContext}`;
+                          setTimeout(() => {
+                            executeFetch(fallbackQuery2).then(fallbackResult2 => {
+                              if (fallbackResult2) {
+                                localStorage.setItem(cacheKey, JSON.stringify(fallbackResult2));
+                                resolve(fallbackResult2);
+                              } else {
+                                resolve(null);
+                              }
+                            });
+                          }, 400);
+                        } else {
+                          resolve(null);
+                        }
+                      }
+                    });
+                  }, 400);
+                } else {
+                  resolve(null);
+                }
+              } else {
+                resolve(null);
+              }
+            }
+          }).catch(err => {
+            console.warn("Geocoding fetch error:", err);
+            resolve(null);
+          });
+        }, Math.random() * 400);
+      });
+    }
+
+    
+    currentUserId = "1";
+    
+    // Check for enroute bookings on page load and poll periodically
+    window.addEventListener("DOMContentLoaded", () => {
+      checkEnrouteBookings();
+      refreshInbox();
+      // Poll every 10 seconds for driver status and inbox updates
+      setInterval(() => {
+        checkEnrouteBookings();
+        refreshInbox();
+      }, 10000);
+    });
+    
+
+    async function checkEnrouteBookings() {
+      if (!currentUserId) return;
+      try {
+        const res = await fetch(`/api/provider/bookings/active-enroute?user_id=${currentUserId}`);
+        if (!res.ok) return;
+        const bookings = await res.json();
+        
+        if (bookings && bookings.length > 0) {
+          const booking = bookings[0]; // focus on the first active enroute booking
+          activeToastBookingId = booking.id;
+
+          // Ensure red dot is shown on My Bookings
+          let dot = document.querySelector("#nav-my-bookings-link .unread-dot");
+          if (!dot) {
+            dot = document.createElement("span");
+            dot.className = "unread-dot";
+            dot.style.cssText = "position: absolute; top: 50%; right: 16px; transform: translateY(-50%); width: 8px; height: 8px; background: #ff4d4f; border-radius: 50%;";
+            document.getElementById("nav-my-bookings-link").appendChild(dot);
+          }
+
+          // Customize toast text
+          const title = document.getElementById("toast-title");
+          const body = document.getElementById("toast-body");
+          if (booking.navigation_status === "trip_started") {
+            title.textContent = "Your vehicle is ready!";
+            body.innerHTML = `Your vehicle <strong>${booking.vehicle_name || 'xyz'}</strong> is ready to go, get to your pickup point on time.`;
+          } else {
+            title.textContent = "Your driver is on the way!";
+            body.textContent = "Ready for a wonderful trip. Track your driver's live location now.";
+          }
+
+          // Show Toast notification if tracking modal is not open
+          const modalOverlay = document.getElementById("tracking-modal-overlay");
+          const toast = document.getElementById("driver-alert-toast");
+          if (modalOverlay.style.display !== "flex" && toast.style.display !== "flex") {
+            toast.style.display = "flex";
+            setTimeout(() => {
+              toast.style.opacity = "1";
+              toast.style.transform = "translateY(0)";
+            }, 50);
+          }
+        }
+
+      } catch (err) {
+        console.warn("Failed to check enroute bookings:", err);
+      }
+    }
+
+    function triggerToastTracking() {
+      if (activeToastBookingId) {
+        openTrackingModal(activeToastBookingId);
+      }
+    }
+
+    function closeToast() {
+      const toast = document.getElementById("driver-alert-toast");
+      if (toast) {
+        toast.style.opacity = "0";
+        toast.style.transform = "translateY(100px)";
+        setTimeout(() => {
+          toast.style.display = "none";
+        }, 300);
+      }
+    }
+
+    function openTrackingModal(bookingId) {
+      closeToast();
+      isFirstTrackingLoad = true;
+      hasDriverReachedPickup = false;
+
+      const overlay = document.getElementById("tracking-modal-overlay");
+      overlay.style.display = "flex";
+      setTimeout(() => {
+        overlay.style.opacity = "1";
+      }, 50);
+
+      // Initialize Leaflet Map if not done
+      setTimeout(() => {
+        if (!trackingMap) {
+          trackingMap = L.map('tracking-map').setView([26.9124, 75.7873], 13);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+          }).addTo(trackingMap);
+        } else {
+          clearTrackingLayers();
+        }
+
+        // Fetch first payload
+        fetchTrackingData(bookingId);
+        
+        // Start polling tracking payload every 5 seconds
+        if (trackingIntervalId) clearInterval(trackingIntervalId);
+        trackingIntervalId = setInterval(() => fetchTrackingData(bookingId), 5000);
+      }, 200);
+    }
+
+    async function fetchTrackingData(bookingId) {
+      try {
+        const res = await fetch(`/api/provider/bookings/${bookingId}/track`);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        // Resolve Pickup LatLng (either direct or client-side geocoding fallback)
+        let pickupLatLng = null;
+        if (data.pickup_lat && data.pickup_lon) {
+          pickupLatLng = L.latLng(data.pickup_lat, data.pickup_lon);
+        } else if (data.pickup_name) {
+          let query = data.pickup_name;
+          if (data.origin && !query.toLowerCase().includes(data.origin.toLowerCase())) {
+            query += `, ${data.origin}`;
+          }
+          const coord = await geocodeAddress(query);
+          if (coord) {
+            pickupLatLng = L.latLng(coord.lat, coord.lon);
+          }
+        }
+
+        // Resolve Drop-off LatLng (either direct or client-side geocoding fallback)
+        let dropoffLatLng = null;
+        if (data.dropoff_lat && data.dropoff_lon) {
+          dropoffLatLng = L.latLng(data.dropoff_lat, data.dropoff_lon);
+        } else if (data.dropoff_name) {
+          let query = data.dropoff_name;
+          const suffix = data.destination || data.origin;
+          if (suffix && !query.toLowerCase().includes(suffix.toLowerCase())) {
+            query += `, ${suffix}`;
+          }
+          const coord = await geocodeAddress(query);
+          if (coord) {
+            dropoffLatLng = L.latLng(coord.lat, coord.lon);
+          }
+        }
+
+        // Fallback to vehicle's destination city
+        if (!dropoffLatLng && data.destination) {
+          const coord = await geocodeAddress(data.destination);
+          if (coord) {
+            dropoffLatLng = L.latLng(coord.lat, coord.lon);
+          }
+        }
+
+        let driverLatLng = (data.driver_lat && data.driver_lon) ? L.latLng(data.driver_lat, data.driver_lon) : null;
+        if (!driverLatLng && data.origin) {
+          const coord = await geocodeAddress(data.origin);
+          if (coord) {
+            driverLatLng = L.latLng(coord.lat, coord.lon);
+          }
+        }
+
+
+        const statusTitle = document.getElementById("tracking-status-title");
+        const hudEta = document.getElementById("tracking-hud-eta");
+
+        if (data.status === "cancelled") {
+          statusTitle.textContent = "Booking Cancelled";
+          statusTitle.style.color = "#ef4444";
+          hudEta.textContent = "This booking has been cancelled.";
+          closeTrackingModal();
+          return;
+        }
+
+        if (data.navigation_status === "trip_started") {
+          statusTitle.textContent = "Trip Started";
+          statusTitle.style.color = "#FF6B35";
+          hudEta.textContent = "Vehicle is on the way to pick you up.";
+        } else if (data.navigation_status === "enroute") {
+          statusTitle.textContent = "Driver Enroute";
+          statusTitle.style.color = "#1D9E75";
+          hudEta.textContent = "Calculating route...";
+        } else {
+          statusTitle.textContent = "Driver Status";
+          hudEta.textContent = "Driver is preparing your cab...";
+        }
+
+
+        // Markers
+        if (pickupLatLng && !trackingPickupMarker) {
+          const pickupIcon = L.divIcon({ html:`<div style="background:#1DB954;color:#fff;padding:4px 8px;border-radius:4px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.2);transform: translate(-50%, -50%);">📥 Pickup: ${data.pickup_name || 'Passenger'}</div>`, className:'', iconSize:[null,22] });
+          trackingPickupMarker = L.marker(pickupLatLng, { icon: pickupIcon }).addTo(trackingMap);
+        }
+
+        if (hasDriverReachedPickup && dropoffLatLng) {
+          if (!trackingDropoffMarker) {
+            const destIcon = L.divIcon({ html:`<div style="background:#ef4444;color:#fff;padding:4px 8px;border-radius:4px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.2);transform: translate(-50%, -50%);">🏁 Drop-off: ${data.dropoff_name || data.destination || 'Destination'}</div>`, className:'', iconSize:[null,22] });
+            trackingDropoffMarker = L.marker(dropoffLatLng, { icon: destIcon }).addTo(trackingMap);
+          }
+        } else {
+          if (trackingDropoffMarker) {
+            trackingMap.removeLayer(trackingDropoffMarker);
+            trackingDropoffMarker = null;
+          }
+        }
+
+        if (driverLatLng) {
+          const driverIcon = L.divIcon({ html:`<div style="font-size:28px; transform: translate(-50%, -50%);">🚖</div>`, className:'', iconSize:[28,28] });
+          if (!trackingDriverMarker) {
+            trackingDriverMarker = L.marker(driverLatLng, { icon: driverIcon }).addTo(trackingMap);
+          } else {
+            trackingDriverMarker.setLatLng(driverLatLng);
+          }
+        }
+
+        // Check if driver has reached/passed pickup
+        if (driverLatLng && pickupLatLng && dropoffLatLng && !hasDriverReachedPickup) {
+          const distToPickup = trackingMap.distance(driverLatLng, pickupLatLng);
+          const distToDestination = trackingMap.distance(driverLatLng, dropoffLatLng);
+          const pickupToDestination = trackingMap.distance(pickupLatLng, dropoffLatLng);
+
+          if (distToPickup < 150 || distToDestination < (pickupToDestination - 150)) {
+            hasDriverReachedPickup = true;
+            isFirstTrackingLoad = true; // Trigger map refit for the whole route!
+          }
+        } else if (driverLatLng && pickupLatLng && !hasDriverReachedPickup) {
+          const distToPickup = trackingMap.distance(driverLatLng, pickupLatLng);
+          if (distToPickup < 150) {
+            hasDriverReachedPickup = true;
+            isFirstTrackingLoad = true; // Trigger map refit for the whole route!
+          }
+        }
+
+        // Route calculation and map centering
+        const activeCoords = [];
+        if (driverLatLng) activeCoords.push(driverLatLng);
+        if (pickupLatLng) activeCoords.push(pickupLatLng);
+        if (hasDriverReachedPickup && dropoffLatLng) activeCoords.push(dropoffLatLng);
+
+        // 1. Segment 1: Driver to Pickup (only shown before reaching pickup)
+        if (driverLatLng && pickupLatLng && !hasDriverReachedPickup) {
+          if (trackingRoutingControl) {
+            trackingRoutingControl.setWaypoints([driverLatLng, pickupLatLng]);
+          } else {
+            trackingRoutingControl = L.Routing.control({
+              waypoints: [driverLatLng, pickupLatLng],
+              routeWhileDragging: false,
+              addWaypoints: false,
+              createMarker: () => null,
+              fitSelectedRoutes: false,
+              router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1', profile: 'driving' }),
+              lineOptions: { styles: [{ color: '#FF6B35', opacity:0.85, weight:6 }] }
+            }).addTo(trackingMap);
+
+            trackingRoutingControl.on('routeselected', function(e) {
+              const route = e.route;
+              const distKm = (route.summary.totalDistance / 1000).toFixed(1);
+              const durMins = Math.round(route.summary.totalTime / 60);
+              hudEta.textContent = `Driver is ${distKm} km away (approx. ${durMins} mins)`;
+            });
+          }
+        } else {
+          if (trackingRoutingControl) {
+            trackingMap.removeControl(trackingRoutingControl);
+            trackingRoutingControl = null;
+          }
+        }
+
+        // 2. Segment 2: Pickup to Destination (only shown once reaching pickup)
+        //    Always route through the pickup point so the line covers the pickup marker
+        if (hasDriverReachedPickup && pickupLatLng && dropoffLatLng) {
+          const waypts = driverLatLng ? [driverLatLng, pickupLatLng, dropoffLatLng] : [pickupLatLng, dropoffLatLng];
+          if (trackingDestRoutingControl) {
+            trackingDestRoutingControl.setWaypoints(waypts);
+          } else {
+            trackingDestRoutingControl = L.Routing.control({
+              waypoints: waypts,
+              routeWhileDragging: false,
+              addWaypoints: false,
+              createMarker: () => null,
+              fitSelectedRoutes: false,
+              router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1', profile: 'driving' }),
+              lineOptions: { styles: [{ color: '#3b82f6', opacity:0.75, weight:5, dashArray: '10, 5' }] }
+            }).addTo(trackingMap);
+
+            trackingDestRoutingControl.on('routeselected', function(e) {
+              const route = e.route;
+              const distKm = (route.summary.totalDistance / 1000).toFixed(1);
+              const durMins = Math.round(route.summary.totalTime / 60);
+              hudEta.textContent = `Heading to destination: ${distKm} km away (approx. ${durMins} mins)`;
+            });
+          }
+        } else {
+          if (trackingDestRoutingControl) {
+            trackingMap.removeControl(trackingDestRoutingControl);
+            trackingDestRoutingControl = null;
+          }
+        }
+
+        // Centering bounds (executed only on initial load to prevent resetting user zoom/pan)
+        if (isFirstTrackingLoad) {
+          if (activeCoords.length >= 2) {
+            const bounds = L.latLngBounds(activeCoords);
+            trackingMap.fitBounds(bounds, { padding: [50, 50] });
+            isFirstTrackingLoad = false;
+          } else if (driverLatLng) {
+            trackingMap.setView(driverLatLng, 14);
+            isFirstTrackingLoad = false;
+          } else if (pickupLatLng) {
+            trackingMap.setView(pickupLatLng, 14);
+            isFirstTrackingLoad = false;
+          } else {
+            // Fallback to geocode vehicle origin
+            if (data.origin) {
+              geocodeAddress(data.origin).then(coord => {
+                if (coord && trackingMap && isFirstTrackingLoad) {
+                  trackingMap.setView(L.latLng(coord.lat, coord.lon), 12);
+                  isFirstTrackingLoad = false;
+                }
+              });
+            }
+          }
+        }
+
+        // Update ETA status text on every poll if routing control is not active
+        if (!driverLatLng && pickupLatLng) {
+          hudEta.textContent = "Waiting for driver to share live location...";
+        } else if (!driverLatLng && !pickupLatLng) {
+          hudEta.textContent = "Waiting for driver location updates...";
+        } else if (driverLatLng && !pickupLatLng) {
+          hudEta.textContent = "Driver is enroute.";
+        }
+
+      } catch (err) {
+        console.warn("Error fetching tracking data:", err);
+      }
+    }
+
+    function clearTrackingLayers() {
+      if (trackingRoutingControl) {
+        trackingMap.removeControl(trackingRoutingControl);
+        trackingRoutingControl = null;
+      }
+      if (trackingDestRoutingControl) {
+        trackingMap.removeControl(trackingDestRoutingControl);
+        trackingDestRoutingControl = null;
+      }
+      if (trackingDriverMarker) {
+        trackingMap.removeLayer(trackingDriverMarker);
+        trackingDriverMarker = null;
+      }
+      if (trackingPickupMarker) {
+        trackingMap.removeLayer(trackingPickupMarker);
+        trackingPickupMarker = null;
+      }
+      if (trackingDropoffMarker) {
+        trackingMap.removeLayer(trackingDropoffMarker);
+        trackingDropoffMarker = null;
+      }
+    }
+
+    function closeTrackingModal() {
+      const overlay = document.getElementById("tracking-modal-overlay");
+      overlay.style.opacity = "0";
+      setTimeout(() => {
+        overlay.style.display = "none";
+      }, 200);
+
+      if (trackingIntervalId) {
+        clearInterval(trackingIntervalId);
+        trackingIntervalId = null;
+      }
+      clearTrackingLayers();
+    }
+
+    async function refreshInbox() {
+      if (!currentUserId) return;
+      const listContainer = document.getElementById("inbox-updates-list");
+      const badge = document.getElementById("inbox-badge");
+      if (!listContainer) return;
+
+      try {
+        // Fetch provider cab bookings
+        const cabRes = await fetch("/api/provider/bookings/user");
+        let cabs = [];
+        if (cabRes.ok) {
+          cabs = await cabRes.json();
+        }
+
+        // Fetch transit bookings
+        const transitRes = await fetch("/api/transport/bookings");
+        let transits = [];
+        if (transitRes.ok) {
+          transits = await transitRes.json();
+        }
+
+        let allUpdates = [];
+
+        // Format cab updates
+        cabs.forEach(b => {
+          if (b.status === 'cancelled') return;
+          
+          let update = {
+            id: b.id,
+            type: 'cab',
+            created_at: b.created_at || new Date().toISOString(),
+            title: '',
+            body: '',
+            status: b.navigation_status,
+            trackable: (b.navigation_status === 'enroute' || b.navigation_status === 'trip_started'),
+            timeStr: b.travel_date
+          };
+
+          if (b.navigation_status === 'trip_started') {
+            update.title = "🚖 Vehicle is Ready!";
+            update.body = `Your vehicle <strong>${b.vehicle_name || 'Cab'}</strong> is ready to depart. Please proceed to your pickup point.`;
+          } else if (b.navigation_status === 'enroute') {
+            update.title = "🚖 Driver is En Route";
+            update.body = `Your driver for <strong>${b.vehicle_name || 'Cab'}</strong> is on the way to pick you up. Track live location below.`;
+          } else {
+            update.title = "✅ Cab Booking Confirmed";
+            update.body = `Your ride with <strong>${b.vehicle_name || 'Cab'}</strong> is confirmed from ${b.pickup_location?.split('|||')[0] || 'Origin'} to ${b.dropoff_location?.split('|||')[0] || 'Destination'}.`;
+          }
+          allUpdates.push(update);
+        });
+
+        // Format transit updates
+        transits.forEach(b => {
+          if (b.status === 'cancelled') return;
+
+          let modeIcon = b.mode === 'flight' ? '✈️' : b.mode === 'train' ? '🚂' : '🚌';
+          let title = `${modeIcon} ${b.mode.toUpperCase()} Ticket Confirmed`;
+          let body = `Your ticket with <strong>${b.transport_option_operator || 'Operator'}</strong> is confirmed. Seats: ${b.selected_seats || 'Auto-Assigned'}.`;
+
+          allUpdates.push({
+            id: b.id,
+            type: 'transit',
+            created_at: b.created_at || new Date().toISOString(),
+            title: title,
+            body: body,
+            trackable: false,
+            timeStr: b.travel_date || ''
+          });
+        });
+
+        // Sort by created_at desc (prioritizing enroute)
+        allUpdates.sort((a, b) => {
+          if (a.trackable && !b.trackable) return -1;
+          if (!a.trackable && b.trackable) return 1;
+          return new Date(b.created_at) - new Date(a.created_at);
+        });
+
+        // Read seen status from localStorage
+        let readIds = JSON.parse(localStorage.getItem("read_booking_ids") || "[]");
+        let unreadCount = 0;
+
+        // Render list
+        if (allUpdates.length === 0) {
+          listContainer.innerHTML = `
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-muted);padding:40px;text-align:center;gap:12px;">
+              <span class="material-symbols-outlined" style="font-size: 48px; color: #cbd5e1;">notifications_off</span>
+              <div style="font-weight:700;font-size:14px;">Your inbox is clean</div>
+              <div style="font-size:11px;">No active booking confirmations or travel updates at the moment.</div>
+            </div>
+          `;
+          if (badge) badge.style.display = "none";
+        } else {
+          let html = "";
+          allUpdates.forEach(up => {
+            let key = `${up.type}_${up.id}`;
+            let isUnread = !readIds.includes(key);
+            if (isUnread) {
+              unreadCount++;
+            }
+
+            let unreadDot = isUnread ? `
+              <span class="unread-dot-badge" style="width: 8px; height: 8px; background: #3b82f6; border-radius: 50%; display: inline-block; margin-left: 6px; box-shadow: 0 0 8px #3b82f6;"></span>
+            ` : "";
+
+            let buttonHTML = up.trackable ? `
+              <button class="btn-primary" style="margin-top: 10px; padding: 6px 12px; font-size: 11px; border-radius: 6px; background: #10b981; border: none; font-weight: 700; color: #fff; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" onclick="openTrackingModal(${up.id})">
+                <span class="material-symbols-outlined" style="font-size: 14px;">distance</span> Track Cab
+              </button>
+            ` : "";
+
+            let badgeBg = up.trackable ? 'rgba(16,185,129,0.1)' : 'var(--primary-light)';
+            let badgeColor = up.trackable ? '#10b981' : 'var(--primary)';
+
+            html += `
+              <div class="inbox-update-card" style="padding: 16px; border-bottom: 1px solid var(--border-color); background: ${isUnread ? '#f8fafc' : 'var(--surface)'}; display: flex; flex-direction: column; gap: 4px; transition: var(--transition); border-left: 4px solid ${isUnread ? '#3b82f6' : 'transparent'};">
+                <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+                  <span style="font-weight: 700; font-size: 13px; color: var(--text-main); display: flex; align-items: center;">${up.title}${unreadDot}</span>
+                  <span style="font-size: 10px; font-weight: 700; padding: 2px 6px; background: ${badgeBg}; color: ${badgeColor}; border-radius: 4px;">${up.timeStr || 'Active'}</span>
+                </div>
+                <p style="font-size: 12px; color: var(--text-muted); margin: 0; line-height: 1.4;">${up.body}</p>
+                ${buttonHTML}
+              </div>
+            `;
+          });
+          listContainer.innerHTML = html;
+
+          if (badge) {
+            if (unreadCount > 0) {
+              badge.textContent = unreadCount;
+              badge.style.display = "flex";
+            } else {
+              badge.style.display = "none";
+            }
+          }
+
+          // If inbox card is active, automatically mark all as read
+          const inboxCard = document.getElementById("floating-inbox-card");
+          if (inboxCard && inboxCard.classList.contains("active")) {
+            setTimeout(() => {
+              let updatedReadIds = JSON.parse(localStorage.getItem("read_booking_ids") || "[]");
+              let newlyRead = false;
+              allUpdates.forEach(up => {
+                let key = `${up.type}_${up.id}`;
+                if (!updatedReadIds.includes(key)) {
+                  updatedReadIds.push(key);
+                  newlyRead = true;
+                }
+              });
+              if (newlyRead) {
+                localStorage.setItem("read_booking_ids", JSON.stringify(updatedReadIds));
+                // Clear the count badge immediately
+                if (badge) badge.style.display = "none";
+              }
+            }, 1500); // 1.5s delay to let user see new updates before marking as read
+          }
+        }
+
+      } catch (e) {
+        console.error("Error refreshing inbox:", e);
+      }
+    }
+
+    window.showBookingConfirmationModal = function(title, message) {
+      const modal = document.getElementById("booking-success-modal");
+      const card = document.getElementById("booking-success-card");
+      document.getElementById("success-modal-title").textContent = title;
+      document.getElementById("success-modal-message").innerHTML = message;
+      
+      modal.style.display = "flex";
+      setTimeout(() => {
+        modal.style.opacity = "1";
+        if (card) card.style.transform = "scale(1)";
+      }, 50);
+
+      // Trigger inbox refresh immediately
+      refreshInbox();
+    };
+
+    window.closeSuccessModal = function() {
+      const modal = document.getElementById("booking-success-modal");
+      const card = document.getElementById("booking-success-card");
+      modal.style.opacity = "0";
+      if (card) card.style.transform = "scale(0.9)";
+      setTimeout(() => {
+        modal.style.display = "none";
+        if (typeof window.onSuccessModalClose === 'function') {
+          window.onSuccessModalClose();
+          window.onSuccessModalClose = null;
+        }
+      }, 300);
+    };
+  </script>
+</body>
+</html>

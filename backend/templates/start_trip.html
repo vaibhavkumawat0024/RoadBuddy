@@ -2246,110 +2246,72 @@
     updateSeatSummary();
 
     let layoutHTML = "";
-    const vType = (vehicleType || "sedan").toLowerCase();
+    const use4Cols = totalSeats <= 15;
+    const gridCols = use4Cols ? 4 : 5;
+    grid.style.gridTemplateColumns = `repeat(${gridCols}, 1fr)`;
 
-    if (vType === "sedan" || vType === "hatchback" || totalSeats <= 4) {
-      // 4-Seater Car Layout
-      grid.style.gridTemplateColumns = "repeat(3, 1fr)";
-      
-      // Row 1: Co-driver (Seat 1), Empty, Driver
+    // Row 1: Front seats and Driver Steering Wheel
+    if (use4Cols) {
       layoutHTML += createSeatHTML("1", farePerSeat, bookedSeatsList);
       layoutHTML += `<div></div>`;
-      layoutHTML += `<div class="steering-wheel" style="width: 44px; height: 44px; background: #e2e8f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px;">🛞</div>`;
-
-      // Row 2: Back Passenger Seats (Seat 2, 3, 4)
-      layoutHTML += createSeatHTML("2", farePerSeat, bookedSeatsList);
-      layoutHTML += createSeatHTML("3", farePerSeat, bookedSeatsList);
-      layoutHTML += createSeatHTML("4", farePerSeat, bookedSeatsList);
-      
-    } else if (vType === "suv" || (totalSeats > 4 && totalSeats <= 7)) {
-      // 6-Seater SUV Layout
-      grid.style.gridTemplateColumns = "repeat(3, 1fr)";
-      
-      // Row 1: Front Co-driver, Empty, Driver
-      layoutHTML += createSeatHTML("1", farePerSeat, bookedSeatsList);
       layoutHTML += `<div></div>`;
       layoutHTML += `<div class="steering-wheel" style="width: 44px; height: 44px; background: #e2e8f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px;">🛞</div>`;
-
-      // Row 2: Middle seats (2, 3, 4)
-      layoutHTML += createSeatHTML("2", farePerSeat, bookedSeatsList);
-      layoutHTML += createSeatHTML("3", farePerSeat, bookedSeatsList);
-      layoutHTML += createSeatHTML("4", farePerSeat, bookedSeatsList);
-
-      // Row 3: Back seats (5, 6)
-      layoutHTML += createSeatHTML("5", farePerSeat, bookedSeatsList);
-      layoutHTML += `<div></div>`;
-      layoutHTML += createSeatHTML("6", farePerSeat, bookedSeatsList);
-      
     } else {
-      // Bus / Traveller Layout
-      const use4Cols = totalSeats <= 15;
-      const gridCols = use4Cols ? 4 : 5;
-      grid.style.gridTemplateColumns = `repeat(${gridCols}, 1fr)`;
+      layoutHTML += createSeatHTML("1", farePerSeat, bookedSeatsList);
+      layoutHTML += createSeatHTML("2", farePerSeat, bookedSeatsList);
+      layoutHTML += `<div></div>`;
+      layoutHTML += `<div></div>`;
+      layoutHTML += `<div class="steering-wheel" style="width: 44px; height: 44px; background: #e2e8f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px;">🛞</div>`;
+    }
 
-      // Row 1: Front seats and Driver Steering Wheel
+    // Generate rows
+    let seatNum = use4Cols ? 2 : 3;
+    const rowCount = Math.ceil((totalSeats - 1) / (gridCols - 1));
+
+    for (let r = 1; r <= rowCount; r++) {
       if (use4Cols) {
-        layoutHTML += createSeatHTML("1", farePerSeat, bookedSeatsList);
-        layoutHTML += `<div></div>`;
-        layoutHTML += `<div></div>`;
-        layoutHTML += `<div class="steering-wheel" style="width: 44px; height: 44px; background: #e2e8f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px;">🛞</div>`;
+        // 2 + Aisle + 1 layout
+        if (seatNum <= totalSeats) {
+          layoutHTML += createSeatHTML(seatNum.toString(), farePerSeat, bookedSeatsList);
+          seatNum++;
+        } else { layoutHTML += "<div></div>"; }
+        
+        if (seatNum <= totalSeats) {
+          layoutHTML += createSeatHTML(seatNum.toString(), farePerSeat, bookedSeatsList);
+          seatNum++;
+        } else { layoutHTML += "<div></div>"; }
+
+        // Aisle
+        layoutHTML += "<div></div>";
+
+        if (seatNum <= totalSeats) {
+          layoutHTML += createSeatHTML(seatNum.toString(), farePerSeat, bookedSeatsList);
+          seatNum++;
+        } else { layoutHTML += "<div></div>"; }
       } else {
-        layoutHTML += createSeatHTML("1", farePerSeat, bookedSeatsList);
-        layoutHTML += createSeatHTML("2", farePerSeat, bookedSeatsList);
-        layoutHTML += `<div></div>`;
-        layoutHTML += `<div></div>`;
-        layoutHTML += `<div class="steering-wheel" style="width: 44px; height: 44px; background: #e2e8f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px;">🛞</div>`;
-      }
+        // 2 + Aisle + 2 layout
+        if (seatNum <= totalSeats) {
+          layoutHTML += createSeatHTML(seatNum.toString(), farePerSeat, bookedSeatsList);
+          seatNum++;
+        } else { layoutHTML += "<div></div>"; }
+        
+        if (seatNum <= totalSeats) {
+          layoutHTML += createSeatHTML(seatNum.toString(), farePerSeat, bookedSeatsList);
+          seatNum++;
+        } else { layoutHTML += "<div></div>"; }
 
-      // Generate rows
-      let seatNum = use4Cols ? 2 : 3;
-      const rowCount = Math.ceil((totalSeats - 1) / (gridCols - 1));
+        // Aisle
+        layoutHTML += "<div></div>";
 
-      for (let r = 1; r <= rowCount; r++) {
-        if (use4Cols) {
-          // 2 + Aisle + 1 layout
-          if (seatNum <= totalSeats) {
-            layoutHTML += createSeatHTML(seatNum.toString(), farePerSeat, bookedSeatsList);
-            seatNum++;
-          } else { layoutHTML += "<div></div>"; }
-          
-          if (seatNum <= totalSeats) {
-            layoutHTML += createSeatHTML(seatNum.toString(), farePerSeat, bookedSeatsList);
-            seatNum++;
-          } else { layoutHTML += "<div></div>"; }
-
-          // Aisle
-          layoutHTML += "<div></div>";
-
-          if (seatNum <= totalSeats) {
-            layoutHTML += createSeatHTML(seatNum.toString(), farePerSeat, bookedSeatsList);
-            seatNum++;
-          } else { layoutHTML += "<div></div>"; }
-        } else {
-          // 2 + Aisle + 2 layout
-          if (seatNum <= totalSeats) {
-            layoutHTML += createSeatHTML(seatNum.toString(), farePerSeat, bookedSeatsList);
-            seatNum++;
-          } else { layoutHTML += "<div></div>"; }
-          
-          if (seatNum <= totalSeats) {
-            layoutHTML += createSeatHTML(seatNum.toString(), farePerSeat, bookedSeatsList);
-            seatNum++;
-          } else { layoutHTML += "<div></div>"; }
-
-          // Aisle
-          layoutHTML += "<div></div>";
-
-          if (seatNum <= totalSeats) {
-            layoutHTML += createSeatHTML(seatNum.toString(), farePerSeat, bookedSeatsList);
-            seatNum++;
-          } else { layoutHTML += "<div></div>"; }
-          
-          if (seatNum <= totalSeats) {
-            layoutHTML += createSeatHTML(seatNum.toString(), farePerSeat, bookedSeatsList);
-            seatNum++;
-          } else { layoutHTML += "<div></div>"; }
-        }
+        if (seatNum <= totalSeats) {
+          layoutHTML += createSeatHTML(seatNum.toString(), farePerSeat, bookedSeatsList);
+          seatNum++;
+        } else { layoutHTML += "<div></div>"; }
+        
+        if (seatNum <= totalSeats) {
+          layoutHTML += createSeatHTML(seatNum.toString(), farePerSeat, bookedSeatsList);
+          seatNum++;
+        } else { layoutHTML += "<div></div>"; }
       }
     }
 
@@ -2670,8 +2632,11 @@
       });
       if (res.ok) {
         const data = await res.json();
-        alert('Ticket booked successfully!\nBooking Reference ID: ' + data.id);
         closeSeatModal();
+        window.showBookingConfirmationModal(
+          'Ticket Booked Successfully! 🎉',
+          `Your ticket reference ID is <strong>${data.id}</strong>. Check your inbox for booking details.`
+        );
 
         // Find the booked option details to display the ticket
         const opt = loadedTransitOptions.find(o => o.id === activeTransitOptionId);
@@ -2902,12 +2867,16 @@
         body: JSON.stringify(payload),
       });
       if (res.ok) {
-        const successMsg = isPrivateBooking 
-          ? 'Cab booked successfully!' 
-          : 'Ticket booked successfully with seats: ' + selectedSeats.join(", ");
-        alert(successMsg);
         closeSeatModal();
-        getRoutes();
+        window.onSuccessModalClose = () => {
+          getRoutes();
+        };
+        window.showBookingConfirmationModal(
+          'Cab Booked Successfully! 🎉',
+          isPrivateBooking 
+            ? 'Your private cab has been booked. Your driver is preparing the vehicle.' 
+            : `Your cab seat ticket is confirmed for seats: <strong>${selectedSeats.join(", ")}</strong>.`
+        );
       } else {
         const err = await res.json().catch(() => ({}));
         alert('Booking failed: ' + (err.detail || res.status));
