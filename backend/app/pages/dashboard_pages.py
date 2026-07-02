@@ -195,7 +195,7 @@ def delete_trip(trip_id: int, request: Request, db: Session = Depends(get_db)):
 # ---------------- TRIP ITINERARY & START TRIP ----------------
 
 @router.get("/my-trips/{trip_id}/itinerary", response_class=HTMLResponse)
-def trip_itinerary_page(trip_id: int, request: Request, db: Session = Depends(get_db)):
+async def trip_itinerary_page(trip_id: int, request: Request, db: Session = Depends(get_db)):
     user = get_user_from_cookie(request, db)
     if not user:
         return RedirectResponse("/login", status_code=303)
@@ -213,6 +213,109 @@ def trip_itinerary_page(trip_id: int, request: Request, db: Session = Depends(ge
     trip.stops = db.query(TripStop).filter(
         TripStop.trip_id == trip.id
     ).order_by(TripStop.day, TripStop.time_slot).all()
+
+    # Dynamic check: Auto-regenerate itinerary if it has only 1 day of stops but trip dates span multiple days
+    from datetime import datetime
+    try:
+        start_dt = datetime.strptime(trip.start_date, "%Y-%m-%d")
+        end_dt = datetime.strptime(trip.end_date, "%Y-%m-%d")
+        expected_days = (end_dt - start_dt).days + 1
+    except Exception:
+        expected_days = 1
+
+    unique_days = {s.day for s in trip.stops}
+    if expected_days > 1 and (len(trip.stops) < expected_days * 4 or not trip.stops):
+        from app.services.ai_planner import generate_itinerary
+        from app.schemas.schemas import TripCreate
+        from app.models.models import Vehicle
+        
+        vehicle = db.query(Vehicle).filter(Vehicle.user_id == user.id).first()
+        vehicle_info = {}
+        if vehicle:
+            vehicle_info = {
+                "fuel_type": vehicle.fuel_type,
+                "category": vehicle.category,
+                "mileage_kmpl": vehicle.mileage_kmpl
+            }
+            
+        trip_create = TripCreate(
+            origin=trip.origin,
+            destination=trip.destination,
+            origin_lat=trip.origin_lat,
+            origin_lon=trip.origin_lon,
+            destination_lat=trip.destination_lat,
+            destination_lon=trip.destination_lon,
+            start_date=trip.start_date,
+            end_date=trip.end_date,
+            budget_inr=trip.budget_inr or 5000.0,
+            travel_mode=trip.travel_mode or "own_vehicle",
+            group_type=trip.group_type or "solo",
+            num_people=trip.num_people or 1,
+            vehicle_id=str(vehicle.id) if vehicle else None
+        )
+        
+        try:
+            # Simply await the async generator function (since this endpoint is now async!)
+            trip_out = await generate_itinerary(trip_create, vehicle_info)
+            
+            # Clear old stops
+            db.query(TripStop).filter(TripStop.trip_id == trip.id).delete()
+            db.commit()
+            
+            # Insert new stops
+            for stop_data in trip_out.stops:
+                new_stop = TripStop(
+                    trip_id=trip.id,
+                    day=stop_data.day,
+                    time_slot=stop_data.time_slot,
+                    place_name=stop_data.place_name,
+                    place_type=stop_data.place_type
+                )
+                db.add(new_stop)
+            
+            # Update trip values
+            trip.fuel_cost_inr = trip_out.fuel_cost_inr
+            trip.toll_cost_inr = trip_out.toll_cost_inr
+            trip.hotel_cost_inr = trip_out.hotel_cost_inr
+            trip.food_cost_inr = trip_out.food_cost_inr
+            trip.total_cost_inr = trip_out.total_estimated_cost_inr
+            trip.ai_summary = trip_out.ai_summary
+            
+            db.commit()
+            
+            # Reload stops
+            trip.stops = db.query(TripStop).filter(
+                TripStop.trip_id == trip.id
+            ).order_by(TripStop.day, TripStop.time_slot).all()
+            
+        except Exception as ex:
+            print(f"Auto-regenerating old 1-day itinerary failed: {ex}")
+
+    # Calculate driving time estimation
+    dist_one_way = 0.0
+    if trip.origin_lat and trip.origin_lon and trip.destination_lat and trip.destination_lon:
+        from app.services.ai_planner import calculate_haversine_distance
+        dist_one_way = calculate_haversine_distance(
+            trip.origin_lat, trip.origin_lon,
+            trip.destination_lat, trip.destination_lon
+        )
+    elif trip.total_distance_km:
+        dist_one_way = trip.total_distance_km / 2
+        
+    driving_time_hours = 0
+    driving_time_mins = 0
+    if dist_one_way > 0:
+        # Assuming average speed of 65 km/h on Indian highways
+        total_hours = dist_one_way / 65.0
+        driving_time_hours = int(total_hours)
+        driving_time_mins = int((total_hours - driving_time_hours) * 60)
+        
+    travel_time_str = ""
+    if driving_time_hours > 0:
+        if driving_time_mins > 0:
+            travel_time_str = f"{driving_time_hours} hr {driving_time_mins} min"
+        else:
+            travel_time_str = f"{driving_time_hours} hr"
 
     from app.models.models import HotelBooking, Hotel, Booking, ProviderBooking
     booked_hotel = db.query(HotelBooking).join(Hotel).filter(
@@ -291,6 +394,7 @@ def trip_itinerary_page(trip_id: int, request: Request, db: Session = Depends(ge
             "id": str(cb.id),
             "vehicle_id": cb.vehicle_id,
             "vehicle_name": cb.vehicle.vehicle_name if cb.vehicle else "Cab",
+            "vehicle_type": cb.vehicle.vehicle_type if cb.vehicle else "cab",
             "passenger_name": cb.passenger_name,
             "passenger_phone": cb.passenger_phone,
             "passenger_email": cb.passenger_email,
@@ -320,7 +424,9 @@ def trip_itinerary_page(trip_id: int, request: Request, db: Session = Depends(ge
         "booked_train": booked_train,
         "booked_flight": booked_flight,
         "booked_cab": booked_cab,
-        "vehicles": vehicles
+        "vehicles": vehicles,
+        "dist_one_way": dist_one_way,
+        "travel_time_str": travel_time_str
     })
 
 
@@ -454,6 +560,7 @@ def start_trip_page(
                 "id": str(cb.id),
                 "vehicle_id": cb.vehicle_id,
                 "vehicle_name": cb.vehicle.vehicle_name if cb.vehicle else "Cab",
+                "vehicle_type": cb.vehicle.vehicle_type if cb.vehicle else "cab",
                 "passenger_name": cb.passenger_name,
                 "passenger_phone": cb.passenger_phone,
                 "passenger_email": cb.passenger_email,

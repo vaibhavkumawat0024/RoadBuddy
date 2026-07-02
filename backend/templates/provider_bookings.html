@@ -238,7 +238,6 @@
       {% endif %}
     </div>
     
-    <!-- Show map option if pickup location exists -->
     {% if b.pickup_location %}
     <div class="booking-actions">
       <button class="btn-map-action" 
@@ -250,6 +249,7 @@
               data-dropoff="{{ b.dropoff_location or '' }}"
               data-pickup-points="{{ b.vehicle.pickup_points or '' }}"
               data-dropoff-points="{{ b.vehicle.dropoff_points or '' }}"
+              data-selected-seats="{{ b.selected_seats or '' }}"
               onclick="openMapModalFromButton(this)">
         🗺️ Map & Route
       </button>
@@ -324,6 +324,7 @@
   // Navigation leg states: "to_pickup" or "to_dropoff"
   let currentLeg = "to_pickup";
   let isNavigating = false;
+  let isSelfDrive = false;
 
   let driverLatLng = null;
   let passengerPickupLatLng = null;
@@ -339,13 +340,15 @@
     const dropoff = btn.getAttribute('data-dropoff') || '';
     const pickupPoints = btn.getAttribute('data-pickup-points') || '';
     const dropoffPoints = btn.getAttribute('data-dropoff-points') || '';
+    const selectedSeats = btn.getAttribute('data-selected-seats') || '';
     
-    openMapModal(bookingId, passengerName, origin, destination, pickup, dropoff, pickupPoints, dropoffPoints);
+    openMapModal(bookingId, passengerName, origin, destination, pickup, dropoff, pickupPoints, dropoffPoints, selectedSeats);
   }
 
-  function openMapModal(bookingId, passengerName, origin, destination, pickup, dropoff, pickupPointsStr, dropoffPointsStr) {
+  function openMapModal(bookingId, passengerName, origin, destination, pickup, dropoff, pickupPointsStr, dropoffPointsStr, selectedSeats = '') {
     activeBookingId = bookingId;
     activeVehicleId = null;
+    isSelfDrive = (selectedSeats === "Self-Drive Rental");
     const startTripBtn = document.getElementById("btn-start-trip");
     if (startTripBtn) {
       startTripBtn.style.display = "none";
@@ -566,7 +569,7 @@
       }
 
       // 2. Geocode Dropoff
-      if (dropoff) {
+      if (dropoff && !isSelfDrive) {
         if (parsedDropoffLatLng) {
           passengerDropoffLatLng = parsedDropoffLatLng;
         } else {
@@ -617,9 +620,15 @@
     overrideBtn.style.display = "inline-block";
 
     if (leg === "to_pickup") {
-      document.getElementById("hud-trip-leg").textContent = "Leg 1: Drive to Pickup";
-      document.getElementById("hud-trip-leg").style.color = "#FF6B35";
-      overrideBtn.textContent = "Arrived 👤";
+      if (isSelfDrive) {
+        document.getElementById("hud-trip-leg").textContent = "Deliver Vehicle to Renter";
+        document.getElementById("hud-trip-leg").style.color = "#10b981";
+        overrideBtn.textContent = "Complete Delivery 🏁";
+      } else {
+        document.getElementById("hud-trip-leg").textContent = "Leg 1: Drive to Pickup";
+        document.getElementById("hud-trip-leg").style.color = "#FF6B35";
+        overrideBtn.textContent = "Arrived 👤";
+      }
 
       if (!driverLatLng || !passengerPickupLatLng) {
         document.getElementById("hud-route-info").textContent = "Location coordinates not found";
@@ -628,7 +637,8 @@
 
       // Markers
       const driverIcon = L.divIcon({ html:`<div style="background:#FF6B35;color:#fff;padding:4px 8px;border-radius:4px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.2);">🚗 Driver (You)</div>`, className:'', iconSize:[null,22], iconAnchor:[8,11] });
-      const pickupIcon = L.divIcon({ html:`<div style="background:#1DB954;color:#fff;padding:4px 8px;border-radius:4px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.2);">👤 Pickup: ${passengerNameStr}</div>`, className:'', iconSize:[null,22], iconAnchor:[8,11] });
+      const labelText = isSelfDrive ? `Delivery: ${passengerNameStr}` : `Pickup: ${passengerNameStr}`;
+      const pickupIcon = L.divIcon({ html:`<div style="background:#1DB954;color:#fff;padding:4px 8px;border-radius:4px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.2);">👤 ${labelText}</div>`, className:'', iconSize:[null,22], iconAnchor:[8,11] });
 
       driverMarker = L.marker(driverLatLng, { icon: driverIcon }).addTo(map);
       L.marker(passengerPickupLatLng, { icon: pickupIcon }).addTo(map);
@@ -829,6 +839,11 @@
   }
 
   function advanceNavigationLeg() {
+    if (isSelfDrive) {
+      alert("Self-drive vehicle delivered successfully to the delivery location!");
+      closeMapModal();
+      return;
+    }
     if (currentLeg === "to_pickup") {
       alert("Arrived at passenger pickup location! Ready to start the passenger ride.");
       initLeg("to_dropoff");

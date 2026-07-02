@@ -838,6 +838,11 @@
     <span class="tab-icon">🚗</span> Own Vehicle
   </button>
   {% endif %}
+  {% if booked_cab and booked_cab.selected_seats == 'Self-Drive Rental' %}
+  <button class="transport-tab active" onclick="selectMode('car')" id="tab-car">
+    <span class="tab-icon">🔑</span> Self Drive Rental
+  </button>
+  {% endif %}
   {% if not trip or trip.travel_mode == 'bus' %}
   <button class="transport-tab {% if trip and trip.travel_mode == 'bus' %}active{% endif %}" onclick="selectMode('bus')" id="tab-bus">
     <span class="tab-icon">🚌</span> Bus
@@ -853,7 +858,7 @@
     <span class="tab-icon">✈️</span> Flight
   </button>
   {% endif %}
-  {% if not trip or trip.travel_mode == 'cab_service' %}
+  {% if (not trip or trip.travel_mode == 'cab_service') and not (booked_cab and booked_cab.selected_seats == 'Self-Drive Rental') %}
   <button class="transport-tab {% if trip and trip.travel_mode == 'cab_service' %}active{% endif %}" onclick="selectMode('cab')" id="tab-cab">
     <span class="tab-icon">🚕</span> Cab
   </button>
@@ -1100,7 +1105,8 @@
 
     if (isCarMode) {
       modeBadge.className = 'mode-badge mode-gps';
-      modeBadge.textContent = '🛰️ GPS Mode — Own Vehicle';
+      const isSelfDrive = bookedCab && bookedCab.selected_seats === "Self-Drive Rental";
+      modeBadge.textContent = isSelfDrive ? '🛰️ GPS Mode — Self Drive Rental' : '🛰️ GPS Mode — Own Vehicle';
       gpsRow.style.display = 'flex';
       gpsBtnWrap.style.display = 'block';
       originManual.style.display = 'block';
@@ -3685,7 +3691,8 @@
     let initialMode = 'car';
     {% if trip and trip.travel_mode %}
       const dbMode = "{{ trip.travel_mode }}";
-      if (dbMode === 'own_vehicle') initialMode = 'car';
+      const isSelfDrive = bookedCab && bookedCab.selected_seats === "Self-Drive Rental";
+      if (dbMode === 'own_vehicle' || isSelfDrive) initialMode = 'car';
       else if (dbMode === 'cab_service') initialMode = 'cab';
       else if (dbMode === 'bus') initialMode = 'bus';
       else if (dbMode === 'train') initialMode = 'train';

@@ -78,6 +78,14 @@
     <div class="provider-nav-menu" id="provider-nav-menu" style="display: flex; align-items: center; gap: 8px; margin-left: auto;">
       {% if provider %}
       <a href="/provider/dashboard" class="provider-nav-link-desktop">Dashboard</a>
+      {% if provider.company_name %}
+      <a href="/provider/bookings" class="provider-nav-link-desktop" style="position: relative; margin-left: 18px;">
+        Bookings
+        {% if has_unread_bookings %}
+        <span class="unread-dot" style="position: absolute; top: -3px; right: -8px; width: 8px; height: 8px; background: #ff4d4f; border-radius: 50%;"></span>
+        {% endif %}
+      </a>
+      {% endif %}
       
       <!-- 3-line Settings Hamburger Button -->
       <button class="provider-sidebar-toggle" id="provider-sidebar-toggle" aria-label="Toggle settings menu">
@@ -846,6 +854,147 @@
         }
       });
     });
+    });
   </script>
+
+  {% if provider %}
+  <!-- Provider Self-Drive Acceptance Popup Modal -->
+  <div id="provider-sd-acceptance-modal" class="provider-popup-overlay" style="display: none; position: fixed; inset: 0; background: rgba(10, 10, 22, 0.6); backdrop-filter: blur(6px); z-index: 9999; align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: #111122; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; max-width: 480px; width: 100%; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
+      
+      <!-- Header -->
+      <div style="background: linear-gradient(135deg, #FF6B35, #FF8F5E); padding: 20px; text-align: center; color: #fff;">
+        <h3 style="margin: 0; font-size: 17px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">⚡ New Self-Drive Booking</h3>
+        <p style="margin: 4px 0 0 0; font-size: 12px; color: rgba(255,255,255,0.8);">Self-drive vehicle booking request received</p>
+      </div>
+
+      <!-- Body -->
+      <div style="padding: 20px; color: #e0e0f0;">
+        
+        <!-- STATE 1: COLLAPSED -->
+        <div id="p-sd-state-collapsed" style="display: flex; flex-direction: column; gap: 14px; text-align: center;">
+          <p style="margin: 0; font-size: 13.5px; color: #94a3b8; line-height: 1.5;">
+            You have received a new self-drive vehicle booking request. Please open the request to review details.
+          </p>
+          <button onclick="openProviderSDRequest()" style="width: 100%; padding: 12px; background: linear-gradient(135deg, #FF6B35, #FF8F5E); color: #fff; font-size: 13.5px; font-weight: 700; border: none; border-radius: 8px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(255,107,53,0.2);">
+            Open Request
+          </button>
+        </div>
+
+        <!-- STATE 2: EXPANDED -->
+        <div id="p-sd-state-expanded" style="display: none; flex-direction: column; gap: 14px;">
+          <!-- Details summary -->
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); padding: 12px; border-radius: 8px; font-size: 13px; line-height: 1.5; text-align: left; display: flex; flex-direction: column; gap: 6px;">
+            <div><strong>Vehicle Name:</strong> <span id="p-sd-vehicle-name">-</span></div>
+            <div><strong>Customer Name:</strong> <span id="p-sd-customer-name">-</span></div>
+            <div><strong>Customer Email:</strong> <span id="p-sd-email">-</span></div>
+            <div><strong>Customer Phone:</strong> <span id="p-sd-phone">-</span></div>
+            <div><strong>Trip Date:</strong> <span id="p-sd-travel-date">-</span></div>
+            <div><strong>Delivery Address:</strong> <span id="p-sd-location">-</span></div>
+            <div style="border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 6px; margin-top: 4px; display: flex; justify-content: space-between; font-size: 14px;">
+              <span>Total Rent:</span>
+              <strong style="color: #10b981;" id="p-sd-total-rent">₹0</strong>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div style="display: flex; gap: 10px;">
+            <button onclick="declineProviderSDBooking()" style="flex: 1; padding: 11px; background: #ef4444; color: #fff; font-size: 13px; font-weight: 700; border: none; border-radius: 8px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(239,68,68,0.2);">
+              Decline Request
+            </button>
+            <button onclick="acceptProviderSDBooking()" style="flex: 1.2; padding: 11px; background: #10b981; color: #fff; font-size: 13px; font-weight: 700; border: none; border-radius: 8px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(16,185,129,0.2);">
+              Accept Request
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentPendingSDBooking = null;
+    const pendingSDModal = document.getElementById("provider-sd-acceptance-modal");
+
+    function openProviderSDRequest() {
+      document.getElementById("p-sd-state-collapsed").style.display = "none";
+      document.getElementById("p-sd-state-expanded").style.display = "flex";
+    }
+
+    async function acceptProviderSDBooking() {
+      if (!currentPendingSDBooking) return;
+      try {
+        const res = await fetch(`/api/provider/bookings/${currentPendingSDBooking.id}/accept`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        if (res.ok) {
+          pendingSDModal.style.display = "none";
+          window.location.reload();
+        } else {
+          alert("Failed to accept booking.");
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function declineProviderSDBooking() {
+      if (!currentPendingSDBooking) return;
+      try {
+        const res = await fetch(`/api/provider/bookings/${currentPendingSDBooking.id}/decline`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        if (res.ok) {
+          pendingSDModal.style.display = "none";
+          window.location.reload();
+        } else {
+          alert("Failed to decline booking.");
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // Polling function for new pending self-drive bookings
+    setInterval(async () => {
+      if (pendingSDModal.style.display === "flex") return;
+
+      try {
+        const res = await fetch('/api/provider/bookings');
+        if (res.ok) {
+          const bookings = await res.json();
+          const pendingSD = bookings.find(b => b.status === "pending" && b.selected_seats === "Self-Drive Rental");
+          if (pendingSD) {
+            currentPendingSDBooking = pendingSD;
+            
+            document.getElementById("p-sd-vehicle-name").textContent = pendingSD.vehicle_name || "Self-Drive Vehicle";
+            document.getElementById("p-sd-customer-name").textContent = pendingSD.passenger_name;
+            document.getElementById("p-sd-total-rent").textContent = `₹${pendingSD.total_fare_inr.toLocaleString('en-IN')}`;
+            
+            document.getElementById("p-sd-travel-date").textContent = pendingSD.travel_date;
+            
+            document.getElementById("p-sd-email").textContent = pendingSD.passenger_email || "N/A";
+            document.getElementById("p-sd-phone").textContent = pendingSD.passenger_phone || "N/A";
+            document.getElementById("p-sd-location").textContent = pendingSD.pickup_location || "N/A";
+            
+            // Reset to state collapsed initially
+            document.getElementById("p-sd-state-collapsed").style.display = "flex";
+            document.getElementById("p-sd-state-expanded").style.display = "none";
+
+            pendingSDModal.style.display = "flex";
+          }
+        }
+      } catch (err) {
+        console.error("Error polling bookings:", err);
+      }
+    }, 3000);
+  </script>
+  {% endif %}
 </body>
 </html>

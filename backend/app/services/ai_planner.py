@@ -89,21 +89,30 @@ def build_own_vehicle_prompt(trip: TripCreate, vehicle_info: dict) -> str:
     lat2, lon2 = trip.destination_lat, trip.destination_lon
     dist = calculate_haversine_distance(lat1, lon1, lat2, lon2)
     
+    road_trip_instructions = ""
+    if dist > 400:
+        road_trip_instructions = f"Since the one-way distance is {dist:.1f} km (which is > 400 km), the drive will take approximately 1.5 to 2 days to arrive safely. Therefore, structure the itinerary so that Day 1 is dedicated to highway driving (NH roads, dhabas, refuelling, and a midway night hotel stay). Day 2 morning should cover the final drive, arriving at {trip.destination} around 12:00 PM (noon) to check in and rest. Destination sightseeing and hotel stay should start on Day 2 afternoon/evening. The middle days are destination exploration, and the final day is the return journey back home."
+    else:
+        road_trip_instructions = f"Since the one-way distance is {dist:.1f} km (which is <= 400 km), the drive will take under 1 day. Day 1 morning/afternoon should cover the highway travel, refueling, and roadside dhaba stops, with arrival at {trip.destination} by afternoon/evening to check in. Local sightseeing should start from Day 1 evening/night."
+
     return f"""You are RoadBuddy AI, India's expert road trip planner.
 
 Trip: {trip.origin} to {trip.destination} | {trip.start_date} to {trip.end_date}
-Distance: Approximately {dist} km one-way (so total round-trip distance is {dist * 2} km).
+Distance: Approximately {dist:.1f} km one-way (so total round-trip distance is {dist * 2:.1f} km).
 Vehicle Selected by User: {category.upper()} running on {fuel_type.upper()} with an efficiency/mileage of {mileage} KMPL.
 Season: {season.upper()}
 {get_budget_breakdown(trip.budget_inr, trip.num_people, fuel_type, "own_vehicle")}
 Group: {get_group_tips(trip.group_type, trip.num_people)}
 Season tip: {get_season_tips(season, trip.destination)}
 
+Road Trip Plan Details:
+{road_trip_instructions}
+
 Generate a complete road trip covering GOING ROUTE, DESTINATION, and RETURN ROUTE.
-IMPORTANT: Provide 4 detailed stops per day covering 'morning', 'afternoon', 'evening', and 'night' (such as dinners, night-life, night markets, or stargazing/rest tips at hotels) to ensure the itinerary is proper for the whole day and night.
+IMPORTANT: Provide 4 detailed stops for EVERY day of the trip (from Day 1 to the final day). Cover 'morning', 'afternoon', 'evening', and 'night' (such as dinners, night markets, stargazing, or rest tips) to ensure the itinerary is complete.
 CRITICAL: Each stop description MUST be a detailed, rich paragraph (at least 3-4 sentences, minimum 40 words) providing extensive local context, what to see, what to eat, travel advice, parking info, and specific highway safety/rest recommendations. Do not return short or generic descriptions.
 Calculate the fuel cost based on:
-1. Round-trip distance of {dist * 2} km.
+1. Round-trip distance of {dist * 2:.1f} km.
 2. Vehicle mileage of {mileage} KMPL.
 3. Average fuel prices in India: Petrol (~104 INR/L), Diesel (~94 INR/L), CNG (~85 INR/L), Electric (Rs 2.5 per km).
 Use real Indian town names and NH highway numbers.
@@ -210,6 +219,7 @@ async def call_groq(prompt: str) -> dict:
 
 
 def mock_own_vehicle(trip: TripCreate, vehicle_info: dict = None) -> dict:
+    from datetime import datetime
     season = get_season(trip.start_date)
     
     fuel_type = vehicle_info.get("fuel_type", "petrol") if vehicle_info else "petrol"
@@ -239,48 +249,88 @@ def mock_own_vehicle(trip: TripCreate, vehicle_info: dict = None) -> dict:
     fuel_cost = round(fuel_cost, 2)
     return_fuel_cost = fuel_cost
     
-    # Toll cost estimation based on distance (approx 1.5 INR per km for highways)
+    # Toll cost estimation
     toll_cost = round(dist * 1.5, 2)
     return_toll_cost = toll_cost
     
-    # Hotel and food costs based on budget and duration
+    # Parse dates to calculate total trip days
+    try:
+        start_dt = datetime.strptime(trip.start_date, "%Y-%m-%d")
+        end_dt = datetime.strptime(trip.end_date, "%Y-%m-%d")
+        total_days = max((end_dt - start_dt).days + 1, 1)
+    except Exception:
+        total_days = 3
+
     hotel_cost = round(trip.budget_inr * 0.35, 2)
     food_cost = round(trip.budget_inr * 0.20, 2)
-    
     total_est = round(fuel_cost + return_fuel_cost + toll_cost + return_toll_cost + hotel_cost + food_cost, 2)
     
-    stops = [
-        # Day 1: Travel & Arrival Day
-        {"day": 1, "time_slot": "morning", "place_name": f"HP Petrol Pump, NH-48, {trip.origin}",
-         "place_type": "fuel", "description": f"Stop at the HP Petrol Pump on NH-48 in {trip.origin} to fill up your {fuel_type} tank. Ensure you check tyre pressure, engine oil level, and coolant for safety. Grab refreshing beverages and light travel snacks from the convenience store to stay energised during the initial leg of the road trip.", "estimated_cost_inr": fuel_cost, "highway": "NH-48", "lat": None, "lng": None},
-        {"day": 1, "time_slot": "afternoon", "place_name": "Apna Dhaba — Highway Lunch",
-         "place_type": "food", "description": "Apna Dhaba is a renowned roadside stop famous for its fresh, clay-oven tandoori rotis, spicy dal fry, and traditional paneer dishes. Unwind under the shade of trees, enjoy the rustic outdoor seating, and rest your legs before continuing the drive on the highway.", "estimated_cost_inr": 400, "highway": "NH-48", "lat": None, "lng": None},
-        {"day": 1, "time_slot": "evening", "place_name": f"Hotel Shree Palace, {trip.destination}",
-         "place_type": "hotel", "description": f"Arrive at {trip.destination} and check into Hotel Shree Palace. The hotel offers clean, spacious rooms, friendly hospitality, and beautiful garden views. Unpack your bags, refresh yourself with a hot shower, and enjoy a complimentary hot masala tea in the courtyard.", "estimated_cost_inr": hotel_cost, "highway": None, "lat": None, "lng": None},
-        {"day": 1, "time_slot": "night", "place_name": f"Local Market & Traditional Dinner, {trip.destination}",
-         "place_type": "destination_food", "description": "Explore the vibrant nearby local market streets illuminated by fairy lights. Sample popular street foods like sweet rabdi or hot jalebis, and pick up local handicrafts. Settle down at a highly rated traditional restaurant to enjoy local specialties for dinner.", "estimated_cost_inr": 300, "highway": None, "lat": None, "lng": None},
-
-        # Day 2: Full Exploration Day
-        {"day": 2, "time_slot": "morning", "place_name": f"Main Sightseeing Attraction, {trip.destination}",
-         "place_type": "sightseeing", "description": f"Visit the iconic historical fort in {trip.destination}, known for its breathtaking architecture and ancient carvings. Explore the central courtyard, hire an official local guide to learn about historical battles, and take stunning panoramic photos from the high bastion towers.", "estimated_cost_inr": 200, "highway": None, "lat": None, "lng": None},
-        {"day": 2, "time_slot": "afternoon", "place_name": f"Heritage Cafe & Lunch, {trip.destination}",
-         "place_type": "destination_food", "description": "Take a midday break at the Heritage Cafe, which features a scenic rooftop terrace looking over the old town. Indulge in wood-fired pizzas, iced cold brew coffee, and local delicacies. The quiet, air-conditioned seating provides a perfect escape from the afternoon sun.", "estimated_cost_inr": 250, "highway": None, "lat": None, "lng": None},
-        {"day": 2, "time_slot": "evening", "place_name": f"Sunset View Point & Lake Walk, {trip.destination}",
-         "place_type": "sightseeing", "description": "Walk along the beautifully paved lakeside path during sunset hours. Watch the water reflect golden and orange hues as boaters glide by. Excellent location for relaxing, enjoying a cool evening breeze, and photographing the scenic landscape.", "estimated_cost_inr": 100, "highway": None, "lat": None, "lng": None},
-        {"day": 2, "time_slot": "night", "place_name": f"Night Bazar & Dinner Show, {trip.destination}",
-         "place_type": "destination_food", "description": "Witness a colorful traditional puppet show and folk music performance highlighting local cultural heritage. Following the show, enjoy an unlimited thali dinner containing multiple vegetable curries, hot flatbreads, and traditional sweets in a heritage setting.", "estimated_cost_inr": 450, "highway": None, "lat": None, "lng": None},
-
-        # Day 3: Return journey Day
-        {"day": 3, "time_slot": "morning", "place_name": f"Indian Oil Pump, {trip.destination}",
-         "place_type": "fuel", "description": f"Stop at the Indian Oil station to refuel your {fuel_type} tank before commencing the return journey. Check tyre air pressure and wash the windshield. The station has clean washrooms and a quick-service cafe to purchase beverages for the road.", "estimated_cost_inr": return_fuel_cost, "highway": None, "lat": None, "lng": None},
-        {"day": 3, "time_slot": "afternoon", "place_name": "Midway Highway Food Court",
-         "place_type": "food", "description": "Stop at the modern midway highway food court offering multiple dining choices. Relish a clean, air-conditioned dining experience with choices ranging from North Indian platters to South Indian dosas and fast food. Rest and prepare for the final drive.", "estimated_cost_inr": 350, "highway": "NH-48", "lat": None, "lng": None},
-        {"day": 3, "time_slot": "evening", "place_name": f"Home — {trip.origin}",
-         "place_type": "return_route", "description": f"Safely complete the road trip and arrive back home in {trip.origin}. Unload all travel luggage from your vehicle, inspect the car body for any highway dust, and settle in for a relaxing evening with family.", "estimated_cost_inr": 0, "highway": None, "lat": None, "lng": None},
-        {"day": 3, "time_slot": "night", "place_name": f"Home Sweet Home, {trip.origin}",
-         "place_type": "return_route", "description": "Unwind in the comfort of your home. Share your favorite highway photos, mileage statistics, and dhaba reviews with friends on the RoadBuddy community platform, and enjoy a deep night's sleep after an incredible trip.", "estimated_cost_inr": 0, "highway": None, "lat": None, "lng": None},
-    ]
+    stops = []
+    is_long_dist = dist > 400
     
+    for day in range(1, total_days + 1):
+        if day == 1:
+            if is_long_dist and total_days >= 3:
+                # 2-day travel logic: Day 1 highway travel
+                stops.extend([
+                    {"day": 1, "time_slot": "morning", "place_name": f"HP Petrol Pump, NH-48, {trip.origin}",
+                     "place_type": "fuel", "description": f"Fill up your {fuel_type} tank at the start of your road trip. Verify tyre pressure, engine oil level, and coolant for safety. Grab refreshing beverages and light travel snacks.", "estimated_cost_inr": fuel_cost, "highway": "NH-48", "lat": None, "lng": None},
+                    {"day": 1, "time_slot": "afternoon", "place_name": "Midway Highway Family Dhaba",
+                     "place_type": "food", "description": "Stop for a fresh highway lunch. Enjoy hot clay-oven parathas, traditional paneer curry, and sweet buttermilk while resting your legs.", "estimated_cost_inr": 350, "highway": "NH-48", "lat": None, "lng": None},
+                    {"day": 1, "time_slot": "evening", "place_name": "Midway Transit Hotel & Stay",
+                     "place_type": "hotel", "description": "Check in to a cozy highway motel to break the journey. Enjoy a hot shower and rest from driving.", "estimated_cost_inr": round(hotel_cost / max(total_days, 1), 2), "highway": None, "lat": None, "lng": None},
+                    {"day": 1, "time_slot": "night", "place_name": "Motel Restaurant & Highway Rest",
+                     "place_type": "food", "description": "Relish a quiet hot dinner at the motel, inspect your vehicle, and get a restful night's sleep for tomorrow's continued journey.", "estimated_cost_inr": 300, "highway": None, "lat": None, "lng": None}
+                ])
+            else:
+                # Normal 1-day travel to destination
+                stops.extend([
+                    {"day": 1, "time_slot": "morning", "place_name": f"HP Petrol Pump, NH-48, {trip.origin}",
+                     "place_type": "fuel", "description": f"Fill up your {fuel_type} tank at the start of the trip. Verify tire pressure and fluid levels for safe highway travel.", "estimated_cost_inr": fuel_cost, "highway": "NH-48", "lat": None, "lng": None},
+                    {"day": 1, "time_slot": "afternoon", "place_name": "Apna Dhaba — Highway Lunch",
+                     "place_type": "food", "description": "Stop for a fresh highway lunch. Enjoy hot parathas, paneer, and lassi while resting your legs.", "estimated_cost_inr": 350, "highway": "NH-48", "lat": None, "lng": None},
+                    {"day": 1, "time_slot": "evening", "place_name": f"Hotel Shree Palace, {trip.destination}",
+                     "place_type": "hotel", "description": f"Arrive at {trip.destination} and check in. Enjoy a hot shower and evening tea.", "estimated_cost_inr": round(hotel_cost / max(total_days, 1), 2), "highway": None, "lat": None, "lng": None},
+                    {"day": 1, "time_slot": "night", "place_name": f"Local Market & Dinner, {trip.destination}",
+                     "place_type": "destination_food", "description": f"Explore the local market lanes in {trip.destination} and enjoy local specialties for dinner.", "estimated_cost_inr": 300, "highway": None, "lat": None, "lng": None}
+                ])
+        elif day == 2 and is_long_dist and total_days >= 3:
+            # 2-day travel logic: Day 2 arrival at noon
+            stops.extend([
+                {"day": 2, "time_slot": "morning", "place_name": "Scenic Mountain Pass & Lookout",
+                 "place_type": "going_route", "description": "Continue driving towards the destination. Pass through scenic curves or countryside roads and take short photos.", "estimated_cost_inr": 0, "highway": None, "lat": None, "lng": None},
+                {"day": 2, "time_slot": "afternoon", "place_name": f"Hotel Shree Palace, {trip.destination}",
+                 "place_type": "hotel", "description": f"Arrive at {trip.destination} around 12:00 PM (noon). Check in, unpack, refresh and rest after the 2-day drive.", "estimated_cost_inr": round(hotel_cost / max(total_days, 1), 2), "highway": None, "lat": None, "lng": None},
+                {"day": 2, "time_slot": "evening", "place_name": f"Main Sightseeing Attraction, {trip.destination}",
+                 "place_type": "sightseeing", "description": f"Start exploring the top spots in {trip.destination}. Hire a local guide and enjoy the architecture.", "estimated_cost_inr": 200, "highway": None, "lat": None, "lng": None},
+                {"day": 2, "time_slot": "night", "place_name": f"Traditional Restaurant & Dinner, {trip.destination}",
+                 "place_type": "destination_food", "description": "Enjoy a delicious dinner in the old town, sampling local curries and traditional desserts.", "estimated_cost_inr": 400, "highway": None, "lat": None, "lng": None}
+            ])
+        elif day == total_days and total_days > 1:
+            # Last Day: Return home
+            stops.extend([
+                {"day": day, "time_slot": "morning", "place_name": f"Indian Oil Pump, {trip.destination}",
+                 "place_type": "fuel", "description": f"Refuel your {fuel_type} tank for the return journey. Clean windshield and verify tire pressure.", "estimated_cost_inr": return_fuel_cost, "highway": None, "lat": None, "lng": None},
+                {"day": day, "time_slot": "afternoon", "place_name": "Midway Highway Food Court",
+                 "place_type": "food", "description": "Stop at a modern food court for lunch, offering North and South Indian dining options.", "estimated_cost_inr": 350, "highway": "NH-48", "lat": None, "lng": None},
+                {"day": day, "time_slot": "evening", "place_name": f"Home — {trip.origin}",
+                 "place_type": "return_route", "description": f"Complete the journey and arrive back in {trip.origin}. Unload bags and relax after an amazing road trip.", "estimated_cost_inr": 0, "highway": None, "lat": None, "lng": None},
+                {"day": day, "time_slot": "night", "place_name": f"Home Sweet Home, {trip.origin}",
+                 "place_type": "return_route", "description": "Rest at home. Share your favorite road trip moments and mileage stats with friends on RoadBuddy.", "estimated_cost_inr": 0, "highway": None, "lat": None, "lng": None}
+            ])
+        else:
+            # Middle Exploration Days
+            stops.extend([
+                {"day": day, "time_slot": "morning", "place_name": f"Scenic Spot & Nature Walk, {trip.destination}",
+                 "place_type": "sightseeing", "description": f"Visit beautiful waterfalls or valleys in {trip.destination}. Take pictures, breathe fresh air, and enjoy local nature hikes.", "estimated_cost_inr": 100, "highway": None, "lat": None, "lng": None},
+                {"day": day, "time_slot": "afternoon", "place_name": f"Rooftop Cafe & Lunch, {trip.destination}",
+                 "place_type": "destination_food", "description": f"Savor fresh coffee, mocktails, and wood-fired pizzas with a panoramic view of the mountains or old town streets.", "estimated_cost_inr": 300, "highway": None, "lat": None, "lng": None},
+                {"day": day, "time_slot": "evening", "place_name": f"Museum & Historical Walk, {trip.destination}",
+                 "place_type": "sightseeing", "description": "Explore local heritage museums, handicrafts showrooms, and buy traditional artwork or woolens.", "estimated_cost_inr": 150, "highway": None, "lat": None, "lng": None},
+                {"day": day, "time_slot": "night", "place_name": f"Gourmet Dinner, {trip.destination}",
+                 "place_type": "destination_food", "description": "Treat yourself to a candlelight dinner under the stars at a highly-rated local courtyard restaurant.", "estimated_cost_inr": 450, "highway": None, "lat": None, "lng": None}
+            ])
+            
     return {
         "total_distance_km": dist * 2,
         "fuel_cost_inr": fuel_cost,
@@ -298,29 +348,72 @@ def mock_own_vehicle(trip: TripCreate, vehicle_info: dict = None) -> dict:
 
 
 def mock_transport_itinerary(trip: TripCreate) -> dict:
+    from datetime import datetime
     season = get_season(trip.start_date)
+    
+    try:
+        start_dt = datetime.strptime(trip.start_date, "%Y-%m-%d")
+        end_dt = datetime.strptime(trip.end_date, "%Y-%m-%d")
+        total_days = max((end_dt - start_dt).days + 1, 1)
+    except Exception:
+        total_days = 3
+
+    stops = []
+    for day in range(1, total_days + 1):
+        if day == 1:
+            stops.extend([
+                {"day": 1, "time_slot": "morning", "place_name": f"Arrival & Top Attraction, {trip.destination}",
+                 "place_type": "sightseeing", "description": "Arrive at your destination and check out the top local attraction. Marvel at the stunning architecture, take pictures, and explore the museum or courtyards with local guide explanations.", "estimated_cost_inr": 200, "highway": None, "lat": None, "lng": None},
+                {"day": 1, "time_slot": "afternoon", "place_name": "Local Food Street",
+                 "place_type": "destination_food", "description": "Indulge in delicious local street food for lunch. Discover regional flavors, sample traditional street desserts, and talk to local stall vendors about popular cultural eats.", "estimated_cost_inr": 400, "highway": None, "lat": None, "lng": None},
+                {"day": 1, "time_slot": "evening", "place_name": "Hotel Grand Inn",
+                 "place_type": "hotel", "description": "Check in at Hotel Grand Inn, unpack your luggage, and refresh after your journey. The hotel offers clean rooms, modern amenities, and cozy bedding for a relaxing evening rest.", "estimated_cost_inr": 1500, "highway": None, "lat": None, "lng": None},
+                {"day": 1, "time_slot": "night", "place_name": "Main Street Bazar & Dinner",
+                 "place_type": "destination_food", "description": "Walk around the lively main street bazar illuminated by colorful lights. Pick up souvenirs and local products, and settle down at a recommended local restaurant for an authentic traditional dinner.", "estimated_cost_inr": 350, "highway": None, "lat": None, "lng": None},
+            ])
+        elif day == total_days and total_days > 1:
+            stops.extend([
+                {"day": day, "time_slot": "morning", "place_name": f"Souvenir Shopping, {trip.destination}",
+                 "place_type": "sightseeing", "description": "Spend your final morning buying souvenirs, local handicrafts, and specialty sweets to take back home.", "estimated_cost_inr": 150, "highway": None, "lat": None, "lng": None},
+                {"day": day, "time_slot": "afternoon", "place_name": "Farewell Lunch",
+                 "place_type": "destination_food", "description": "Enjoy a final lunch at a popular cafe, reminiscing about the highlights of your trip.", "estimated_cost_inr": 300, "highway": None, "lat": None, "lng": None},
+                {"day": day, "time_slot": "evening", "place_name": "Departure Terminal / Station",
+                 "place_type": "sightseeing", "description": "Head to the departure terminal or train station to begin your travel back.", "estimated_cost_inr": 0, "highway": None, "lat": None, "lng": None},
+                {"day": day, "time_slot": "night", "place_name": "Arrive Back Home",
+                 "place_type": "sightseeing", "description": "Arrive safely back home, unpack your bags, and get a peaceful night's rest.", "estimated_cost_inr": 0, "highway": None, "lat": None, "lng": None},
+            ])
+        else:
+            stops.extend([
+                {"day": day, "time_slot": "morning", "place_name": f"Sightseeing Exploration, {trip.destination}",
+                 "place_type": "sightseeing", "description": "Explore the famous spots, temples, scenic parks, or valley viewpoints in the region.", "estimated_cost_inr": 150, "highway": None, "lat": None, "lng": None},
+                {"day": day, "time_slot": "afternoon", "place_name": "Traditional Cuisine Lunch",
+                 "place_type": "destination_food", "description": "Have an authentic lunch at a heritage restaurant specializing in regional cuisine.", "estimated_cost_inr": 250, "highway": None, "lat": None, "lng": None},
+                {"day": day, "time_slot": "evening", "place_name": "Lakeside / Mountain Sunset Walk",
+                 "place_type": "sightseeing", "description": "Stroll around scenic waterfronts or sunset points to enjoy the peaceful evening atmosphere.", "estimated_cost_inr": 50, "highway": None, "lat": None, "lng": None},
+                {"day": day, "time_slot": "night", "place_name": "Local Dinner & Nightwalk",
+                 "place_type": "destination_food", "description": "Have dinner at a cozy eatery and walk around the quiet lanes before heading back to the hotel.", "estimated_cost_inr": 400, "highway": None, "lat": None, "lng": None},
+            ])
+            
     return {
         "total_distance_km": 0, "hotel_cost_inr": 3000, "food_cost_inr": 1500,
         "total_estimated_cost_inr": round(trip.budget_inr * 0.75, 2),
         "season": season, "season_tip": "Carry appropriate clothing.",
         "ai_summary": f"Explore the beautiful {trip.destination}.",
-        "stops": [
-            # Day 1
-            {"day": 1, "time_slot": "morning", "place_name": f"Arrival & Top Attraction, {trip.destination}",
-             "place_type": "sightseeing", "description": "Arrive at your destination and check out the top local attraction. Marvel at the stunning architecture, take pictures, and explore the museum or courtyards with local guide explanations.", "estimated_cost_inr": 200, "highway": None, "lat": None, "lng": None},
-            {"day": 1, "time_slot": "afternoon", "place_name": "Local Food Street",
-             "place_type": "destination_food", "description": "Indulge in delicious local street food for lunch. Discover regional flavors, sample traditional street desserts, and talk to local stall vendors about popular cultural eats.", "estimated_cost_inr": 400, "highway": None, "lat": None, "lng": None},
-            {"day": 1, "time_slot": "evening", "place_name": "Hotel Grand Inn",
-             "place_type": "hotel", "description": "Check in at Hotel Grand Inn, unpack your luggage, and refresh after your journey. The hotel offers clean rooms, modern amenities, and cozy bedding for a relaxing evening rest.", "estimated_cost_inr": 1500, "highway": None, "lat": None, "lng": None},
-            {"day": 1, "time_slot": "night", "place_name": "Main Street Bazar & Dinner",
-             "place_type": "destination_food", "description": "Walk around the lively main street bazar illuminated by colorful lights. Pick up souvenirs and local products, and settle down at a recommended local restaurant for an authentic traditional dinner.", "estimated_cost_inr": 350, "highway": None, "lat": None, "lng": None},
-        ],
+        "stops": stops
     }
 
 
 async def generate_itinerary(trip: TripCreate, vehicle_info: dict) -> TripOut:
     try:
-        if trip.travel_mode == TravelMode.own_vehicle:
+        is_road_trip = (trip.travel_mode == TravelMode.own_vehicle or trip.travel_mode == TravelMode.cab_service)
+        
+        if is_road_trip:
+            if not vehicle_info:
+                vehicle_info = {
+                    "fuel_type": "petrol",
+                    "category": "car",
+                    "mileage_kmpl": 15.0
+                }
             if settings.groq_api_key:
                 try:
                     data = await call_groq(build_own_vehicle_prompt(trip, vehicle_info))

@@ -10,7 +10,7 @@
   }
   @media (min-width: 992px) {
     .vehicles-container {
-      grid-template-columns: 1fr 1.2fr;
+      grid-template-columns: 1.2fr 1fr;
     }
   }
   .form-toggle-buttons {
@@ -225,127 +225,22 @@
 {% endif %}
 
 <div class="vehicles-container">
-  {% set show_private_btn = bmode in ('solo_owner', 'both_services', 'self_drive_private', 'self_drive_both', 'self_drive_only') or not bmode %}
+  {% set show_self_drive = bmode in ('self_drive_only', 'self_drive_private', 'self_drive_both', 'self_drive_public') %}
+  {% set show_private_chauffeur = bmode in ('solo_owner', 'both_services', 'self_drive_private', 'self_drive_both') or not bmode %}
   {% set show_public_btn = bmode in ('route_based', 'both_services', 'self_drive_public', 'self_drive_both') %}
-
-  <!-- Left Side: Public Route Fleet & Active Listings -->
-  <div style="display: flex; flex-direction: column; gap: 24px;">
-    
-    <!-- 1. Saved Public Fleet (only shown if public route services are supported) -->
-    {% if show_public_btn %}
-    <div class="form-card">
-      <h2>📋 Saved Public Fleet ({{ vehicle_assets|length }})</h2>
-      <p class="card-subtitle">These vehicles can be assigned when adding a route.</p>
-      {% if vehicle_assets %}
-        <div style="display: flex; flex-direction: column; gap: 10px;">
-          {% for asset in vehicle_assets %}
-            <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
-              <div>
-                <div style="font-weight: 600; color: #fff; font-size: 13.5px;">
-                  {{ asset.vehicle_name }}
-                </div>
-                <div style="font-size: 11.5px; color: #7878a0; margin-top: 2px;">
-                  Type: {{ asset.vehicle_type|capitalize }} · Seats: {{ asset.total_seats }}
-                </div>
-              </div>
-              <form method="POST" action="/provider/vehicle-assets/{{ asset.id }}/delete" onsubmit="return confirm('Delete this vehicle from your fleet?')">
-                <button type="submit" style="background: none; border: none; font-size: 14px; cursor: pointer; color: #ff6b6b; padding: 4px;">🗑️</button>
-              </form>
-            </div>
-          {% endfor %}
-        </div>
-      {% else %}
-        <p style="color: #6a6a8a; font-size: 13px; text-align: center; padding: 10px 0; margin: 0;">No fleet vehicles saved yet.</p>
-      {% endif %}
-    </div>
-    {% endif %}
-
-    <!-- 2. Listed Vehicles / Active Listings -->
-    <div>
-      <h2 style="font-size: 18px; font-weight: 600; color: #fff; margin-bottom: 16px; margin-top: 10px;">Your Active Listings ({{ vehicles|length }})</h2>
-      {% if vehicles %}
-      <div class="vehicle-list">
-        {% for v in vehicles %}
-        <div class="vehicle-card active-listing-card" data-vehicle-id="{{ v.id }}"
-             data-name="{{ v.vehicle_name }}"
-             data-type="{{ v.vehicle_type }}"
-             data-origin="{{ v.origin }}"
-             data-destination="{{ v.destination }}"
-             data-fixed-fare="{{ v.fixed_fare_inr or '' }}"
-             data-price-per-km="{{ v.price_per_km_inr or '' }}"
-             data-departure-time="{{ v.departure_time or '' }}"
-             data-arrival-time="{{ v.arrival_time or '' }}"
-             data-pickups="{{ v.pickup_points or '' }}"
-             data-dropoffs="{{ v.dropoff_points or '' }}"
-             data-dates="{{ v.service_dates or '' }}">
-          <div style="display: flex; align-items: center; gap: 16px;">
-            <div style="font-size: 28px;">
-              {% if not v.driver_included %}🔑
-              {% elif 'bus' in v.vehicle_type %}🚌
-              {% elif v.vehicle_type == 'suv' %}🚙
-              {% else %}🚗
-              {% endif %}
-            </div>
-            <div>
-              <div style="font-weight: 600; color: #fff; font-size: 14.5px;">
-                {{ v.vehicle_name }} 
-                {% if not v.driver_included %}<span style="font-size: 11px; padding: 2px 6px; background: rgba(255,107,53,0.15); color: #FF6B35; border-radius: 4px; font-weight: 500; margin-left: 6px;">Self-Drive</span>{% endif %}
-              </div>
-              <div style="font-size: 12px; color: #7878a0; margin-top: 2px;">
-                {% if not v.driver_included %}
-                📍 Available at: {{ v.origin }} · ₹{{ v.fixed_fare_inr|int }}/day rental
-                {% elif v.destination == 'Private' %}
-                📍 Available at: {{ v.origin }} (Chauffeur Cab) · ₹{{ v.price_per_km_inr }}/KM
-                {% else %}
-                📍 Route: {{ v.origin }} → {{ v.destination }} · 🕐 {{ v.departure_time }} - {{ v.arrival_time }} · ₹{{ v.fixed_fare_inr }} per seat
-                {% endif %}
-              </div>
-              <div style="font-size: 11.5px; color: #505075; margin-top: 2px;">
-                💺 Seats: {{ v.total_seats }}
-              </div>
-              {% if v.pickup_points %}
-              <div style="font-size: 11.5px; color: #FF6B35; margin-top: 4px; display: flex; align-items: center; gap: 4px;">
-                <span>📥</span> <strong>Pickups:</strong> {{ v.pickup_points.split(';')|join(', ') }}
-              </div>
-              {% endif %}
-              {% if v.dropoff_points %}
-              <div style="font-size: 11.5px; color: #4b88ff; margin-top: 2px; display: flex; align-items: center; gap: 4px;">
-                <span>📤</span> <strong>Drop-offs:</strong> {{ v.dropoff_points.split(';')|join(', ') }}
-              </div>
-              {% endif %}
-              {% if v.service_dates %}
-              <div style="font-size: 11.5px; color: #1DB954; margin-top: 2px; display: flex; align-items: center; gap: 4px;">
-                <span>📅</span> <strong>Dates:</strong> {{ v.service_dates.split(',')|join(', ') }}
-              </div>
-              {% endif %}
-            </div>
-          </div>
-          <div class="card-actions" style="display: flex; align-items: center; gap: 6px;">
-            <button type="button" class="btn-edit-listing" style="background: none; border: none; font-size: 15px; cursor: pointer; color: #4b88ff; padding: 8px;" title="Edit Listing">✏️</button>
-            <form method="POST" action="/provider/vehicles/{{ v.id }}/delete" onsubmit="return confirm('Delete this vehicle listing?')">
-              <button type="submit" style="background: none; border: none; font-size: 15px; cursor: pointer; color: #ff6b6b; padding: 8px;" title="Delete Listing">🗑️</button>
-            </form>
-          </div>
-        </div>
-
-        {% endfor %}
-      </div>
-      {% else %}
-      <p class="empty" style="color: #6a6a8a; font-size: 13.5px; margin-top: 8px;">No listings added yet.</p>
-      {% endif %}
-    </div>
-
-  </div>
 
   <!-- Right Side: Listings & Routes Creation Forms -->
   <div style="display: flex; flex-direction: column; gap: 24px;">
     
     <!-- Top-Level Toggle Buttons -->
     <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 8px;">
-      {% if show_private_btn or show_public_btn %}
+      {% if show_self_drive or show_private_chauffeur or show_public_btn %}
       <div style="display: flex; gap: 12px; justify-content: center; width: 100%; flex-wrap: wrap;">
-        {% if show_private_btn %}
-        <button type="button" class="btn-toggle" id="btn-toggle-private-veh" onclick="showMainFormBlock('private-veh')">Add Private Vehicle</button>
+        {% if show_self_drive %}
+        <button type="button" class="btn-toggle" id="btn-toggle-selfdrive" onclick="showMainFormBlock('selfdrive')">Add Self-Drive Vehicle</button>
+        {% endif %}
+        {% if show_private_chauffeur %}
+        <button type="button" class="btn-toggle" id="btn-toggle-private-chauffeur" onclick="showMainFormBlock('private-chauffeur')">Add Private Chauffeur Vehicle</button>
         {% endif %}
         {% if show_public_btn %}
         <button type="button" class="btn-toggle" id="btn-toggle-public-veh" onclick="showMainFormBlock('public-veh')">Add Public Vehicle (Fleet)</button>
@@ -393,108 +288,97 @@
       </div>
       {% endif %}
 
-      <!-- 2. PRIVATE VEHICLES GROUP (Self-Drive / Chauffeur) -->
-      {% if show_private_btn %}
-      <div class="form-card" id="block-private-group" style="display: none;">
-        {% set has_both_private = bmode in ('self_drive_private', 'self_drive_both') %}
-        {% if has_both_private %}
-        <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 15px;">
-          <button type="button" class="btn-toggle active" id="btn-sub-selfdrive" onclick="showPrivateSubBlock('selfdrive')" style="padding: 6px 16px; font-size: 12.5px;">Self-Drive</button>
-          <button type="button" class="btn-toggle" id="btn-sub-private" onclick="showPrivateSubBlock('private')" style="padding: 6px 16px; font-size: 12.5px;">Private Chauffeur</button>
-        </div>
-        {% endif %}
-
-        <!-- Self-Drive sub-form -->
-        {% if bmode in ('self_drive_only', 'self_drive_private', 'self_drive_both', 'self_drive_public') %}
-        <div id="sub-block-selfdrive" style="display: block;">
-          <h2>🔑 Self-Drive Rental Vehicle</h2>
-          <p class="card-subtitle">List vehicles available for self-driven customer rentals (priced per day)</p>
-          
-          <form id="form-selfdrive" onsubmit="handleFormSubmit(event, 'selfdrive')">
-            <input type="hidden" name="driver_included" value="false" />
-            <div class="form-grid">
-              <div class="form-group">
-                <label>Vehicle Type *</label>
-                <select name="vehicle_type" required>
-                  <option value="hatchback">Hatchback</option>
-                  <option value="sedan">Sedan</option>
-                  <option value="suv">SUV</option>
-                  <option value="muv">MUV</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label>Vehicle Name *</label>
-                <input type="text" name="vehicle_name" placeholder="e.g. Swift (Self-Drive)" required />
-              </div>
-              <div class="form-group">
-                <label>Seats *</label>
-                <input type="number" name="total_seats" value="5" min="1" required />
-              </div>
-              <div class="form-group">
-                <label>Rent per Day (₹) *</label>
-                <input type="number" name="fixed_fare_inr" placeholder="e.g. 2500" required />
-              </div>
-              <div class="form-group full-width">
-                <label>Current Location City *</label>
-                <div style="display: flex; gap: 8px;">
-                  <input type="text" id="selfdrive-origin" name="origin" placeholder="e.g. Jaipur" style="flex: 1;" required />
-                  <button type="button" class="btn-toggle" onclick="detectProviderGPS('selfdrive-origin')" style="padding: 0 12px; margin: 0; display: flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap; font-size: 12.5px; background: rgba(29, 158, 117, 0.15); border-color: rgba(29, 158, 117, 0.25); color: #1DB954;">
-                    📍 Detect Location
-                  </button>
-                </div>
+      <!-- 2. SELF-DRIVE VEHICLE FORM -->
+      {% if show_self_drive %}
+      <div class="form-card" id="block-selfdrive" style="display: none;">
+        <h2>🔑 Self-Drive Rental Vehicle</h2>
+        <p class="card-subtitle">List vehicles available for self-driven customer rentals (priced per day)</p>
+        
+        <form id="form-selfdrive" onsubmit="handleFormSubmit(event, 'selfdrive')">
+          <input type="hidden" name="driver_included" value="false" />
+          <input type="hidden" name="destination" value="Private" />
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Vehicle Type *</label>
+              <select name="vehicle_type" required>
+                <option value="hatchback">Hatchback</option>
+                <option value="sedan">Sedan</option>
+                <option value="suv">SUV</option>
+                <option value="muv">MUV</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Vehicle Name *</label>
+              <input type="text" name="vehicle_name" placeholder="e.g. Swift (Self-Drive)" required />
+            </div>
+            <div class="form-group">
+              <label>Seats *</label>
+              <input type="number" name="total_seats" value="5" min="1" required />
+            </div>
+            <div class="form-group">
+              <label>Rent per Day (₹) *</label>
+              <input type="number" name="fixed_fare_inr" placeholder="e.g. 2500" required />
+            </div>
+            <div class="form-group full-width">
+              <label>Current Location City *</label>
+              <div style="display: flex; gap: 8px;">
+                <input type="text" id="selfdrive-origin" name="origin" placeholder="e.g. Jaipur" style="flex: 1;" required />
+                <button type="button" class="btn-toggle" onclick="detectProviderGPS('selfdrive-origin')" style="padding: 0 12px; margin: 0; display: flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap; font-size: 12.5px; background: rgba(29, 158, 117, 0.15); border-color: rgba(29, 158, 117, 0.25); color: #1DB954;">
+                  📍 Detect Location
+                </button>
               </div>
             </div>
-            <button type="submit" class="btn-add-vehicle">+ Add Self-Drive Vehicle</button>
-          </form>
-        </div>
-        {% endif %}
+          </div>
+          <button type="submit" class="btn-add-vehicle">+ Add Self-Drive Vehicle</button>
+        </form>
+      </div>
+      {% endif %}
 
-        <!-- Private Chauffeur sub-form -->
-        {% if bmode in ('solo_owner', 'both_services', 'self_drive_private', 'self_drive_both') or not bmode %}
-        <div id="sub-block-private" style="display: {% if bmode in ('self_drive_private', 'self_drive_both') %}none{% else %}block{% endif %};">
-          <h2>🚗 Private Chauffeur Booking</h2>
-          <p class="card-subtitle">List vehicle available for private distance-based chauffeur driven bookings</p>
-          
-          <form id="form-private" onsubmit="handleFormSubmit(event, 'private')">
-            <input type="hidden" name="driver_included" value="true" />
-            <div class="form-grid">
-              <div class="form-group">
-                <label>Vehicle Type *</label>
-                <select name="vehicle_type" required>
-                  <option value="hatchback">Hatchback</option>
-                  <option value="sedan">Sedan</option>
-                  <option value="suv">SUV</option>
-                  <option value="muv">MUV</option>
-                  <option value="mini_bus">Mini Bus</option>
-                  <option value="traveller_bus">Traveller Bus</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label>Vehicle Name *</label>
-                <input type="text" name="vehicle_name" placeholder="e.g. Toyota Innova" required />
-              </div>
-              <div class="form-group">
-                <label>Seats *</label>
-                <input type="number" name="total_seats" value="4" min="1" required />
-              </div>
-              <div class="form-group">
-                <label>Fare per KM (₹) *</label>
-                <input type="number" name="price_per_km_inr" placeholder="e.g. 15" step="0.5" required />
-              </div>
-              <div class="form-group full-width">
-                <label>Current City Available *</label>
-                <div style="display: flex; gap: 8px;">
-                  <input type="text" id="private-origin" name="origin" placeholder="e.g. Jaipur" style="flex: 1;" required />
-                  <button type="button" class="btn-toggle" onclick="detectProviderGPS('private-origin')" style="padding: 0 12px; margin: 0; display: flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap; font-size: 12.5px; background: rgba(29, 158, 117, 0.15); border-color: rgba(29, 158, 117, 0.25); color: #1DB954;">
-                    📍 Detect Location
-                  </button>
-                </div>
+      <!-- 3. PRIVATE CHAUFFEUR VEHICLE FORM -->
+      {% if show_private_chauffeur %}
+      <div class="form-card" id="block-private-chauffeur" style="display: none;">
+        <h2>🚗 Private Chauffeur Booking</h2>
+        <p class="card-subtitle">List vehicle available for private distance-based chauffeur driven bookings</p>
+        
+        <form id="form-private" onsubmit="handleFormSubmit(event, 'private')">
+          <input type="hidden" name="driver_included" value="true" />
+          <input type="hidden" name="destination" value="Private" />
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Vehicle Type *</label>
+              <select name="vehicle_type" required>
+                <option value="hatchback">Hatchback</option>
+                <option value="sedan">Sedan</option>
+                <option value="suv">SUV</option>
+                <option value="muv">MUV</option>
+                <option value="mini_bus">Mini Bus</option>
+                <option value="traveller_bus">Traveller Bus</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Vehicle Name *</label>
+              <input type="text" name="vehicle_name" placeholder="e.g. Toyota Innova" required />
+            </div>
+            <div class="form-group">
+              <label>Seats (excluding driver) *</label>
+              <input type="number" name="total_seats" value="4" min="1" required />
+            </div>
+            <div class="form-group">
+              <label>Fare per KM (₹) *</label>
+              <input type="number" name="price_per_km_inr" placeholder="e.g. 15" step="0.5" required />
+            </div>
+            <div class="form-group full-width">
+              <label>Current City Available *</label>
+              <div style="display: flex; gap: 8px;">
+                <input type="text" id="private-origin" name="origin" placeholder="e.g. Jaipur" style="flex: 1;" required />
+                <button type="button" class="btn-toggle" onclick="detectProviderGPS('private-origin')" style="padding: 0 12px; margin: 0; display: flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap; font-size: 12.5px; background: rgba(29, 158, 117, 0.15); border-color: rgba(29, 158, 117, 0.25); color: #1DB954;">
+                  📍 Detect Location
+                </button>
               </div>
             </div>
-            <button type="submit" class="btn-add-vehicle">+ Add Private Vehicle</button>
-          </form>
-        </div>
-        {% endif %}
+          </div>
+          <button type="submit" class="btn-add-vehicle">+ Add Private Vehicle</button>
+        </form>
       </div>
       {% endif %}
 
@@ -588,6 +472,121 @@
       {% endif %}
     </div>
   </div>
+
+  <!-- Left Side: Public Route Fleet & Active Listings -->
+  <div style="display: flex; flex-direction: column; gap: 24px;">
+    
+    <!-- 1. Saved Public Fleet (only shown if public route services are supported) -->
+    {% if show_public_btn %}
+    <div class="form-card">
+      <h2>📋 Saved Public Fleet ({{ vehicle_assets|length }})</h2>
+      <p class="card-subtitle">These vehicles can be assigned when adding a route.</p>
+      {% if vehicle_assets %}
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          {% for asset in vehicle_assets %}
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <div style="font-weight: 600; color: #fff; font-size: 13.5px;">
+                  {{ asset.vehicle_name }}
+                </div>
+                <div style="font-size: 11.5px; color: #7878a0; margin-top: 2px;">
+                  Type: {{ asset.vehicle_type|capitalize }} · Seats: {{ asset.total_seats }}
+                </div>
+              </div>
+              <form method="POST" action="/provider/vehicle-assets/{{ asset.id }}/delete" onsubmit="return confirm('Delete this vehicle from your fleet?')">
+                <button type="submit" style="background: none; border: none; font-size: 14px; cursor: pointer; color: #ff6b6b; padding: 4px;">🗑️</button>
+              </form>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p style="color: #6a6a8a; font-size: 13px; text-align: center; padding: 10px 0; margin: 0;">No fleet vehicles saved yet.</p>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- 2. Listed Vehicles / Active Listings -->
+    <div>
+      <h2 style="font-size: 18px; font-weight: 600; color: #fff; margin-bottom: 16px; margin-top: 10px;">Your Active Listings ({{ vehicles|length }})</h2>
+      {% if vehicles %}
+      <div class="vehicle-list">
+        {% for v in vehicles %}
+        <div class="vehicle-card active-listing-card" data-vehicle-id="{{ v.id }}"
+             data-name="{{ v.vehicle_name }}"
+             data-type="{{ v.vehicle_type }}"
+             data-origin="{{ v.origin }}"
+             data-destination="{{ v.destination }}"
+             data-fixed-fare="{{ v.fixed_fare_inr or '' }}"
+             data-price-per-km="{{ v.price_per_km_inr or '' }}"
+             data-departure-time="{{ v.departure_time or '' }}"
+             data-arrival-time="{{ v.arrival_time or '' }}"
+             data-pickups="{{ v.pickup_points or '' }}"
+             data-dropoffs="{{ v.dropoff_points or '' }}"
+             data-dates="{{ v.service_dates or '' }}"
+             data-driver-included="{{ 'true' if v.driver_included else 'false' }}">
+          <div style="display: flex; align-items: center; gap: 16px;">
+            <div style="font-size: 28px;">
+              {% if not v.driver_included %}🔑
+              {% elif 'bus' in v.vehicle_type %}🚌
+              {% elif v.vehicle_type == 'suv' %}🚙
+              {% else %}🚗
+              {% endif %}
+            </div>
+            <div>
+              <div style="font-weight: 600; color: #fff; font-size: 14.5px;">
+                {{ v.vehicle_name }} 
+                {% if not v.driver_included %}<span style="font-size: 11px; padding: 2px 6px; background: rgba(255,107,53,0.15); color: #FF6B35; border-radius: 4px; font-weight: 500; margin-left: 6px;">Self-Drive</span>{% endif %}
+              </div>
+              <div style="font-size: 12px; color: #7878a0; margin-top: 2px;">
+                {% if not v.driver_included %}
+                📍 Available at: {{ v.origin }} · ₹{{ v.fixed_fare_inr|int }}/day rental
+                {% elif v.destination == 'Private' %}
+                📍 Available at: {{ v.origin }} (Chauffeur Cab) · ₹{{ v.price_per_km_inr }}/KM
+                {% else %}
+                📍 Route: {{ v.origin }} → {{ v.destination }} · 🕐 {{ v.departure_time }} - {{ v.arrival_time }} · ₹{{ v.fixed_fare_inr }} per seat
+                {% endif %}
+              </div>
+              <div style="font-size: 11.5px; color: #505075; margin-top: 2px;">
+                {% if v.driver_included and v.destination == 'Private' %}
+                💺 Seats (excluding driver): {{ v.total_seats }}
+                {% else %}
+                💺 Seats: {{ v.total_seats }}
+                {% endif %}
+              </div>
+              {% if v.pickup_points %}
+              <div style="font-size: 11.5px; color: #FF6B35; margin-top: 4px; display: flex; align-items: center; gap: 4px;">
+                <span>📥</span> <strong>Pickups:</strong> {{ v.pickup_points.split(';')|join(', ') }}
+              </div>
+              {% endif %}
+              {% if v.dropoff_points %}
+              <div style="font-size: 11.5px; color: #4b88ff; margin-top: 2px; display: flex; align-items: center; gap: 4px;">
+                <span>📤</span> <strong>Drop-offs:</strong> {{ v.dropoff_points.split(';')|join(', ') }}
+              </div>
+              {% endif %}
+              {% if v.service_dates %}
+              <div style="font-size: 11.5px; color: #1DB954; margin-top: 2px; display: flex; align-items: center; gap: 4px;">
+                <span>📅</span> <strong>Dates:</strong> {{ v.service_dates.split(',')|join(', ') }}
+              </div>
+              {% endif %}
+            </div>
+          </div>
+          <div class="card-actions" style="display: flex; align-items: center; gap: 6px;">
+            <button type="button" class="btn-edit-listing" style="background: none; border: none; font-size: 15px; cursor: pointer; color: #4b88ff; padding: 8px;" title="Edit Listing">✏️</button>
+            <form method="POST" action="/provider/vehicles/{{ v.id }}/delete" onsubmit="return confirm('Delete this vehicle listing?')">
+              <button type="submit" style="background: none; border: none; font-size: 15px; cursor: pointer; color: #ff6b6b; padding: 8px;" title="Delete Listing">🗑️</button>
+            </form>
+          </div>
+        </div>
+
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="empty" style="color: #6a6a8a; font-size: 13.5px; margin-top: 8px;">No listings added yet.</p>
+      {% endif %}
+    </div>
+
+  </div>
+
 </div>
 
 
@@ -776,28 +775,35 @@
   });
 
   function showMainFormBlock(type) {
-    const blockPrivate = document.getElementById("block-private-group");
+    const blockSelfDrive = document.getElementById("block-selfdrive");
+    const blockPrivateChauffeur = document.getElementById("block-private-chauffeur");
     const blockPublicVeh = document.getElementById("block-public-veh");
     const blockPublicRoute = document.getElementById("block-public-route");
     
-    const btnPrivate = document.getElementById("btn-toggle-private-veh");
+    const btnSelfDrive = document.getElementById("btn-toggle-selfdrive");
+    const btnPrivateChauffeur = document.getElementById("btn-toggle-private-chauffeur");
     const btnPublicVeh = document.getElementById("btn-toggle-public-veh");
     const btnPublicRoute = document.getElementById("btn-toggle-public-route");
 
     // Hide all form cards
-    if (blockPrivate) blockPrivate.style.display = "none";
+    if (blockSelfDrive) blockSelfDrive.style.display = "none";
+    if (blockPrivateChauffeur) blockPrivateChauffeur.style.display = "none";
     if (blockPublicVeh) blockPublicVeh.style.display = "none";
     if (blockPublicRoute) blockPublicRoute.style.display = "none";
     
     // Deactivate all buttons
-    if (btnPrivate) btnPrivate.classList.remove("active");
+    if (btnSelfDrive) btnSelfDrive.classList.remove("active");
+    if (btnPrivateChauffeur) btnPrivateChauffeur.classList.remove("active");
     if (btnPublicVeh) btnPublicVeh.classList.remove("active");
     if (btnPublicRoute) btnPublicRoute.classList.remove("active");
 
     // Show and activate selected
-    if (type === 'private-veh') {
-      if (blockPrivate) blockPrivate.style.display = "block";
-      if (btnPrivate) btnPrivate.classList.add("active");
+    if (type === 'selfdrive') {
+      if (blockSelfDrive) blockSelfDrive.style.display = "block";
+      if (btnSelfDrive) btnSelfDrive.classList.add("active");
+    } else if (type === 'private-chauffeur') {
+      if (blockPrivateChauffeur) blockPrivateChauffeur.style.display = "block";
+      if (btnPrivateChauffeur) btnPrivateChauffeur.classList.add("active");
     } else if (type === 'public-veh') {
       if (blockPublicVeh) blockPublicVeh.style.display = "block";
       if (btnPublicVeh) btnPublicVeh.classList.add("active");
@@ -807,34 +813,17 @@
     }
   }
 
-  function showPrivateSubBlock(subType) {
-    const subSelfDrive = document.getElementById("sub-block-selfdrive");
-    const subPrivate = document.getElementById("sub-block-private");
-    const btnSubSelfDrive = document.getElementById("btn-sub-selfdrive");
-    const btnSubPrivate = document.getElementById("btn-sub-private");
-
-    if (subSelfDrive) subSelfDrive.style.display = "none";
-    if (subPrivate) subPrivate.style.display = "none";
-    if (btnSubSelfDrive) btnSubSelfDrive.classList.remove("active");
-    if (btnSubPrivate) btnSubPrivate.classList.remove("active");
-
-    if (subType === 'selfdrive') {
-      if (subSelfDrive) subSelfDrive.style.display = "block";
-      if (btnSubSelfDrive) btnSubSelfDrive.classList.add("active");
-    } else if (subType === 'private') {
-      if (subPrivate) subPrivate.style.display = "block";
-      if (btnSubPrivate) btnSubPrivate.classList.add("active");
-    }
-  }
-
   document.addEventListener("DOMContentLoaded", function() {
     const showPublic = {{ 'true' if bmode in ('route_based', 'both_services', 'self_drive_public', 'self_drive_both') else 'false' }};
-    const showPrivate = {{ 'true' if bmode in ('solo_owner', 'both_services', 'self_drive_private', 'self_drive_both', 'self_drive_only') or not bmode else 'false' }};
+    const showSelfDrive = {{ 'true' if bmode in ('self_drive_only', 'self_drive_private', 'self_drive_both', 'self_drive_public') else 'false' }};
+    const showPrivateChauffeur = {{ 'true' if bmode in ('solo_owner', 'both_services', 'self_drive_private', 'self_drive_both') or not bmode else 'false' }};
     
     if (showPublic) {
       showMainFormBlock('public-route');
-    } else if (showPrivate) {
-      showMainFormBlock('private-veh');
+    } else if (showSelfDrive) {
+      showMainFormBlock('selfdrive');
+    } else if (showPrivateChauffeur) {
+      showMainFormBlock('private-chauffeur');
     }
   });
 
@@ -1034,6 +1023,7 @@
         const pickups = card.getAttribute("data-pickups");
         const dropoffs = card.getAttribute("data-dropoffs");
         const dates = card.getAttribute("data-dates");
+        const driverIncluded = card.getAttribute("data-driver-included") !== "false";
 
         // Clear dynamic wraps
         document.getElementById("edit-pickup-inputs-wrap").innerHTML = "";
@@ -1055,7 +1045,7 @@
         const timingGroup = document.getElementById("edit-timing-group");
         const routeDetailsGroup = document.getElementById("edit-route-details-group");
 
-        if (destination === "Private") {
+        if (destination === "Private" && driverIncluded) {
           // Private Chauffeur Cab
           destGroup.style.display = "none";
           fareGroup.style.display = "none";
@@ -1068,7 +1058,7 @@
           document.getElementById("edit-fixed-fare").removeAttribute("required");
           document.getElementById("edit-departure-time").removeAttribute("required");
           document.getElementById("edit-arrival-time").removeAttribute("required");
-        } else if (destination === "Rental" || !departureTime) {
+        } else if (destination === "Private" && !driverIncluded) {
           // Self-Drive Rental
           destGroup.style.display = "none";
           fareGroup.style.display = "block";

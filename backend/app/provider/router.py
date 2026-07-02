@@ -272,25 +272,17 @@ def _derive_cab_category(provider: Provider, vehicle: ProviderVehicle) -> str:
     Classify a listed vehicle as private / company / rental for the
     user-facing Cab Service tab.
 
-    Real signals (from provider_dashboard.html setup form + provider_vehicles.html):
-      - Provider.service_type: car_rental | bus_traveller_rental | both_car_big | self_drive
-      - ProviderVehicle.destination == "Private" sentinel -> listed via the
-        "Private Booking Service" form (distance-based, price_per_km_inr)
-      - Anything else -> listed via the "Route-Based Public Service" form
-        (fixed origin->destination, schedule, fixed_fare_inr)
+    Real signals:
+      - ProviderVehicle.driver_included == False -> Self-Drive Rental ("rental")
+      - ProviderVehicle.destination == "Private" -> Private Chauffeur Cab ("private")
+      - Anything else -> Route-based scheduled public transport ("company")
     """
-    service_type = (provider.service_type or "").lower()
-
-    if "self_drive" in service_type:
+    if not vehicle.driver_included:
         return "rental"
 
     if vehicle.destination == "Private":
         return "private"
 
-    if service_type in ("bus_traveller_rental", "both_car_big"):
-        return "company"
-
-    # car_rental provider running a scheduled route is still an operator-style listing
     return "company"
 
 
@@ -458,10 +450,13 @@ def book_vehicle(
     vehicle = db.query(ProviderVehicle).filter(ProviderVehicle.id == data.vehicle_id).first()
     if not vehicle:
         raise HTTPException(status_code=404, detail="Vehicle not found")
-    if vehicle.seats_available < data.num_seats:
+    if vehicle.driver_included and vehicle.seats_available < data.num_seats:
         raise HTTPException(status_code=400, detail="Not enough seats available")
 
-    if vehicle.destination == "Private":
+    if not vehicle.driver_included:
+        # Self-drive rental: use the fare sent from the frontend (which is days * daily fare)
+        total_fare = data.total_fare_inr if data.total_fare_inr is not None else (vehicle.fixed_fare_inr or 0.0)
+    elif vehicle.destination == "Private":
         # Private cab: fare = distance * price_per_km * total_seats
         dist = _calculate_geodesic_distance(data.pickup_location, data.dropoff_location)
         fare_per_km = vehicle.price_per_km_inr or 0.0
@@ -486,12 +481,14 @@ def book_vehicle(
         dropoff_location=data.dropoff_location,
         selected_seats=data.selected_seats,
         total_fare_inr=total_fare,
+        status="pending" if not vehicle.driver_included else "confirmed",
     )
     
-    if vehicle.destination == "Private":
-        vehicle.seats_booked = vehicle.total_seats
-    else:
-        vehicle.seats_booked += data.num_seats
+    if vehicle.driver_included:
+        if vehicle.destination == "Private":
+            vehicle.seats_booked = vehicle.total_seats
+        else:
+            vehicle.seats_booked += data.num_seats
 
     db.add(booking)
     db.commit()
@@ -831,5 +828,68 @@ async def provider_chat(
 
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/bookings/{booking_id}/accept", response_model=ProviderBookingOut)
+def accept_provider_booking(
+    booking_id: int,
+    provider: Provider = Depends(get_current_provider),
+    db: Session = Depends(get_db)
+):
+    booking = db.query(ProviderBooking).join(ProviderVehicle).filter(
+        ProviderBooking.id == booking_id,
+        ProviderVehicle.provider_id == provider.id
+    ).first()
+
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+
+    booking.status = "confirmed"
+    booking.provider_unread = False
+    db.commit()
+    db.refresh(booking)
+    return booking
+
+
+@router.post("/bookings/{booking_id}/decline", response_model=ProviderBookingOut)
+def decline_provider_booking(
+    booking_id: int,
+    provider: Provider = Depends(get_current_provider),
+    db: Session = Depends(get_db)
+):
+    booking = db.query(ProviderBooking).join(ProviderVehicle).filter(
+        ProviderBooking.id == booking_id,
+        ProviderVehicle.provider_id == provider.id
+    ).first()
+
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+
+    booking.status = "cancelled"
+    booking.provider_unread = False
+    db.commit()
+    db.refresh(booking)
+    return booking
+
+
+@router.get("/bookings/{booking_id}/status")
+def get_booking_status(
+    booking_id: int,
+    db: Session = Depends(get_db)
+):
+    booking = db.query(ProviderBooking).filter(ProviderBooking.id == booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    return {
+        "id": booking.id,
+        "status": booking.status,
+        "passenger_name": booking.passenger_name,
+        "travel_date": booking.travel_date,
+        "pickup_location": booking.pickup_location,
+        "dropoff_location": booking.dropoff_location,
+        "total_fare_inr": booking.total_fare_inr,
+        "vehicle_name": booking.vehicle.vehicle_name if booking.vehicle else "Vehicle",
+        "vehicle_type": booking.vehicle.vehicle_type if booking.vehicle else "cab"
+    }
 
 

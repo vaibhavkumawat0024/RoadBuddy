@@ -206,6 +206,7 @@ class ProviderBookingCreate(BaseModel):
     passenger_phone: Optional[str] = None
     passenger_email: Optional[str] = None
     passenger_details: Optional[str] = None
+    total_fare_inr: Optional[float] = None
 
 
 class ProviderBookingOut(BaseModel):
