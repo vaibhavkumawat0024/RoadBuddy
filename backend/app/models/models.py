@@ -428,8 +428,30 @@ class ProviderVehicle(Base):
     vehicle_asset = relationship("ProviderVehicleAsset")
  
     @property
+    def seats_booked_today(self):
+        from sqlalchemy.orm import object_session
+        session = object_session(self)
+        if session is None:
+            return self.seats_booked
+        
+        from datetime import date
+        today_str = date.today().isoformat()
+        
+        from app.models.models import ProviderBooking
+        bookings = session.query(ProviderBooking).filter(
+            ProviderBooking.vehicle_id == self.id,
+            ProviderBooking.travel_date == today_str,
+            ProviderBooking.status != "cancelled"
+        ).all()
+        
+        if self.destination == "Private":
+            return self.total_seats if bookings else 0
+        else:
+            return sum(b.num_seats for b in bookings)
+
+    @property
     def seats_available(self):
-        return max(self.total_seats - self.seats_booked, 0)
+        return max(self.total_seats - self.seats_booked_today, 0)
  
  
 class ProviderBooking(Base):

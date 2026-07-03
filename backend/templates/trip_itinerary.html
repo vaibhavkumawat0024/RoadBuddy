@@ -2925,7 +2925,8 @@
           confirmBtn.textContent = "Confirm & Book";
         }
       } catch (e) {
-        alert('Booking failed: network error');
+        console.error("Booking error details:", e);
+        alert('Booking failed: network error (' + e.message + ')');
         confirmBtn.disabled = false;
         confirmBtn.textContent = "Confirm & Book";
       }
@@ -2967,7 +2968,8 @@
           confirmBtn.textContent = "Confirm & Book";
         }
       } catch (e) {
-        alert('Booking failed: network error');
+        console.error("Booking error details:", e);
+        alert('Booking failed: network error (' + e.message + ')');
         confirmBtn.disabled = false;
         confirmBtn.textContent = "Confirm & Book";
       }
