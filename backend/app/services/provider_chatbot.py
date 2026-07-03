@@ -6,8 +6,8 @@ import httpx
 from app.core.config import settings
 from sqlalchemy.orm import Session
 
-GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL = "llama-3.1-8b-instant"
+GROQ_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+GROQ_MODEL = "gemini-1.5-flash"
 
 SYSTEM_PROMPT = """You are RoadBuddy Partner Assistant, a helpful AI guide for transport operators, fleet managers, and cab/bus service providers on the RoadBuddy platform.
 Your job is to help partners manage their vehicles, check user bookings, monitor stats/revenue, and configure settings.
@@ -222,7 +222,7 @@ def mock_partner_chat_response(message: str, provider_id: int = None, db: Sessio
 
 
 async def call_groq_chat(messages: list[dict], system_prompt: str) -> str:
-    headers = {"Authorization": f"Bearer {settings.groq_api_key}", "Content-Type": "application/json"}
+    headers = {"Authorization": f"Bearer {settings.gemini_api_key}", "Content-Type": "application/json"}
     groq_messages = [{"role": "system", "content": system_prompt}]
     for msg in messages:
         groq_messages.append({"role": msg["role"], "content": msg["content"]})
@@ -783,7 +783,7 @@ async def chat_with_provider_bot(message: str, history: list[dict] = None, provi
                 updated_history = messages + [{"role": "assistant", "content": update_response}]
                 return {"response": update_response, "history": updated_history, "total_messages": len(updated_history)}
 
-        if settings.groq_api_key:
+        if settings.gemini_api_key:
             try:
                 dynamic_prompt = SYSTEM_PROMPT
                 if db and provider_id:

@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     # AI
     openai_api_key: str = ""
     groq_api_key: str = ""
+    gemini_api_key: str = ""
 
     # Google Maps / Routing
     open_router_service_api_key: str = ""
@@ -27,7 +28,7 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24  # 24 hours
 
-    allowed_origins: list[str] = ["http://localhost:8000", "http://127.0.0.1:8000"]
+    allowed_origins: list[str] = ["http://localhost:8000", "http://127.0.0.1:8000", "http://localhost:3000", "http://127.0.0.1:3000"]
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

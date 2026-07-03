@@ -14,8 +14,8 @@ import json
 import httpx
 from app.core.config import settings
 
-GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL = "llama-3.1-8b-instant"
+GROQ_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+GROQ_MODEL = "gemini-1.5-flash"
 
 
 # ── Prompt Builder ────────────────────────────────────────────────────────────
@@ -89,7 +89,7 @@ Rules:
 
 async def call_groq_recommender(prompt: str) -> dict:
     headers = {
-        "Authorization": f"Bearer {settings.groq_api_key}",
+        "Authorization": f"Bearer {settings.gemini_api_key}",
         "Content-Type": "application/json",
     }
     payload = {
@@ -214,7 +214,7 @@ async def get_trip_recommendations(
     try:
         interests = interests or ["sightseeing"]
 
-        if settings.groq_api_key:
+        if settings.gemini_api_key:
             prompt = build_recommender_prompt(
                 home_city=home_city,
                 budget_inr=budget_inr,

@@ -6,7 +6,7 @@ from app.provider.pages import router as provider_pages_router
 from app.provider.food_pages import router as food_provider_pages_router
 from app.routers import booking
 
-from app.routers import trips, fuel, users, community, journal, transport, food
+from app.routers import trips, fuel, users, community, journal, transport, food, auth
 from app.pages import auth_pages, dashboard_pages
 from app.core.database import engine
 from sqlalchemy import text
@@ -127,6 +127,7 @@ app.add_middleware(
 
 # API routes
 app.include_router(users.router,     prefix="/api/users",     tags=["Users & Auth"])
+app.include_router(auth.router,      prefix="/api/auth",      tags=["Unified Auth"])
 app.include_router(trips.router,     prefix="/api/trips",     tags=["AI Trip Planner"])
 app.include_router(fuel.router,      prefix="/api/fuel",      tags=["Fuel & Toll"])
 app.include_router(community.router, prefix="/api/community", tags=["Community Routes"])

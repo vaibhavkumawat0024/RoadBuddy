@@ -5,8 +5,8 @@ AI Trip Chatbot Service — RoadBuddy (Groq)
 import httpx
 from app.core.config import settings
 
-GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL = "llama-3.1-8b-instant"
+GROQ_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+GROQ_MODEL = "gemini-1.5-flash"
 
 SYSTEM_PROMPT = """You are RoadBuddy AI, India's friendliest road trip assistant.
 You have deep expertise in Indian road trips, highways, tourist destinations,
@@ -153,7 +153,7 @@ def mock_chat_response(message: str, user_context: str = None) -> str:
 
 
 async def call_groq_chat(messages: list[dict], user_context: str = None) -> str:
-    headers = {"Authorization": f"Bearer {settings.groq_api_key}", "Content-Type": "application/json"}
+    headers = {"Authorization": f"Bearer {settings.gemini_api_key}", "Content-Type": "application/json"}
     sys_prompt = SYSTEM_PROMPT
     if user_context:
         sys_prompt += f"\n\n[USER CONTEXT]\nThe user is logged in. Use this context to answer questions about their name, profile, registered vehicles, active trips, and booking details (hotels, buses, trains, flights, cabs, transits). Be specific and match their queries with these details:\n{user_context}"
@@ -583,7 +583,7 @@ async def chat_with_roadbuddy(message: str, history: list[dict] = None, user_con
             return {"response": response_text, "history": updated_history, "total_messages": len(updated_history)}
             
         messages = truncated_history + [{"role": "user", "content": message}]
-        if settings.groq_api_key:
+        if settings.gemini_api_key:
             try:
                 response_text = await call_groq_chat(messages, user_context)
             except Exception as e:

@@ -15,8 +15,8 @@ import json
 import httpx
 from app.core.config import settings
 
-GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL = "llama-3.1-8b-instant"
+GROQ_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+GROQ_MODEL = "gemini-1.5-flash"
 
 
 # ── Prompt Builder ────────────────────────────────────────────────────────────
@@ -56,7 +56,7 @@ Rules:
 
 async def call_groq_search(prompt: str) -> dict:
     headers = {
-        "Authorization": f"Bearer {settings.groq_api_key}",
+        "Authorization": f"Bearer {settings.gemini_api_key}",
         "Content-Type": "application/json",
     }
     payload = {
@@ -161,7 +161,7 @@ async def smart_search(query: str) -> dict:
     Takes natural language query and returns extracted filters + suggestions.
     """
     try:
-        if settings.groq_api_key:
+        if settings.gemini_api_key:
             prompt = build_search_prompt(query)
             filters = await call_groq_search(prompt)
         else:

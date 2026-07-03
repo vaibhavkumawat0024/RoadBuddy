@@ -1032,6 +1032,111 @@
   let userHeading = null;
   let prevGpsCoords = null;
 
+  // ─── TRIP STOPS & GEOGRAPHIC DISTANCE HELPERS ──────────
+  const tripStops = [];
+  {% if trip and trip.stops %}
+    {% for s in trip.stops %}
+      tripStops.push("{{ s.place_name }}");
+    {% endfor %}
+  {% endif %}
+
+  function getDistanceKm(lat1, lon1, lat2, lon2) {
+    if (leafletMap) {
+      try {
+        const dist = leafletMap.distance([lat1, lon1], [lat2, lon2]);
+        return (dist / 1000).toFixed(1);
+      } catch (e) {
+        // Fallback below
+      }
+    }
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return (R * c).toFixed(1);
+  }
+
+  let partnerRestaurantMarkers = [];
+
+  async function loadPartnerRestaurantsOnMap() {
+    if (!leafletMap) return;
+    
+    // Clear any existing partner restaurant markers first
+    partnerRestaurantMarkers.forEach(m => leafletMap.removeLayer(m));
+    partnerRestaurantMarkers = [];
+
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const activeTripId = urlParams.get('trip_id') || tripId || "";
+      const queryCities = [prefillOrigin, prefillDestination, ...tripStops].filter(Boolean).join(",");
+      
+      const res = await fetch(`/api/food/restaurants?city=${encodeURIComponent(queryCities)}`);
+      if (!res.ok) return;
+      
+      const partnerRestaurants = await res.json();
+      
+      let refLat = null;
+      let refLon = null;
+      if (gpsCoords && gpsCoords.lat && gpsCoords.lon) {
+        refLat = gpsCoords.lat;
+        refLon = gpsCoords.lon;
+      } else if (currentPolyline && currentPolyline.length > 0) {
+        refLat = currentPolyline[0].lat;
+        refLon = currentPolyline[0].lng || currentPolyline[0].lon;
+      }
+      
+      partnerRestaurants.forEach(r => {
+        if (!r.latitude || !r.longitude) return;
+        
+        let distanceHtml = '';
+        if (refLat && refLon) {
+          const distKm = getDistanceKm(refLat, refLon, r.latitude, r.longitude);
+          distanceHtml = `<div style="font-size:11.5px; color:#10b981; font-weight:700; margin-bottom:4px;">🚗 ${distKm} km away</div>`;
+        }
+        
+        let orderButtonHtml = '';
+        if (activeTripId) {
+          orderButtonHtml = `
+            <a href="/trips/${activeTripId}/restaurants/${r.id}" target="_blank" style="display: block; width: 100%; text-align: center; background: #10b981; color: white; padding: 6px 0; border-radius: 6px; font-size: 11px; font-weight: 700; text-decoration: none; margin-top: 6px; box-shadow: 0 2px 6px rgba(16,185,129,0.25);">
+              🛒 View Menu & Order
+            </a>
+          `;
+        }
+        
+        const popupContent = `
+          <div style="font-family:'Plus Jakarta Sans',sans-serif; padding:4px; max-width:220px; text-align: left;">
+            <div style="font-size: 9.5px; font-weight: 800; color: #d97706; text-transform: uppercase; margin-bottom: 2px;">🌟 RoadBuddy Partner</div>
+            <div style="font-weight:800; font-size:13.5px; color:var(--text-dark); margin-bottom:4px;">🍴 ${escapeHTML(r.name)}</div>
+            ${distanceHtml}
+            <div style="font-size:11px; color:#f59e0b; font-weight:600; margin-bottom:4px;">Rating: ★ ${(r.rating || 4.0).toFixed(1)} (${r.reviews_count || 0} reviews)</div>
+            <div style="font-size:11px; color:var(--text-muted); margin-bottom:4px;">📍 ${escapeHTML(r.address || r.city)}</div>
+            ${orderButtonHtml}
+          </div>
+        `;
+        
+        const partnerIcon = L.divIcon({
+          html: `<div style="background-color: #10b981; width: 32px; height: 32px; border-radius: 50%; border: 3px solid #fbbf24; display: flex; align-items: center; justify-content: center; font-size: 15px; box-shadow: 0 0 12px rgba(251, 191, 36, 0.6); position: relative; animation: pulseGlow 2s infinite;">
+                   🌟
+                 </div>`,
+          className: '',
+          iconSize: [32, 32],
+          iconAnchor: [16, 16],
+          popupAnchor: [0, -16]
+        });
+        
+        const marker = L.marker([r.latitude, r.longitude], { icon: partnerIcon }).addTo(leafletMap);
+        marker.bindPopup(popupContent);
+        partnerRestaurantMarkers.push(marker);
+        searchMarkers.push(marker); // Keep tracked so clearPoiMarkers can clear them too
+      });
+    } catch (e) {
+      console.error("Failed to load partner restaurants on map:", e);
+    }
+  }
+
   // ─── COMPASS / HEADING HELPERS ─────────────────────────
   function calcBearing(lat1, lon1, lat2, lon2) {
     const toRad = d => d * Math.PI / 180;
@@ -2924,6 +3029,7 @@
       renderCarDirections(route.instructions, distKm, durHrs, durMins);
       document.getElementById('nav-toggle-btn').style.display = 'block';
       setTimeout(() => leafletMap.invalidateSize(), 100);
+      loadPartnerRestaurantsOnMap();
     });
 
     setTimeout(() => leafletMap.invalidateSize(), 300);
@@ -3515,6 +3621,7 @@
   function clearPoiMarkers() {
     searchMarkers.forEach(m => leafletMap.removeLayer(m));
     searchMarkers = [];
+    partnerRestaurantMarkers = [];
   }
 
   function sampleRoutePoints(coords, maxPoints = 25) {
@@ -3601,12 +3708,18 @@
       out body center;`;
       
     try {
+      if (category === 'restaurant') {
+        await loadPartnerRestaurantsOnMap();
+      }
+
       const response = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`);
       if (!response.ok) throw new Error("API status " + response.status);
       const data = await response.json();
       
       const elements = data.elements || [];
-      if (elements.length === 0) {
+      const partnerCount = partnerRestaurantMarkers.length;
+
+      if (elements.length === 0 && partnerCount === 0) {
         alert("No nearby " + category + "s found in this area. Try zooming out or panning to another area.");
       } else {
         const emojiMap = {
@@ -3641,9 +3754,25 @@
           const cuisine = tags.cuisine || '';
           const openingHours = tags.opening_hours || '';
           
+          let distanceHtml = '';
+          let refLat = null;
+          let refLon = null;
+          if (gpsCoords && gpsCoords.lat && gpsCoords.lon) {
+            refLat = gpsCoords.lat;
+            refLon = gpsCoords.lon;
+          } else if (currentPolyline && currentPolyline.length > 0) {
+            refLat = currentPolyline[0].lat;
+            refLon = currentPolyline[0].lng || currentPolyline[0].lon;
+          }
+          if (refLat && refLon) {
+            const distKm = getDistanceKm(refLat, refLon, lat, lon);
+            distanceHtml = `<div style="font-size:11px; color:#10b981; font-weight:700; margin-bottom:4px;">🚗 ${distKm} km away</div>`;
+          }
+
           let popupContent = `
             <div style="font-family:'Plus Jakarta Sans',sans-serif; padding:4px; max-width:200px;">
               <div style="font-weight:800; font-size:13.5px; color:var(--text-dark); margin-bottom:4px;">${currentEmoji} ${escapeHTML(name)}</div>
+              ${distanceHtml}
           `;
           if (cuisine) popupContent += `<div style="font-size:11px; color:var(--secondary); font-weight:600; margin-bottom:4px;">${escapeHTML(cuisine)}</div>`;
           if (address) popupContent += `<div style="font-size:11px; color:var(--text-muted); margin-bottom:4px;">📍 ${escapeHTML(address)}</div>`;

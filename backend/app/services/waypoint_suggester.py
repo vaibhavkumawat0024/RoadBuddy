@@ -6,8 +6,8 @@ import json
 import httpx
 from app.core.config import settings
 
-GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL = "llama-3.1-8b-instant"
+GROQ_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+GROQ_MODEL = "gemini-1.5-flash"
 
 
 def build_waypoint_prompt(origin, destination, preferences, travel_mode, num_people, group_type):
@@ -44,7 +44,7 @@ Types: nature, food, heritage, viewpoint, fuel, adventure, market, hidden_gem"""
 
 
 async def call_groq_waypoints(prompt: str) -> dict:
-    headers = {"Authorization": f"Bearer {settings.groq_api_key}", "Content-Type": "application/json"}
+    headers = {"Authorization": f"Bearer {settings.gemini_api_key}", "Content-Type": "application/json"}
     payload = {"model": GROQ_MODEL, "messages": [{"role": "user", "content": prompt}], "temperature": 0.7, "max_tokens": 3000}
     async with httpx.AsyncClient(timeout=60) as client:
         res = await client.post(GROQ_URL, headers=headers, json=payload)
@@ -77,7 +77,7 @@ def mock_waypoints(origin, destination):
 
 async def suggest_waypoints(origin, destination, preferences=None, travel_mode="own_vehicle", num_people=2, group_type="friends"):
     try:
-        if settings.groq_api_key:
+        if settings.gemini_api_key:
             data = await call_groq_waypoints(build_waypoint_prompt(origin, destination, preferences or [], travel_mode, num_people, group_type))
         else:
             data = mock_waypoints(origin, destination)

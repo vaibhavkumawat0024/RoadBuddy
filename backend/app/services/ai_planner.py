@@ -10,8 +10,8 @@ from datetime import date
 from app.core.config import settings
 from app.schemas.schemas import TripCreate, ItineraryStop, TripOut, TravelMode
 
-GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL = "llama-3.1-8b-instant"
+GROQ_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+GROQ_MODEL = "gemini-1.5-flash"
 
 
 def get_season(start_date) -> str:
@@ -180,7 +180,7 @@ Place types: sightseeing, hotel, destination_food"""
 async def call_groq(prompt: str) -> dict:
     import asyncio
     headers = {
-        "Authorization": f"Bearer {settings.groq_api_key}",
+        "Authorization": f"Bearer {settings.gemini_api_key}",
         "Content-Type": "application/json",
     }
     payload = {
@@ -321,7 +321,7 @@ def mock_transport_itinerary(trip: TripCreate) -> dict:
 async def generate_itinerary(trip: TripCreate, vehicle_info: dict) -> TripOut:
     try:
         if trip.travel_mode == TravelMode.own_vehicle:
-            if settings.groq_api_key:
+            if settings.gemini_api_key:
                 try:
                     data = await call_groq(build_own_vehicle_prompt(trip, vehicle_info))
                 except Exception as e:
@@ -330,7 +330,7 @@ async def generate_itinerary(trip: TripCreate, vehicle_info: dict) -> TripOut:
             else:
                 data = mock_own_vehicle(trip, vehicle_info)
         else:
-            if settings.groq_api_key:
+            if settings.gemini_api_key:
                 try:
                     data = await call_groq(build_transport_prompt(trip))
                 except Exception as e:
