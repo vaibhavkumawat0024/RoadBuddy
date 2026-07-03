@@ -152,21 +152,14 @@ def mock_chat_response(message: str, user_context: str = None) -> str:
                 "Try: 'Plan a 3-day trip from Jaipur to Udaipur for 2 people' 😊")
 
 
+from app.services.groq_client import call_gemini_native
+
 async def call_groq_chat(messages: list[dict], user_context: str = None) -> str:
-    headers = {"Authorization": f"Bearer {settings.gemini_api_key}", "Content-Type": "application/json"}
     sys_prompt = SYSTEM_PROMPT
     if user_context:
         sys_prompt += f"\n\n[USER CONTEXT]\nThe user is logged in. Use this context to answer questions about their name, profile, registered vehicles, active trips, and booking details (hotels, buses, trains, flights, cabs, transits). Be specific and match their queries with these details:\n{user_context}"
-    groq_messages = [{"role": "system", "content": sys_prompt}]
-    for msg in messages:
-        groq_messages.append({"role": msg["role"], "content": msg["content"]})
-    payload = {"model": GROQ_MODEL, "messages": groq_messages, "temperature": 0.8, "max_tokens": 1000}
-    async with httpx.AsyncClient(timeout=30) as client:
-        res = await client.post(GROQ_URL, headers=headers, json=payload)
-        if res.status_code != 200:
-            print(f"Groq error: {res.status_code} — {res.text}")
-        res.raise_for_status()
-        return res.json()["choices"][0]["message"]["content"].strip()
+    combined_messages = [{"role": "system", "content": sys_prompt}] + messages
+    return await call_gemini_native(combined_messages, temperature=0.8, max_tokens=1000)
 
 
 def lookup_details_by_id(db, record_id: int) -> str:

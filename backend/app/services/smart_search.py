@@ -54,26 +54,7 @@ Rules:
 
 # ── Call Groq API ─────────────────────────────────────────────────────────────
 
-async def call_groq_search(prompt: str) -> dict:
-    headers = {
-        "Authorization": f"Bearer {settings.gemini_api_key}",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "model": GROQ_MODEL,
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.3,
-        "max_tokens": 1000,
-    }
-    async with httpx.AsyncClient(timeout=30) as client:
-        res = await client.post(GROQ_URL, headers=headers, json=payload)
-        res.raise_for_status()
-        text = res.json()["choices"][0]["message"]["content"].strip()
-        if text.startswith("```"):
-            text = text.split("```")[1]
-            if text.startswith("json"):
-                text = text[4:]
-        return json.loads(text.strip())
+from app.services.groq_client import call_groq as call_groq_search
 
 
 # ── Mock Response ─────────────────────────────────────────────────────────────
