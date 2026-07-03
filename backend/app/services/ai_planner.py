@@ -10,8 +10,8 @@ from datetime import date
 from app.core.config import settings
 from app.schemas.schemas import TripCreate, ItineraryStop, TripOut, TravelMode
 
-GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL = "llama-3.1-8b-instant"
+GROQ_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+GROQ_MODEL = "gemini-1.5-flash"
 
 
 def get_season(start_date) -> str:
@@ -186,36 +186,7 @@ Return ONLY valid JSON, no markdown:
 Place types: sightseeing, hotel, destination_food"""
 
 
-async def call_groq(prompt: str) -> dict:
-    import asyncio
-    headers = {
-        "Authorization": f"Bearer {settings.groq_api_key}",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "model": GROQ_MODEL,
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.7,
-        "max_tokens": 4000,
-    }
-    for attempt in range(3):
-        async with httpx.AsyncClient(timeout=60) as client:
-            res = await client.post(GROQ_URL, headers=headers, json=payload)
-            if res.status_code == 429:
-                wait = (attempt + 1) * 15
-                print(f"Rate limit hit, waiting {wait}s...")
-                await asyncio.sleep(wait)
-                continue
-            res.raise_for_status()
-            text = res.json()["choices"][0]["message"]["content"].strip()
-            if text.startswith("```"):
-                text = text.split("```")[1]
-                if text.startswith("json"):
-                    text = text[4:]
-            return json.loads(text.strip())
-
-    # All retries failed
-    raise RuntimeError("All Groq retry attempts failed.")
+from app.services.groq_client import call_groq
 
 
 def mock_own_vehicle(trip: TripCreate, vehicle_info: dict = None) -> dict:
@@ -414,20 +385,20 @@ async def generate_itinerary(trip: TripCreate, vehicle_info: dict) -> TripOut:
                     "category": "car",
                     "mileage_kmpl": 15.0
                 }
-            if settings.groq_api_key:
+            if settings.gemini_api_key:
                 try:
                     data = await call_groq(build_own_vehicle_prompt(trip, vehicle_info))
                 except Exception as e:
-                    print(f"Groq itinerary failed: {e}. Falling back to mock.")
+                    print(f"Gemini itinerary failed: {e}. Falling back to mock.")
                     data = mock_own_vehicle(trip, vehicle_info)
             else:
                 data = mock_own_vehicle(trip, vehicle_info)
         else:
-            if settings.groq_api_key:
+            if settings.gemini_api_key:
                 try:
                     data = await call_groq(build_transport_prompt(trip))
                 except Exception as e:
-                    print(f"Groq itinerary failed: {e}. Falling back to mock.")
+                    print(f"Gemini itinerary failed: {e}. Falling back to mock.")
                     data = mock_transport_itinerary(trip)
             else:
                 data = mock_transport_itinerary(trip)

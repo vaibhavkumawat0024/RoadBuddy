@@ -7,8 +7,8 @@ import httpx
 from app.core.config import settings
 from datetime import date
 
-GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL = "llama-3.1-8b-instant"
+GROQ_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+GROQ_MODEL = "gemini-1.5-flash"
 
 
 def get_season(travel_date: str) -> str:
@@ -63,18 +63,7 @@ Hazard types: mountain_road, ghat_section, flood_prone, landslide_zone, fog_zone
 Severity: low, medium, high, critical"""
 
 
-async def call_groq_safety(prompt: str) -> dict:
-    headers = {"Authorization": f"Bearer {settings.groq_api_key}", "Content-Type": "application/json"}
-    payload = {"model": GROQ_MODEL, "messages": [{"role": "user", "content": prompt}], "temperature": 0.5, "max_tokens": 3000}
-    async with httpx.AsyncClient(timeout=60) as client:
-        res = await client.post(GROQ_URL, headers=headers, json=payload)
-        res.raise_for_status()
-        text = res.json()["choices"][0]["message"]["content"].strip()
-        if text.startswith("```"):
-            text = text.split("```")[1]
-            if text.startswith("json"):
-                text = text[4:]
-        return json.loads(text.strip())
+from app.services.groq_client import call_groq as call_groq_safety
 
 
 def mock_safety_report(origin, destination, travel_date, departure_time):
@@ -112,7 +101,7 @@ EMERGENCY_CONTACTS = [
 
 async def analyze_route_safety(origin, destination, travel_date, departure_time="08:00", vehicle_type="car", num_people=2):
     try:
-        if settings.groq_api_key:
+        if settings.gemini_api_key:
             data = await call_groq_safety(build_safety_prompt(origin, destination, travel_date, departure_time, vehicle_type, num_people))
         else:
             data = mock_safety_report(origin, destination, travel_date, departure_time)

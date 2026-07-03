@@ -6,8 +6,8 @@ import json
 import httpx
 from app.core.config import settings
 
-GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL = "llama-3.1-8b-instant"
+GROQ_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+GROQ_MODEL = "gemini-1.5-flash"
 
 
 def build_summarizer_prompt(origin, destination, entries, total_days, total_cost_inr, group_type, num_people):
@@ -40,18 +40,7 @@ Generate a complete trip summary. Return ONLY valid JSON, no markdown:
 }}"""
 
 
-async def call_groq_summarizer(prompt: str) -> dict:
-    headers = {"Authorization": f"Bearer {settings.groq_api_key}", "Content-Type": "application/json"}
-    payload = {"model": GROQ_MODEL, "messages": [{"role": "user", "content": prompt}], "temperature": 0.8, "max_tokens": 4000}
-    async with httpx.AsyncClient(timeout=60) as client:
-        res = await client.post(GROQ_URL, headers=headers, json=payload)
-        res.raise_for_status()
-        text = res.json()["choices"][0]["message"]["content"].strip()
-        if text.startswith("```"):
-            text = text.split("```")[1]
-            if text.startswith("json"):
-                text = text[4:]
-        return json.loads(text.strip())
+from app.services.groq_client import call_groq as call_groq_summarizer
 
 
 def mock_summary(origin, destination, entries, total_days, total_cost_inr, num_people):
@@ -72,7 +61,7 @@ def mock_summary(origin, destination, entries, total_days, total_cost_inr, num_p
 
 async def summarize_trip_journal(origin, destination, entries, total_days, total_cost_inr=0, group_type="friends", num_people=2):
     try:
-        if settings.groq_api_key and entries:
+        if settings.gemini_api_key and entries:
             data = await call_groq_summarizer(build_summarizer_prompt(origin, destination, entries, total_days, total_cost_inr, group_type, num_people))
         else:
             data = mock_summary(origin, destination, entries, total_days, total_cost_inr, num_people)

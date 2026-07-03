@@ -6,8 +6,8 @@ import httpx
 from app.core.config import settings
 from sqlalchemy.orm import Session
 
-GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL = "llama-3.1-8b-instant"
+GROQ_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+GROQ_MODEL = "gemini-1.5-flash"
 
 SYSTEM_PROMPT = """You are RoadBuddy Partner Assistant, a helpful AI guide for transport operators, fleet managers, and cab/bus service providers on the RoadBuddy platform.
 Your job is to help partners manage their vehicles, check user bookings, monitor stats/revenue, and configure settings.
@@ -221,18 +221,11 @@ def mock_partner_chat_response(message: str, provider_id: int = None, db: Sessio
         return "I can only answer questions related to our app."
 
 
+from app.services.groq_client import call_gemini_native
+
 async def call_groq_chat(messages: list[dict], system_prompt: str) -> str:
-    headers = {"Authorization": f"Bearer {settings.groq_api_key}", "Content-Type": "application/json"}
-    groq_messages = [{"role": "system", "content": system_prompt}]
-    for msg in messages:
-        groq_messages.append({"role": msg["role"], "content": msg["content"]})
-    payload = {"model": GROQ_MODEL, "messages": groq_messages, "temperature": 0.5, "max_tokens": 800}
-    async with httpx.AsyncClient(timeout=30) as client:
-        res = await client.post(GROQ_URL, headers=headers, json=payload)
-        if res.status_code != 200:
-            print(f"Groq error: {res.status_code} — {res.text}")
-        res.raise_for_status()
-        return res.json()["choices"][0]["message"]["content"].strip()
+    combined_messages = [{"role": "system", "content": system_prompt}] + messages
+    return await call_gemini_native(combined_messages, temperature=0.5, max_tokens=800)
 
 
 def find_best_vehicle_match(message: str, vehicles: list) -> tuple:
@@ -783,7 +776,7 @@ async def chat_with_provider_bot(message: str, history: list[dict] = None, provi
                 updated_history = messages + [{"role": "assistant", "content": update_response}]
                 return {"response": update_response, "history": updated_history, "total_messages": len(updated_history)}
 
-        if settings.groq_api_key:
+        if settings.gemini_api_key:
             try:
                 dynamic_prompt = SYSTEM_PROMPT
                 if db and provider_id:

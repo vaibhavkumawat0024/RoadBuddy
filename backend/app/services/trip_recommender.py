@@ -14,8 +14,8 @@ import json
 import httpx
 from app.core.config import settings
 
-GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL = "llama-3.1-8b-instant"
+GROQ_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+GROQ_MODEL = "gemini-1.5-flash"
 
 
 # ── Prompt Builder ────────────────────────────────────────────────────────────
@@ -87,28 +87,7 @@ Rules:
 
 # ── Call Groq API ─────────────────────────────────────────────────────────────
 
-async def call_groq_recommender(prompt: str) -> dict:
-    headers = {
-        "Authorization": f"Bearer {settings.groq_api_key}",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "model": GROQ_MODEL,
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.7,
-        "max_tokens": 3000,
-    }
-    async with httpx.AsyncClient(timeout=60) as client:
-        res = await client.post(GROQ_URL, headers=headers, json=payload)
-        if res.status_code != 200:
-            print(f"Groq error: {res.status_code} — {res.text}")
-        res.raise_for_status()
-        text = res.json()["choices"][0]["message"]["content"].strip()
-        if text.startswith("```"):
-            text = text.split("```")[1]
-            if text.startswith("json"):
-                text = text[4:]
-        return json.loads(text.strip())
+from app.services.groq_client import call_groq as call_groq_recommender
 
 
 # ── Mock Recommendations ──────────────────────────────────────────────────────
@@ -214,7 +193,7 @@ async def get_trip_recommendations(
     try:
         interests = interests or ["sightseeing"]
 
-        if settings.groq_api_key:
+        if settings.gemini_api_key:
             prompt = build_recommender_prompt(
                 home_city=home_city,
                 budget_inr=budget_inr,

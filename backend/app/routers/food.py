@@ -362,6 +362,52 @@ def update_order_prep_time(
     return {"success": True, "preparation_time_mins": order.preparation_time_mins}
 
 
+@router.get("/provider/restaurant")
+def get_provider_restaurant(
+    current_provider: Provider = Depends(get_current_provider),
+    db: Session = Depends(get_db)
+):
+    """Retrieve details and menu items for the logged-in provider's restaurant."""
+    restaurant = db.query(Restaurant).filter(Restaurant.provider_id == current_provider.id).first()
+    if not restaurant:
+        restaurant = Restaurant(
+            provider_id=current_provider.id,
+            name=current_provider.company_name or "My Restaurant",
+            city=current_provider.city or "Jaipur",
+            address="Main Street",
+            rating=4.0,
+            reviews_count=0
+        )
+        db.add(restaurant)
+        db.commit()
+        db.refresh(restaurant)
+
+    items = db.query(MenuItem).filter(MenuItem.restaurant_id == restaurant.id).all()
+    
+    return {
+        "restaurant": {
+            "id": restaurant.id,
+            "name": restaurant.name,
+            "city": restaurant.city,
+            "address": restaurant.address,
+            "rating": restaurant.rating,
+            "reviews_count": restaurant.reviews_count,
+            "contact_number": restaurant.contact_number
+        },
+        "menu_items": [
+            {
+                "id": item.id,
+                "name": item.name,
+                "description": item.description,
+                "price_inr": item.price_inr,
+                "category": item.category,
+                "rating": item.rating
+            }
+            for item in items
+        ]
+    }
+
+
 @router.post("/provider/menu", status_code=201)
 def add_provider_menu_item(
     data: MenuItemCreate,
