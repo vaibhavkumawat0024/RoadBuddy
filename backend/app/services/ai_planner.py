@@ -95,11 +95,18 @@ def build_own_vehicle_prompt(trip: TripCreate, vehicle_info: dict) -> str:
     else:
         road_trip_instructions = f"Since the one-way distance is {dist:.1f} km (which is <= 400 km), the drive will take under 1 day. Day 1 morning/afternoon should cover the highway travel, refueling, and roadside dhaba stops, with arrival at {trip.destination} by afternoon/evening to check in. Local sightseeing should start from Day 1 evening/night."
 
+    if trip.travel_mode == TravelMode.cab_service:
+        vehicle_details = "Hired Cab Service (traveling by road in a cab with driver)."
+        summary_instruction = f'7. The "ai_summary" field MUST be customized and personalized. Describe the road trip experience by Cab Service for the group size ({trip.num_people} travelers) on this specific Indian route. Do not mention "your vehicle", "mileage", or "fuel cost" as it is a hired cab.'
+    else:
+        vehicle_details = f"{category.upper()} running on {fuel_type.upper()} with an efficiency/mileage of {mileage} KMPL."
+        summary_instruction = f'7. The "ai_summary" field MUST be customized and personalized. Mention the specific vehicle selected ({category.upper()} running on {fuel_type.upper()}) and describe the driving experience in your own vehicle for the group size ({trip.num_people} travelers) on this specific Indian route.'
+
     return f"""You are RoadBuddy AI, India's expert road trip planner. This entire road trip must be within INDIA only. All places, landmarks, dhabas, cities, and NH highways must be real and located in India.
 
 Trip: {trip.origin} to {trip.destination} | {trip.start_date} to {trip.end_date}
 Distance: Approximately {dist:.1f} km one-way (so total round-trip distance is {dist * 2:.1f} km).
-Vehicle Selected by User: {category.upper()} running on {fuel_type.upper()} with an efficiency/mileage of {mileage} KMPL.
+Vehicle Selected by User: {vehicle_details}
 Season: {season.upper()}
 {get_budget_breakdown(trip.budget_inr, trip.num_people, fuel_type, "own_vehicle")}
 Group: {get_group_tips(trip.group_type, trip.num_people)} (Total {trip.num_people} travelers)
@@ -119,7 +126,7 @@ CRITICAL ITINERARY RULES:
    - Round-trip distance of {dist * 2:.1f} km.
    - Vehicle mileage of {mileage} KMPL.
    - Average fuel prices in India: Petrol (~104 INR/L), Diesel (~94 INR/L), CNG (~85 INR/L), Electric (Rs 2.5 per km).
-7. The "ai_summary" field MUST be customized and personalized. Mention the specific vehicle selected ({category.upper()} running on {fuel_type.upper()}) and describe the driving experience for the group size ({trip.num_people} travelers) on this specific Indian route. Do not write a generic summary.
+{summary_instruction}
 
 Return ONLY valid JSON, no markdown:
 {{
@@ -324,7 +331,11 @@ def mock_own_vehicle(trip: TripCreate, vehicle_info: dict = None) -> dict:
         "total_estimated_cost_inr": total_est,
         "season": season,
         "season_tip": "Check road conditions and tyre pressure before leaving.",
-        "ai_summary": f"A personalized road trip from {trip.origin} to {trip.destination} for a group of {num_p} ({trip.group_type}) in your {fuel_type.upper()} {category.upper()} (Mileage: {mileage_kmpl} KMPL).",
+        "ai_summary": (
+            f"A personalized road trip from {trip.origin} to {trip.destination} for a group of {num_p} ({trip.group_type}) by Cab Service."
+            if trip.travel_mode == TravelMode.cab_service else
+            f"A personalized road trip from {trip.origin} to {trip.destination} for a group of {num_p} ({trip.group_type}) in your {fuel_type.upper()} {category.upper()} (Mileage: {mileage_kmpl} KMPL)."
+        ),
         "stops": stops
     }
 

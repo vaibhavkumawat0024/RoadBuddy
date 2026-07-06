@@ -1080,7 +1080,20 @@
     try {
       const urlParams = new URLSearchParams(window.location.search);
       const activeTripId = urlParams.get('trip_id') || tripId || "";
-      const queryCities = [prefillOrigin, prefillDestination, ...tripStops].filter(Boolean).join(",");
+      const knownCities = ["Jodhpur", "Shimla", "Manali", "Chennai", "Agra", "Kolkata", "Jaipur", "Goa", "Udaipur", "Delhi", "Hyderabad", "Bangalore", "Pune", "Mumbai"];
+      const cleanStopCity = (stopName) => {
+        if (!stopName) return "";
+        const lower = stopName.toLowerCase();
+        for (const city of knownCities) {
+          if (lower.includes(city.toLowerCase())) return city;
+        }
+        const parts = stopName.split(",");
+        return parts.length > 0 ? parts[parts.length - 1].trim() : stopName;
+      };
+      const uniqueCities = Array.from(new Set(
+        [prefillOrigin, prefillDestination, ...tripStops.map(cleanStopCity)].filter(Boolean)
+      ));
+      const queryCities = uniqueCities.join(",");
       
       const res = await fetch(`/api/food/restaurants?city=${encodeURIComponent(queryCities)}`);
       if (!res.ok) return;

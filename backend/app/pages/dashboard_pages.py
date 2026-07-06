@@ -300,7 +300,7 @@ async def trip_itinerary_page(trip_id: int, request: Request, db: Session = Depe
             trip.origin_lat, trip.origin_lon,
             trip.destination_lat, trip.destination_lon
         )
-    elif trip.total_distance_km:
+    elif hasattr(trip, 'total_distance_km') and trip.total_distance_km:
         dist_one_way = trip.total_distance_km / 2
         
     travel_mode_str = str(trip.travel_mode).lower()
@@ -429,6 +429,17 @@ async def trip_itinerary_page(trip_id: int, request: Request, db: Session = Depe
 
     from app.models.models import Vehicle
     vehicles = db.query(Vehicle).filter(Vehicle.user_id == user.id).all()
+
+    # Clean up ai_summary if travel mode is not own_vehicle and contains vehicle details
+    travel_mode_str = str(trip.travel_mode).lower()
+    if "own_vehicle" not in travel_mode_str and trip.ai_summary:
+        if "in your" in trip.ai_summary.lower() or "mileage" in trip.ai_summary.lower():
+            num_people = trip.num_people or 1
+            group_type = trip.group_type or "solo"
+            if "cab" in travel_mode_str:
+                trip.ai_summary = f"A personalized road trip from {trip.origin} to {trip.destination} for a group of {num_people} ({group_type}) by Cab Service."
+            else:
+                trip.ai_summary = f"A personalized vacation in {trip.destination} for {num_people} travelers ({group_type}) traveling by {travel_mode_str.replace('_', ' ').title()}."
 
     token = request.cookies.get("access_token")
     has_unread_bookings = check_unread_bookings(user, db)
@@ -792,6 +803,9 @@ def cancel_booking(booking_id: int, request: Request, db: Session = Depends(get_
         
         db.commit()
 
+    referer = request.headers.get("referer")
+    if referer:
+        return RedirectResponse(referer, status_code=303)
     return RedirectResponse("/my-bookings", status_code=303)
 
 
@@ -835,6 +849,9 @@ def cancel_transit_booking(booking_id: int, request: Request, db: Session = Depe
             
         db.commit()
 
+    referer = request.headers.get("referer")
+    if referer:
+        return RedirectResponse(referer, status_code=303)
     return RedirectResponse("/my-bookings", status_code=303)
 
 
@@ -860,4 +877,7 @@ def cancel_hotel_booking(booking_id: int, request: Request, db: Session = Depend
             
         db.commit()
 
+    referer = request.headers.get("referer")
+    if referer:
+        return RedirectResponse(referer, status_code=303)
     return RedirectResponse("/my-bookings", status_code=303)
