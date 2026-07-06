@@ -335,17 +335,29 @@ def list_cab_services(
             if travel_date not in dates:
                 continue
 
+        query_date = travel_date
+        if not query_date:
+            from datetime import date
+            query_date = date.today().isoformat()
+
+        date_bookings_list = db.query(ProviderBooking).filter(
+            ProviderBooking.vehicle_id == v.id,
+            ProviderBooking.travel_date == query_date,
+            ProviderBooking.status != "cancelled"
+        ).all()
+
         # Private cab visibility logic:
+        if v.destination == "Private" and date_bookings_list:
+            # If booked on this date, only show if it belongs to the requesting user_id
+            if user_id is None or any(b.user_id != user_id for b in date_bookings_list):
+                continue
+
         if v.destination == "Private":
-            # Check if this private vehicle has any active bookings
-            booking = db.query(ProviderBooking).filter(
-                ProviderBooking.vehicle_id == v.id,
-                ProviderBooking.status != "cancelled"
-            ).first()
-            if booking:
-                # If booked, only show if it belongs to the requesting user_id
-                if user_id is None or booking.user_id != user_id:
-                    continue
+            seats_booked_on_date = v.total_seats if date_bookings_list else 0
+        else:
+            seats_booked_on_date = sum(b.num_seats for b in date_bookings_list)
+
+        seats_available_on_date = max(v.total_seats - seats_booked_on_date, 0)
 
         results.append(CabServiceResult(
             id=v.id,
@@ -361,7 +373,7 @@ def list_cab_services(
             price_per_km_inr=v.price_per_km_inr,
             fixed_fare_inr=v.fixed_fare_inr,
             total_seats=v.total_seats,
-            seats_available=v.seats_available,
+            seats_available=seats_available_on_date,
             is_active=v.is_active,
             pickup_points=v.pickup_points,
             dropoff_points=v.dropoff_points,
@@ -385,8 +397,27 @@ def search_vehicles(data: VehicleSearchRequest, db: Session = Depends(get_db)):
 
     results = []
     for v in vehicles:
-        if v.seats_available < data.num_seats:
+        query_date = data.travel_date
+        if not query_date:
+            from datetime import date
+            query_date = date.today().isoformat()
+
+        date_bookings = db.query(ProviderBooking).filter(
+            ProviderBooking.vehicle_id == v.id,
+            ProviderBooking.travel_date == query_date,
+            ProviderBooking.status != "cancelled"
+        ).all()
+
+        if v.destination == "Private":
+            seats_booked_on_date = v.total_seats if date_bookings else 0
+        else:
+            seats_booked_on_date = sum(b.num_seats for b in date_bookings)
+
+        seats_available_on_date = max(v.total_seats - seats_booked_on_date, 0)
+
+        if seats_available_on_date < data.num_seats:
             continue
+
         # Filter by travel_date if service_dates is specified
         if data.travel_date and v.service_dates:
             dates = [d.strip() for d in v.service_dates.split(",") if d.strip()]
@@ -405,7 +436,7 @@ def search_vehicles(data: VehicleSearchRequest, db: Session = Depends(get_db)):
             destination=v.destination,
             departure_time=v.departure_time,
             estimated_fare_inr=fare,
-            seats_available=v.seats_available,
+            seats_available=seats_available_on_date,
         ))
     return results
 
@@ -450,7 +481,21 @@ def book_vehicle(
     vehicle = db.query(ProviderVehicle).filter(ProviderVehicle.id == data.vehicle_id).first()
     if not vehicle:
         raise HTTPException(status_code=404, detail="Vehicle not found")
-    if vehicle.driver_included and vehicle.seats_available < data.num_seats:
+    # Calculate seats booked for this vehicle on this specific date
+    date_bookings = db.query(ProviderBooking).filter(
+        ProviderBooking.vehicle_id == data.vehicle_id,
+        ProviderBooking.travel_date == data.travel_date,
+        ProviderBooking.status != "cancelled"
+    ).all()
+
+    if vehicle.destination == "Private":
+        seats_booked_on_date = vehicle.total_seats if date_bookings else 0
+    else:
+        seats_booked_on_date = sum(b.num_seats for b in date_bookings)
+
+    seats_available_on_date = max(vehicle.total_seats - seats_booked_on_date, 0)
+
+    if vehicle.driver_included and seats_available_on_date < data.num_seats:
         raise HTTPException(status_code=400, detail="Not enough seats available")
 
     if not vehicle.driver_included:
@@ -483,12 +528,6 @@ def book_vehicle(
         total_fare_inr=total_fare,
         status="pending" if not vehicle.driver_included else "confirmed",
     )
-    
-    if vehicle.driver_included:
-        if vehicle.destination == "Private":
-            vehicle.seats_booked = vehicle.total_seats
-        else:
-            vehicle.seats_booked += data.num_seats
 
     db.add(booking)
     db.commit()

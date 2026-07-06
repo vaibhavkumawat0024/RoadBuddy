@@ -81,6 +81,8 @@ async def create_trip(
                 time_slot  = stop.time_slot,
                 place_name = stop.place_name,
                 place_type = stop.place_type,
+                description = stop.description,
+                estimated_cost_inr = stop.estimated_cost_inr,
             )
             db.add(db_stop)
         db.commit()
@@ -155,7 +157,9 @@ def get_trip(
     if not trip:
         raise HTTPException(status_code=404, detail="Trip not found")
 
-    stops = db.query(TripStop).filter(TripStop.trip_id == trip.id).all()
+    raw_stops = db.query(TripStop).filter(TripStop.trip_id == trip.id).all()
+    slot_order = {"morning": 0, "afternoon": 1, "evening": 2, "night": 3}
+    stops = sorted(raw_stops, key=lambda s: (s.day, slot_order.get((s.time_slot or "").lower(), 4)))
 
     from app.schemas.schemas import ItineraryStop
     stop_list = [
@@ -164,7 +168,8 @@ def get_trip(
             time_slot   = s.time_slot,
             place_name  = s.place_name,
             place_type  = s.place_type,
-            description = "",
+            description = s.description or "",
+            estimated_cost_inr = s.estimated_cost_inr or 0.0,
         )
         for s in stops
     ]
@@ -268,6 +273,8 @@ async def update_trip(
                 time_slot  = stop.time_slot,
                 place_name = stop.place_name,
                 place_type = stop.place_type,
+                description = stop.description,
+                estimated_cost_inr = stop.estimated_cost_inr,
             )
             db.add(db_stop)
         

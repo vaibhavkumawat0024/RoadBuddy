@@ -210,9 +210,9 @@ async def trip_itinerary_page(trip_id: int, request: Request, db: Session = Depe
     if not trip:
         return RedirectResponse("/my-trips", status_code=303)
 
-    trip.stops = db.query(TripStop).filter(
-        TripStop.trip_id == trip.id
-    ).order_by(TripStop.day, TripStop.time_slot).all()
+    raw_stops = db.query(TripStop).filter(TripStop.trip_id == trip.id).all()
+    slot_order = {"morning": 0, "afternoon": 1, "evening": 2, "night": 3}
+    trip.stops = sorted(raw_stops, key=lambda s: (s.day, slot_order.get((s.time_slot or "").lower(), 4)))
 
     # Dynamic check: Auto-regenerate itinerary if it has only 1 day of stops but trip dates span multiple days
     from datetime import datetime
@@ -269,7 +269,9 @@ async def trip_itinerary_page(trip_id: int, request: Request, db: Session = Depe
                     day=stop_data.day,
                     time_slot=stop_data.time_slot,
                     place_name=stop_data.place_name,
-                    place_type=stop_data.place_type
+                    place_type=stop_data.place_type,
+                    description=stop_data.description,
+                    estimated_cost_inr=stop_data.estimated_cost_inr
                 )
                 db.add(new_stop)
             
@@ -284,9 +286,8 @@ async def trip_itinerary_page(trip_id: int, request: Request, db: Session = Depe
             db.commit()
             
             # Reload stops
-            trip.stops = db.query(TripStop).filter(
-                TripStop.trip_id == trip.id
-            ).order_by(TripStop.day, TripStop.time_slot).all()
+            raw_stops = db.query(TripStop).filter(TripStop.trip_id == trip.id).all()
+            trip.stops = sorted(raw_stops, key=lambda s: (s.day, slot_order.get((s.time_slot or "").lower(), 4)))
             
         except Exception as ex:
             print(f"Auto-regenerating old 1-day itinerary failed: {ex}")
@@ -302,20 +303,38 @@ async def trip_itinerary_page(trip_id: int, request: Request, db: Session = Depe
     elif trip.total_distance_km:
         dist_one_way = trip.total_distance_km / 2
         
-    driving_time_hours = 0
-    driving_time_mins = 0
-    if dist_one_way > 0:
-        # Assuming average speed of 65 km/h on Indian highways
-        total_hours = dist_one_way / 65.0
-        driving_time_hours = int(total_hours)
-        driving_time_mins = int((total_hours - driving_time_hours) * 60)
-        
+    travel_mode_str = str(trip.travel_mode).lower()
+    
+    # Speeds:
+    # own_vehicle / cab_service: 65 km/h
+    # bus: 50 km/h
+    # train: 70 km/h
+    # flight: 600 km/h + 2.0 hrs airport overhead
+    if "flight" in travel_mode_str:
+        speed = 600.0
+        airport_overhead = 2.0
+    elif "train" in travel_mode_str:
+        speed = 70.0
+        airport_overhead = 0.0
+    elif "bus" in travel_mode_str:
+        speed = 50.0
+        airport_overhead = 0.0
+    else:  # own_vehicle, cab_service
+        speed = 65.0
+        airport_overhead = 0.0
+
     travel_time_str = ""
-    if driving_time_hours > 0:
-        if driving_time_mins > 0:
-            travel_time_str = f"{driving_time_hours} hr {driving_time_mins} min"
+    if dist_one_way > 0:
+        total_hours = (dist_one_way / speed) + airport_overhead
+        hours = int(total_hours)
+        mins = int((total_hours - hours) * 60)
+        if hours > 0:
+            if mins > 0:
+                travel_time_str = f"{hours} hr {mins} min"
+            else:
+                travel_time_str = f"{hours} hr"
         else:
-            travel_time_str = f"{driving_time_hours} hr"
+            travel_time_str = f"{mins} min"
 
     from app.models.models import HotelBooking, Hotel, Booking, ProviderBooking
     booked_hotel = db.query(HotelBooking).join(Hotel).filter(

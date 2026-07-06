@@ -309,6 +309,25 @@
   let routingControl = null;
   let watchId = null; // for geolocation tracking
   let cabMarker = null; // active navigation marker (🚖)
+  let userInteractedWithMap = false;
+  let reFocusTimeout = null;
+
+  function handleMapInteraction() {
+    if (!isNavigating) return;
+    if (reFocusTimeout) {
+      clearTimeout(reFocusTimeout);
+    }
+    userInteractedWithMap = true;
+    
+    // Start a 5-second timer to re-enable auto-centering
+    reFocusTimeout = setTimeout(() => {
+      userInteractedWithMap = false;
+      if (isNavigating && driverLatLng) {
+        map.setView(driverLatLng, map.getZoom());
+      }
+    }, 5000);
+  }
+
   let driverMarker = null; // stationary driver marker (🚗)
   let activeBookingId = null; // active booking being navigated
   let activeVehicleId = null; // active vehicle being navigated
@@ -456,6 +475,8 @@
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           attribution: '© OpenStreetMap contributors'
         }).addTo(map);
+        map.on('dragstart', handleMapInteraction);
+        map.on('zoomstart', handleMapInteraction);
       } else {
         clearMapLayers();
       }
@@ -552,6 +573,8 @@
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           attribution: '© OpenStreetMap contributors'
         }).addTo(map);
+        map.on('dragstart', handleMapInteraction);
+        map.on('zoomstart', handleMapInteraction);
       } else {
         clearMapLayers();
       }
@@ -763,7 +786,9 @@
           const prevLatLng = cabMarker.getLatLng();
 
           cabMarker.setLatLng([curLat, curLon]);
-          map.setView([curLat, curLon], 16);
+          if (!userInteractedWithMap) {
+            map.setView([curLat, curLon], 16);
+          }
 
           // Update driverLatLng coordinate
           driverLatLng = L.latLng(curLat, curLon);
@@ -855,6 +880,11 @@
 
   function stopNavAndWatch(restoreDriverMarker = true) {
     isNavigating = false;
+    userInteractedWithMap = false;
+    if (reFocusTimeout) {
+      clearTimeout(reFocusTimeout);
+      reFocusTimeout = null;
+    }
     
     if (watchId !== null) {
       navigator.geolocation.clearWatch(watchId);
@@ -1092,6 +1122,8 @@
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
       }).addTo(map);
+      map.on('dragstart', handleMapInteraction);
+      map.on('zoomstart', handleMapInteraction);
     } else {
       clearMapLayers();
     }
@@ -1291,7 +1323,9 @@
           const prevLatLng = cabMarker.getLatLng();
 
           cabMarker.setLatLng([curLat, curLon]);
-          map.setView([curLat, curLon], 16);
+          if (!userInteractedWithMap) {
+            map.setView([curLat, curLon], 16);
+          }
 
           // Update driverLatLng coordinate
           driverLatLng = L.latLng(curLat, curLon);
@@ -1339,6 +1373,11 @@
 
   function stopTripAndWatch() {
     isNavigating = false;
+    userInteractedWithMap = false;
+    if (reFocusTimeout) {
+      clearTimeout(reFocusTimeout);
+      reFocusTimeout = null;
+    }
     
     if (watchId !== null) {
       navigator.geolocation.clearWatch(watchId);

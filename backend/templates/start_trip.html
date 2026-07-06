@@ -1019,6 +1019,10 @@
   let activeTransitOrigin = "";
   let activeTransitDestination = "";
   let currentMode = 'car';
+  function isGPSModeActive() {
+    const isPrivateCab = bookedCab && (bookedCab.selected_seats === "Whole Vehicle" || bookedCab.selected_seats === "Whole Vehicle (Private Cab)");
+    return currentMode === 'car' || (currentMode === 'cab' && isPrivateCab);
+  }
   let leafletMap = null;
   let routingControl = null;
   let tileLayer = null;
@@ -1182,6 +1186,27 @@
     });
   }
 
+  let userInteractedWithMap = false;
+  let reFocusTimeout = null;
+
+  function handleMapInteraction() {
+    if (!isNavigating) return;
+    
+    if (reFocusTimeout) {
+      clearTimeout(reFocusTimeout);
+    }
+    
+    userInteractedWithMap = true;
+    
+    // Start a 5-second timer to re-enable auto-centering
+    reFocusTimeout = setTimeout(() => {
+      userInteractedWithMap = false;
+      if (isNavigating && gpsCoords) {
+        leafletMap.setView([gpsCoords.lat, gpsCoords.lon], leafletMap.getZoom());
+      }
+    }, 5000);
+  }
+
   // ─── INIT MAP ────────────────────────────────────────────
   function initMap() {
     leafletMap = L.map('map', { zoomControl: false }).setView([20.5937, 78.9629], 5);
@@ -1189,6 +1214,9 @@
     tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap'
     }).addTo(leafletMap);
+
+    leafletMap.on('dragstart', handleMapInteraction);
+    leafletMap.on('zoomstart', handleMapInteraction);
 
     setTimeout(() => { leafletMap.invalidateSize(); }, 300);
   }
@@ -1200,7 +1228,8 @@
     document.getElementById('tab-' + mode).classList.add('active');
     document.getElementById('sidebar-panel').classList.remove('collapsed-view');
 
-    const isCarMode = mode === 'car';
+    const isPrivateCab = bookedCab && (bookedCab.selected_seats === "Whole Vehicle" || bookedCab.selected_seats === "Whole Vehicle (Private Cab)");
+    const isCarMode = mode === 'car' || (mode === 'cab' && isPrivateCab);
     const isCabMode = mode === 'cab';
     const modeBadge = document.getElementById('mode-badge');
     const gpsRow = document.getElementById('gps-status-row');
@@ -1211,7 +1240,15 @@
     if (isCarMode) {
       modeBadge.className = 'mode-badge mode-gps';
       const isSelfDrive = bookedCab && bookedCab.selected_seats === "Self-Drive Rental";
-      modeBadge.textContent = isSelfDrive ? '🛰️ GPS Mode — Self Drive Rental' : '🛰️ GPS Mode — Own Vehicle';
+      const isPrivateCabVal = bookedCab && (bookedCab.selected_seats === "Whole Vehicle" || bookedCab.selected_seats === "Whole Vehicle (Private Cab)");
+      
+      if (isSelfDrive) {
+        modeBadge.textContent = '🛰️ GPS Mode — Self Drive Rental';
+      } else if (isPrivateCabVal) {
+        modeBadge.textContent = '🛰️ GPS Mode — Private Cab';
+      } else {
+        modeBadge.textContent = '🛰️ GPS Mode — Own Vehicle';
+      }
       gpsRow.style.display = 'flex';
       gpsBtnWrap.style.display = 'block';
       originManual.style.display = 'block';
@@ -1376,7 +1413,7 @@
   function checkEnableRouteBtn() {
     const dest = document.getElementById('destination-input').value.trim();
     const btn = document.getElementById('get-routes-btn');
-    if (currentMode === 'car') {
+    if (isGPSModeActive()) {
       if (prefillOrigin) {
         const origin = document.getElementById('origin-manual').value.trim();
         btn.disabled = !origin || !dest;
@@ -1466,7 +1503,7 @@
       acTimers[inputId] = setTimeout(async () => {
         if (acCache[q]) { renderResults(acCache[q]); return; }
         try {
-          const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q + ', India')}&limit=6&addressdetails=1`;
+          const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q + ', India')}&countrycodes=in&limit=6&addressdetails=1`;
           const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
           const data = await res.json();
           const results = data.map(item => {
@@ -1561,7 +1598,7 @@
   }
   setupAutocomplete('destination-input', 'ac-destination', (result) => {
     checkEnableRouteBtn();
-    if (currentMode === 'car' && gpsLocked) {
+    if (isGPSModeActive() && gpsLocked) {
       leafletMap.setView(L.latLng(result.lat, result.lon), 10);
     }
   });
@@ -1576,7 +1613,7 @@
     }
     const cleanQ = q.toLowerCase().includes('india') ? q : q + ', India';
     try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanQ)}&limit=1`);
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanQ)}&countrycodes=in&limit=1`);
       const data = await res.json();
       if (data && data.length > 0) return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
     } catch(e) { console.error(e); }
@@ -1595,7 +1632,7 @@
       document.getElementById('sidebar-panel').classList.add('collapsed-view');
     }
 
-    if (currentMode === 'car') {
+    if (isGPSModeActive()) {
       let originCoords = null;
       let originVal = 'My Location';
 
@@ -3193,7 +3230,9 @@
     }
     userMarker.bindPopup(`<strong>${opt.operator}</strong><br/>En Route`);
     
-    leafletMap.setView(routeCoords[simIndex], 16);
+    if (!userInteractedWithMap) {
+      leafletMap.setView(routeCoords[simIndex], 16);
+    }
     
     const speedRanges = { bus: [60, 80], train: [100, 130], flight: [700, 900] };
     const range = speedRanges[mode] || [60, 80];
@@ -3218,7 +3257,9 @@
       const currPt = routeCoords[simIndex];
       
       userMarker.setLatLng(currPt);
-      leafletMap.setView(currPt, 16);
+      if (!userInteractedWithMap) {
+        leafletMap.setView(currPt, 16);
+      }
       
       const heading = calcBearing(prevPt[0], prevPt[1], currPt[0], currPt[1]);
       userHeading = heading;
@@ -3314,7 +3355,9 @@
       gpsLocked = true;
       
       if (userMarker) userMarker.setLatLng([gpsCoords.lat, gpsCoords.lon]);
-      leafletMap.setView([gpsCoords.lat, gpsCoords.lon], 16);
+      if (!userInteractedWithMap) {
+        leafletMap.setView([gpsCoords.lat, gpsCoords.lon], 16);
+      }
       
       if (routingControl) {
         routingControl.spliceWaypoints(0, 1, L.latLng(gpsCoords.lat, gpsCoords.lon));
@@ -3333,6 +3376,11 @@
   function stopNavigation() {
     isNavigating = false;
     prevGpsCoords = null;
+    userInteractedWithMap = false;
+    if (reFocusTimeout) {
+      clearTimeout(reFocusTimeout);
+      reFocusTimeout = null;
+    }
     document.getElementById('nav-toggle-btn').textContent = '🚀 Start Navigation';
     document.getElementById('nav-hud').classList.remove('visible');
     document.getElementById('compass-widget').classList.remove('visible');
@@ -3829,7 +3877,8 @@
     {% endif %}
 
     selectMode(initialMode);
-    if (initialMode === 'car') {
+    const isInitialPrivateCab = bookedCab && (bookedCab.selected_seats === "Whole Vehicle" || bookedCab.selected_seats === "Whole Vehicle (Private Cab)");
+    if (initialMode === 'car' || (initialMode === 'cab' && isInitialPrivateCab)) {
       detectGPS();
     }
 

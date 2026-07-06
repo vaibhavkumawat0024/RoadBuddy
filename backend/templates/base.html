@@ -214,6 +214,7 @@
   </div>
 
   <script>
+    window.currentUserId = {% if user %}{{ user.id }}{% else %}null{% endif %};
     function initSidebar() {
       const toggleBtn = document.getElementById("sidebar-toggle");
       const closeBtn = document.getElementById("sidebar-close");
@@ -880,7 +881,7 @@
     }
 
     async function refreshInbox() {
-      if (!currentUserId) return;
+      if (!window.currentUserId) return;
       const listContainer = document.getElementById("inbox-updates-list");
       const badge = document.getElementById("inbox-badge");
       if (!listContainer) return;
