@@ -2,47 +2,107 @@
 {% block title %}Dashboard — RoadBuddy{% endblock %}
 
 {% block page_overlay %}
-<div class="dashboard-bg-overlay"></div>
+<div class="dashboard-bg-overlay">
+  <video class="page-bg-video" autoplay muted loop playsinline poster="/static/images/dashboard_bg.png" id="bg-video">
+    <source src="/static/videos/dashboard_bg.mp4" type="video/mp4">
+  </video>
+</div>
+
+<script>
+// Pause the video background when tab is not active to optimize battery/CPU
+document.addEventListener("visibilitychange", () => {
+  const video = document.getElementById("bg-video");
+  if (video) {
+    if (document.hidden) {
+      video.pause();
+    } else {
+      video.play().catch(() => {});
+    }
+  }
+});
+</script>
 {% endblock %}
 
 {% block content %}
 
 <div class="dashboard-header">
-  <h1>Hello, {{ user.name }} 👋</h1>
+  <h1>Hello, {{ user.name }} <span class="wave-emoji">👋</span></h1>
   <div style="display: flex; gap: 12px; align-items: center;">
-    <a href="/plan-trip" class="btn-primary">+ Plan a Trip</a>
+    <a href="/plan-trip" class="btn-primary"><span class="btn-icon-plus">+</span> Plan a Trip</a>
   </div>
 </div>
 
 <!-- Stats Row -->
 <div class="stats-row">
   <div class="stat-card">
-    <span class="stat-num">{{ trip_count }}</span>
+    <span class="stat-num" data-target="{{ trip_count }}">{{ trip_count }}</span>
     <span class="stat-label">Trips planned</span>
   </div>
   <div class="stat-card">
-    <span class="stat-num">{{ vehicle_count }}</span>
+    <span class="stat-num" data-target="{{ vehicle_count }}">{{ vehicle_count }}</span>
     <span class="stat-label">Vehicles added</span>
   </div>
 </div>
 
-
-
 <!-- Recent Trips -->
-<h2 style="margin-top: 32px;">Recent Trips</h2>
+<h2 style="margin-top: 32px; font-weight: 700; color: #ffffff; font-size: 20px; margin-bottom: 16px; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);">Recent Trips</h2>
 {% if trips %}
   <div class="trip-list">
     {% for trip in trips %}
-    <div class="trip-card">
-      <div class="trip-route">{{ trip.origin }} → {{ trip.destination }}</div>
-      <div class="trip-meta">{{ trip.travel_mode }} &nbsp;·&nbsp; ₹{{ trip.total_cost_inr | int }}</div>
-      <div class="trip-date">{{ trip.start_date }}</div>
+    <div class="trip-card" style="--i: {{ loop.index0 }};">
+      <div style="display: flex; align-items: center; gap: 16px;">
+        <div class="trip-icon-chip">
+          <span class="material-symbols-outlined">
+            {% if trip.travel_mode == 'own_vehicle' %}directions_car
+            {% elif trip.travel_mode == 'cab_service' %}local_taxi
+            {% elif trip.travel_mode == 'bus' %}directions_bus
+            {% elif trip.travel_mode == 'train' %}train
+            {% elif trip.travel_mode == 'flight' %}flight
+            {% else %}map
+            {% endif %}
+          </span>
+        </div>
+        <div>
+          <div class="trip-route" style="text-transform: capitalize;">{{ trip.origin }} → {{ trip.destination }}</div>
+          <div class="trip-meta">{{ trip.travel_mode.replace('_', ' ') | title }} &nbsp;·&nbsp; <span class="trip-date">{{ trip.start_date }}</span></div>
+        </div>
+      </div>
+      <div class="trip-price">₹{{ trip.total_cost_inr | int }}</div>
     </div>
     {% endfor %}
   </div>
 {% else %}
-  <p class="empty">No trips yet. <a href="/plan-trip">Plan your first trip!</a></p>
+  <p class="empty">No trips yet. <a href="/plan-trip" style="color: var(--rb-primary); font-weight: 600;">Plan your first trip!</a></p>
 {% endif %}
 
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const counters = document.querySelectorAll(".stat-num");
+  counters.forEach(counter => {
+    const target = parseInt(counter.getAttribute("data-target") || counter.innerText) || 0;
+    counter.innerText = "0";
+    const duration = 900; // ms
+    const startTime = performance.now();
+    
+    function updateCounter(currentTime) {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      // Easing out quadratic
+      const easeProgress = progress * (2 - progress);
+      const currentVal = Math.floor(easeProgress * target);
+      
+      counter.innerText = currentVal;
+      
+      if (progress < 1) {
+        requestAnimationFrame(updateCounter);
+      } else {
+        counter.innerText = target;
+      }
+    }
+    requestAnimationFrame(updateCounter);
+  });
+});
+</script>
 
 {% endblock %}

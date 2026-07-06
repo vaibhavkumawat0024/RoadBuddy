@@ -40,6 +40,9 @@
 </head>
 <body>
 
+  <!-- Page background gradient mesh -->
+  <div class="page-bg"></div>
+
   <!-- Sidebar Backdrop Overlay -->
   <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
 
@@ -112,10 +115,24 @@
     </div>
   </div>
 
-  <!-- Floating Action Button for Chatbot -->
-  <button class="chatbot-fab" id="chatbot-fab" aria-label="Open AI Chatbot">
-    <span class="material-symbols-outlined">smart_toy</span>
-  </button>
+  <!-- 3D Compass Badge Launcher for Chatbot -->
+  <div class="chat-badge" id="chatbot-fab" aria-label="Open AI Chatbot">
+    <div class="chat-badge__shadow"></div>
+    <div class="chat-badge__solid">
+      <!-- Faceted 3D Diamond faces -->
+      <div class="chat-badge__face chat-badge__face--top"></div>
+      <div class="chat-badge__face chat-badge__face--right"></div>
+      <div class="chat-badge__face chat-badge__face--left"></div>
+      <!-- Inner lit seam ridge highlight -->
+      <div class="chat-badge__ridge"></div>
+      <!-- Compass icon indicator -->
+      <div class="chat-badge__icon">
+        <span class="material-symbols-outlined">explore</span>
+      </div>
+      <!-- 3D Spherical notification dot -->
+      <div class="chat-badge__nub" id="chat-badge-nub" style="display: none;"></div>
+    </div>
+  </div>
 
   <!-- Floating Chatbot Widget Panel -->
   <div class="floating-chatbot-card" id="floating-chatbot-card">
@@ -162,9 +179,6 @@
     </a>
     <div class="nav-menu" id="nav-menu" style="display: flex; align-items: center; gap: 8px; margin-left: auto;">
       {% block navbar_menu %}
-      {% if user %}
-      <a href="/dashboard">Dashboard</a>
-      {% endif %}
       {% endblock %}
       
       <!-- Hamburger Toggle Button -->
@@ -272,21 +286,68 @@
       const chatbotClose = document.getElementById("floating-chatbot-close");
 
       if (chatbotFab && chatbotCard && chatbotClose) {
+        const solid = chatbotFab.querySelector(".chat-badge__solid");
+        const nub = document.getElementById("chat-badge-nub");
+
+        chatbotFab.addEventListener("mousemove", (e) => {
+          if (chatbotFab.classList.contains("morphing") || chatbotFab.classList.contains("hidden-state")) return;
+          const rect = chatbotFab.getBoundingClientRect();
+          const x = e.clientX - rect.left - rect.width / 2;
+          const y = e.clientY - rect.top - rect.height / 2;
+          
+          const tiltX = -(y / (rect.height / 2)) * 12 + 18;
+          const tiltY = (x / (rect.width / 2)) * 12 - 24;
+          
+          if (solid) {
+            solid.style.animation = "none";
+            solid.style.transform = `rotateX(${tiltX}deg) rotateY(${tiltY}deg)`;
+          }
+        });
+
+        chatbotFab.addEventListener("mouseleave", () => {
+          if (solid) {
+            solid.style.transform = "";
+            solid.style.animation = "rb-badge-float 4s ease-in-out infinite, rb-badge-glow 4s ease-in-out infinite";
+          }
+        });
+
         chatbotFab.addEventListener("click", (e) => {
           e.stopPropagation();
-          chatbotCard.classList.toggle("active");
-          document.body.classList.toggle("chatbot-open", chatbotCard.classList.contains("active"));
+          if (nub) nub.style.display = "none";
+
+          chatbotFab.classList.add("morphing");
+
+          setTimeout(() => {
+            chatbotCard.classList.add("active");
+            document.body.classList.add("chatbot-open");
+          }, 100);
+
+          setTimeout(() => {
+            chatbotFab.classList.add("hidden-state");
+          }, 350);
         });
 
         chatbotClose.addEventListener("click", () => {
           chatbotCard.classList.remove("active");
           document.body.classList.remove("chatbot-open");
+
+          chatbotFab.classList.remove("hidden-state");
+          setTimeout(() => {
+            chatbotFab.classList.remove("morphing");
+          }, 150);
         });
 
         document.addEventListener("click", (e) => {
           if (!chatbotCard.contains(e.target) && !chatbotFab.contains(e.target)) {
-            chatbotCard.classList.remove("active");
-            document.body.classList.remove("chatbot-open");
+            if (chatbotCard.classList.contains("active")) {
+              chatbotCard.classList.remove("active");
+              document.body.classList.remove("chatbot-open");
+
+              chatbotFab.classList.remove("hidden-state");
+              setTimeout(() => {
+                chatbotFab.classList.remove("morphing");
+              }, 150);
+            }
           }
         });
       }
@@ -393,8 +454,17 @@
       const div = document.createElement('div');
       div.className = `chat-msg ${role === 'user' ? 'user-msg' : 'ai-msg'}`;
       if (id) div.id = id;
-      if (role === 'ai') {
+      if (id === 'thinking') {
+        div.innerHTML = `<div class="typing-dots"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div>`;
+      } else if (role === 'ai') {
         div.innerHTML = parseMarkdown(text);
+        
+        // Show 3D notification nub if panel is closed
+        const chatbotCard = document.getElementById('floating-chatbot-card');
+        if (chatbotCard && !chatbotCard.classList.contains('active')) {
+          const nub = document.getElementById('chat-badge-nub');
+          if (nub) nub.style.display = 'block';
+        }
       } else {
         div.textContent = text;
       }
