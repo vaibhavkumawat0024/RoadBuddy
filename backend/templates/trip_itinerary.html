@@ -1522,8 +1522,9 @@
 
   function getHeaders() {
     const headers = { "Content-Type": "application/json" };
-    if (IS_BACKEND && "{{ token }}") {
-      headers["Authorization"] = "{{ token }}".startsWith("Bearer ") ? "{{ token }}" : "Bearer {{ token }}";
+    const token = "{{ token }}";
+    if (IS_BACKEND && token && token !== "None" && token !== "") {
+      headers["Authorization"] = token.startsWith("Bearer ") ? token : "Bearer " + token;
     }
     return headers;
   }
@@ -2996,7 +2997,7 @@
           confirmBtn.textContent = "Confirm & Book";
         }
       } catch (e) {
-        console.error("Booking error details:", e);
+        console.error("Cab booking error details:", e);
         alert('Booking failed: network error (' + e.message + ')');
         confirmBtn.disabled = false;
         confirmBtn.textContent = "Confirm & Book";
@@ -3039,7 +3040,7 @@
           confirmBtn.textContent = "Confirm & Book";
         }
       } catch (e) {
-        console.error("Booking error details:", e);
+        console.error("Transit booking error details:", e);
         alert('Booking failed: network error (' + e.message + ')');
         confirmBtn.disabled = false;
         confirmBtn.textContent = "Confirm & Book";

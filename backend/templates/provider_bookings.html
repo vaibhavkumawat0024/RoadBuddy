@@ -96,6 +96,13 @@
     overflow: hidden;
     box-shadow: 0 20px 60px rgba(0,0,0,0.5);
   }
+  .confirm-modal.map-modal > div {
+    min-height: 0;
+  }
+  #booking-map {
+    width: 100%;
+    min-height: 300px;
+  }
   
   /* Leaflet specific dark layout overrides */
   .leaflet-container {
@@ -160,24 +167,21 @@
   <a href="/provider/dashboard" class="btn-secondary" style="background: rgba(255,255,255,0.05); color: #fff; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-size: 13px; border: 1px solid rgba(255,255,255,0.1);">← Dashboard</a>
 </div>
 
-<!-- Route-Based Vehicles & Sequential Navigation -->
-{% set public_vehicles = [] %}
-{% for v in vehicles %}
-  {% if v.destination != 'Private' and v.driver_included %}
-    {% set _ = public_vehicles.append(v) %}
-  {% endif %}
-{% endfor %}
+<!-- Fleet Vehicles & Route Navigation -->
+{% set fleet_vehicles = vehicles if vehicles else [] %}
 
-{% if public_vehicles %}
+{% if fleet_vehicles %}
 <div class="form-card" style="background: linear-gradient(145deg, #1a1a30, #20203a); border: 1px solid rgba(255,255,255,0.05); border-radius: 14px; padding: 18px; margin-bottom: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);">
-  <h2 style="font-size: 15px; font-weight: 600; color: #fff; margin-bottom: 4px; display: flex; align-items: center; gap: 8px;">🚌 Predefined Route Navigation</h2>
-  <p style="font-size: 12px; color: #7878a0; margin-bottom: 14px;">Select a route vehicle to view and navigate its sequential pickup/drop-off stops on the map.</p>
+  <h2 style="font-size: 15px; font-weight: 600; color: #fff; margin-bottom: 4px; display: flex; align-items: center; gap: 8px;">🚌 Fleet Route & Map Navigation</h2>
+  <p style="font-size: 12px; color: #7878a0; margin-bottom: 14px;">Select any vehicle (Public Route, Private Cab, or Self-Drive Rental) to view and navigate its sequential pickup/drop-off stops on the map.</p>
   
-  <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px;">
-    {% for v in public_vehicles %}
+  <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px;">
+    {% for v in fleet_vehicles %}
     {# Collect unique pickup/dropoff locations from actual bookings for this vehicle #}
     {% set bp = [] %}
     {% set bd = [] %}
+    {% set bp_raw = [] %}
+    {% set bd_raw = [] %}
     {% for b in bookings %}
       {% if b.vehicle_id == v.id and b.status != 'Cancelled' %}
         {% if b.pickup_location and b.pickup_location.split('|||')[0] not in bp %}
@@ -186,14 +190,46 @@
         {% if b.dropoff_location and b.dropoff_location.split('|||')[0] not in bd %}
           {% set _ = bd.append(b.dropoff_location.split('|||')[0]) %}
         {% endif %}
+        {% if b.pickup_location and b.pickup_location not in bp_raw %}
+          {% set _ = bp_raw.append(b.pickup_location) %}
+        {% endif %}
+        {% if b.dropoff_location and b.dropoff_location not in bd_raw %}
+          {% set _ = bd_raw.append(b.dropoff_location) %}
+        {% endif %}
       {% endif %}
     {% endfor %}
-    {% set effective_pickups = v.pickup_points if v.pickup_points else bp|join('; ') %}
-    {% set effective_dropoffs = v.dropoff_points if v.dropoff_points else bd|join('; ') %}
+    {% set effective_pickups = v.pickup_points if v.pickup_points else bp_raw|join('; ') %}
+    {% set effective_dropoffs = v.dropoff_points if v.dropoff_points else bd_raw|join('; ') %}
     <div data-vehicle-id="{{ v.id }}" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
-      <div style="flex: 1; min-width: 0; padding-right: 12px;">
-        <div style="font-weight: 600; color: #fff; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ v.vehicle_name }}</div>
-        <div style="font-size: 11px; color: #a0a0c0; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">📍 Route: {{ v.origin }} → {{ v.destination }}</div>
+      <div style="flex: 1; min-width: 0; padding-right: 12px; text-align: left;">
+        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+          <div style="font-weight: 600; color: #fff; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;">{{ v.vehicle_name }}</div>
+          <span style="font-size: 8.5px; font-weight: 700; padding: 1.5px 6px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px; display: inline-block;
+            {% if not v.driver_included %}
+              background: rgba(59,130,246,0.15); color: #3b82f6; border: 1px solid rgba(59,130,246,0.3);
+            {% elif v.destination == 'Private' %}
+              background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3);
+            {% else %}
+              background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3);
+            {% endif %}">
+            {% if not v.driver_included %}
+              Self-Drive
+            {% elif v.destination == 'Private' %}
+              Private
+            {% else %}
+              Public
+            {% endif %}
+          </span>
+        </div>
+        <div style="font-size: 11px; color: #a0a0c0; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+          {% if v.destination == 'Private' %}
+            📍 Origin: {{ v.origin }} (Private Cab)
+          {% elif not v.driver_included %}
+            📍 Origin: {{ v.origin }} (Self-Drive Rental)
+          {% else %}
+            📍 Route: {{ v.origin }} → {{ v.destination }}
+          {% endif %}
+        </div>
       </div>
       <button class="btn-map-action" style="padding: 6px 12px; font-size: 11.5px; border-radius: 6px; flex-shrink: 0;"
               data-vehicle-id="{{ v.id }}"
@@ -202,10 +238,10 @@
               data-destination="{{ v.destination }}"
               data-pickup-points="{{ effective_pickups }}"
               data-dropoff-points="{{ effective_dropoffs }}"
+              data-is-private="{% if v.destination == 'Private' and v.driver_included %}true{% else %}false{% endif %}"
               onclick="openVehicleRouteMapFromButton(this)">
         🗺️ Navigate Route
       </button>
-
     </div>
     {% endfor %}
   </div>
@@ -270,7 +306,7 @@
       <h3 style="margin: 0; color: #fff; font-size: 16px; font-weight: 600;">🗺️ Pickup Location Map</h3>
       <button onclick="closeMapModal()" style="background: none; border: none; font-size: 24px; color: #a0a0c0; cursor: pointer; padding: 4px; line-height: 1;">&times;</button>
     </div>
-    <div style="display: flex; flex: 1; position: relative;">
+    <div style="display: flex; flex: 1; position: relative; min-height: 0; overflow: hidden;">
       <!-- Google Maps Teal Navigation Banner -->
       <div id="nav-banner" style="position: absolute; top: 16px; left: 16px; right: 16px; background: rgba(15, 118, 110, 0.95); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; padding: 12px 18px; display: none; z-index: 1000; box-shadow: 0 8px 32px rgba(0,0,0,0.3); align-items: center; gap: 14px; transition: all 0.3s ease;">
         <div id="nav-banner-icon" style="font-size: 24px; color: #fff; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.1); border-radius: 50%;">⬆️</div>
@@ -281,7 +317,7 @@
       </div>
 
       <!-- Map Container -->
-      <div id="booking-map" style="flex: 1; height: 100%;"></div>
+      <div id="booking-map" style="flex: 1; width: 100%; height: 100%;"></div>
       
       <!-- Driver HUD -->
       <div id="booking-hud" style="position: absolute; bottom: 16px; left: 16px; right: 16px; background: rgba(26,26,48,0.95); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 14px; display: none; z-index: 1000; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
@@ -344,6 +380,12 @@
   let currentLeg = "to_pickup";
   let isNavigating = false;
   let isSelfDrive = false;
+  let activeVehicleIsPrivate = false;
+  let privatePickupLatLng = null;
+  let privateDropoffLatLng = null;
+  let privatePickupName = "";
+  let privateDropoffName = "";
+  let privateCurrentLeg = "pickup"; // "pickup" or "destination"
 
   let driverLatLng = null;
   let passengerPickupLatLng = null;
@@ -480,6 +522,8 @@
       } else {
         clearMapLayers();
       }
+      // Force Leaflet to recalculate container size (modal may still be transitioning)
+      setTimeout(() => { if (map) map.invalidateSize(); }, 200);
 
       const validResults = [];
       const stopsList = [
@@ -578,6 +622,8 @@
       } else {
         clearMapLayers();
       }
+      // Force Leaflet to recalculate container size
+      setTimeout(() => { if (map) map.invalidateSize(); }, 200);
 
       // 1. Geocode Pickup
       if (parsedPickupLatLng) {
@@ -1046,182 +1092,236 @@
     const destination = btn.getAttribute('data-destination') || '';
     const pickups = btn.getAttribute('data-pickup-points') || '';
     const dropoffs = btn.getAttribute('data-dropoff-points') || '';
+    
+    activeVehicleIsPrivate = btn.getAttribute('data-is-private') === 'true';
+    privateCurrentLeg = "pickup"; // Reset to pickup leg
+    
     openVehicleRouteMap(vehicleId, vehicleName, origin, destination, pickups, dropoffs);
   }
 
   async function openVehicleRouteMap(vehicleId, vehicleName, origin, destination, pickupPointsStr, dropoffPointsStr) {
-    activeVehicleId = vehicleId;
-    activeBookingId = null;
-    document.getElementById("map-modal-overlay").classList.add("show");
-    setTimeout(() => {
-      if (map) {
-        map.invalidateSize();
+    try {
+      activeVehicleId = vehicleId;
+      activeBookingId = null;
+      document.getElementById("map-modal-overlay").classList.add("show");
+      setTimeout(() => {
+        if (map) {
+          map.invalidateSize();
+        }
+      }, 250);
+      
+      // Reset state machine
+      currentLeg = "multi_waypoint";
+      isNavigating = false;
+      routeCoords = [];
+      routeInstructions = [];
+      driverLatLng = null;
+      passengerPickupLatLng = null;
+      passengerDropoffLatLng = null;
+      passengerNameStr = vehicleName;
+
+      document.getElementById("booking-hud").style.display = "block";
+      document.getElementById("hud-route-info").textContent = "Locating driver...";
+      document.getElementById("hud-trip-leg").textContent = "Stops Sequence Route Overview";
+      document.getElementById("hud-trip-leg").style.color = "#FF6B35";
+      
+      // Hide navigation HUD buttons during full route sequence overview
+      document.getElementById("btn-action-override").style.display = "none";
+      document.getElementById("btn-start-nav").style.display = "none";
+      const startTripBtn = document.getElementById("btn-start-trip");
+      if (startTripBtn) {
+        startTripBtn.style.display = "inline-block";
+        startTripBtn.textContent = "🚀 Start Trip";
+        startTripBtn.style.background = "linear-gradient(135deg, #FF6B35, #FF8F5E)";
       }
-    }, 250);
-    
-    // Reset state machine
-    currentLeg = "multi_waypoint";
-    isNavigating = false;
-    routeCoords = [];
-    routeInstructions = [];
-    driverLatLng = null;
-    passengerPickupLatLng = null;
-    passengerDropoffLatLng = null;
-    passengerNameStr = vehicleName;
 
-    document.getElementById("booking-hud").style.display = "block";
-    document.getElementById("hud-route-info").textContent = "Locating driver...";
-    document.getElementById("hud-trip-leg").textContent = "Stops Sequence Route Overview";
-    document.getElementById("hud-trip-leg").style.color = "#FF6B35";
-    
-    // Hide navigation HUD buttons during full route sequence overview
-    document.getElementById("btn-action-override").style.display = "none";
-    document.getElementById("btn-start-nav").style.display = "none";
-    const startTripBtn = document.getElementById("btn-start-trip");
-    if (startTripBtn) {
-      startTripBtn.style.display = "inline-block";
-      startTripBtn.textContent = "🚀 Start Trip";
-      startTripBtn.style.background = "linear-gradient(135deg, #FF6B35, #FF8F5E)";
-    }
-
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          driverLatLng = L.latLng(pos.coords.latitude, pos.coords.longitude);
-          continueLoadingVehicleRouteMap(origin, destination, pickupPointsStr, dropoffPointsStr);
-        },
-        (err) => {
-          console.warn("Geolocation failed, using vehicle origin:", err);
-          fallbackVehicleRouteOrigin(origin, destination, pickupPointsStr, dropoffPointsStr);
-        },
-        { enableHighAccuracy: true, timeout: 5000 }
-      );
-    } else {
-      fallbackVehicleRouteOrigin(origin, destination, pickupPointsStr, dropoffPointsStr);
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          async (pos) => {
+            try {
+              driverLatLng = L.latLng(pos.coords.latitude, pos.coords.longitude);
+              await continueLoadingVehicleRouteMap(origin, destination, pickupPointsStr, dropoffPointsStr);
+            } catch (err) {
+              console.error("Async GPS callback error:", err);
+              alert("Async GPS callback error: " + err.message);
+            }
+          },
+          async (err) => {
+            try {
+              console.warn("Geolocation failed, using vehicle origin:", err);
+              await fallbackVehicleRouteOrigin(origin, destination, pickupPointsStr, dropoffPointsStr);
+            } catch (ferr) {
+              console.error("Async GPS fallback error:", ferr);
+              alert("Async GPS fallback error: " + ferr.message);
+            }
+          },
+          { enableHighAccuracy: true, timeout: 5000 }
+        );
+      } else {
+        fallbackVehicleRouteOrigin(origin, destination, pickupPointsStr, dropoffPointsStr);
+      }
+    } catch (e) {
+      console.error("Error opening map:", e);
+      alert("Error opening map: " + e.message);
     }
   }
 
   function fallbackVehicleRouteOrigin(origin, destination, pickupPointsStr, dropoffPointsStr) {
-    geocodeAddress(origin || "Jaipur").then(coord => {
-      if (coord) {
-        driverLatLng = L.latLng(coord.lat, coord.lon);
-      } else {
-        driverLatLng = L.latLng(26.9124, 75.7873); 
+    geocodeAddress(origin || "Jaipur").then(async coord => {
+      try {
+        if (coord) {
+          driverLatLng = L.latLng(coord.lat, coord.lon);
+        } else {
+          driverLatLng = L.latLng(26.9124, 75.7873); 
+        }
+        await continueLoadingVehicleRouteMap(origin, destination, pickupPointsStr, dropoffPointsStr);
+      } catch (err) {
+        console.error("Fallback route error:", err);
+        alert("Fallback route error: " + err.message);
       }
-      continueLoadingVehicleRouteMap(origin, destination, pickupPointsStr, dropoffPointsStr);
     });
   }
 
   async function continueLoadingVehicleRouteMap(origin, destination, pickupPointsStr, dropoffPointsStr) {
-    const pickups = (pickupPointsStr || "").split(";").map(s => s.trim()).filter(Boolean);
-    const dropoffs = (dropoffPointsStr || "").split(";").map(s => s.trim()).filter(Boolean);
-    
-    // Initialize Leaflet Map if not already initialized
-    if (!map) {
-      map = L.map('booking-map').setView(driverLatLng || [26.9124, 75.7873], 10);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
-      }).addTo(map);
-      map.on('dragstart', handleMapInteraction);
-      map.on('zoomstart', handleMapInteraction);
-    } else {
-      clearMapLayers();
-    }
+    try {
+      const pickups = (pickupPointsStr || "").split(";").map(s => s.trim()).filter(Boolean);
+      const dropoffs = (dropoffPointsStr || "").split(";").map(s => s.trim()).filter(Boolean);
+      
+      // Initialize Leaflet Map if not already initialized
+      if (!map) {
+        map = L.map('booking-map').setView(driverLatLng || [26.9124, 75.7873], 10);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+        map.on('dragstart', handleMapInteraction);
+        map.on('zoomstart', handleMapInteraction);
+      } else {
+        clearMapLayers();
+      }
+      // Force Leaflet to recalculate container size
+      setTimeout(() => { if (map) map.invalidateSize(); }, 200);
 
-    const validResults = [];
+      if (activeVehicleIsPrivate) {
+        const pickupParts = (pickupPointsStr || "").split(";")[0] || "";
+        const dropoffParts = (dropoffPointsStr || "").split(";")[0] || "";
+        
+        privatePickupName = pickupParts.split("|||")[0] || "Pickup Stop";
+        privateDropoffName = dropoffParts.split("|||")[0] || "Destination";
+        
+        privatePickupLatLng = parseCoordsString(pickupParts);
+        if (!privatePickupLatLng) {
+          const coord = await geocodeAddress(privatePickupName);
+          if (coord) privatePickupLatLng = L.latLng(coord.lat, coord.lon);
+        }
+        
+        privateDropoffLatLng = parseCoordsString(dropoffParts);
+        if (!privateDropoffLatLng) {
+          const coord = await geocodeAddress(privateDropoffName);
+          if (coord) privateDropoffLatLng = L.latLng(coord.lat, coord.lon);
+        }
+        
+        loadPrivateVehicleRoute();
+        return;
+      }
 
-    // Use driver's live GPS as starting point instead of geocoding origin city
-    if (driverLatLng) {
-      validResults.push({
-        latlng: driverLatLng,
-        name: 'Your Location',
-        role: 'origin',
-        index: 0
-      });
-    } else {
-      // Fallback: geocode origin city if GPS is unavailable
-      const originCoord = await geocodeAddress(origin);
-      if (originCoord) {
+      const validResults = [];
+
+      // Use driver's live GPS as starting point instead of geocoding origin city
+      if (driverLatLng) {
         validResults.push({
-          latlng: L.latLng(originCoord.lat, originCoord.lon),
-          name: origin,
+          latlng: driverLatLng,
+          name: 'Your Location',
           role: 'origin',
           index: 0
         });
-      }
-    }
-
-    // Build stops list for pickup and dropoff points + destination
-    const stopsList = [
-      ...pickups.map((stop, i) => {
-        let query = stop;
-        if (origin && !query.toLowerCase().includes(origin.toLowerCase())) {
-          query += `, ${origin}`;
-        }
-        return { name: stop, query: query, role: 'pickup', index: i + 1 };
-      }),
-      ...dropoffs.map((stop, i) => {
-        let query = stop;
-        let suffix = destination || origin;
-        if (suffix && !query.toLowerCase().includes(suffix.toLowerCase())) {
-          query += `, ${suffix}`;
-        }
-        return { name: stop, query: query, role: 'dropoff', index: pickups.length + i + 1 };
-      }),
-      { name: destination, query: destination, role: 'destination', index: pickups.length + dropoffs.length + 1 }
-    ];
-
-    // Geocode stops sequentially to stay within Nominatim usage guidelines
-    for (let i = 0; i < stopsList.length; i++) {
-      const stop = stopsList[i];
-      const cacheKey = `geo_cache_${stop.query.toLowerCase().trim()}`;
-      const isCached = localStorage.getItem(cacheKey) !== null;
-      if (!isCached && i > 0) {
-        await new Promise(r => setTimeout(r, 800));
-      }
-      
-      const coord = await geocodeAddress(stop.query);
-      if (coord) {
-        validResults.push({
-          latlng: L.latLng(coord.lat, coord.lon),
-          name: stop.name,
-          role: stop.role,
-          index: stop.index
-        });
-      }
-    }
-
-    if (validResults.length < 2) {
-      document.getElementById("hud-route-info").textContent = "Could not geocode route cities";
-      return;
-    }
-
-    // Draw custom markers for each stop
-    validResults.forEach(r => {
-      let markerIcon = null;
-      let iconColor = "#FF6B35";
-      let label = r.name;
-
-      if (r.role === 'origin') {
-        iconColor = "#10b981"; // Green for Driver/Origin
-        markerIcon = L.divIcon({ html:`<div style="background:${iconColor};color:#fff;padding:4px 8px;border-radius:4px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.2);transform: translate(-50%, -50%);">🚗 ${label}</div>`, className:'', iconSize:[null,22] });
-      } else if (r.role === 'destination') {
-        iconColor = "#ef4444"; // Red for Destination
-        markerIcon = L.divIcon({ html:`<div style="background:${iconColor};color:#fff;padding:4px 8px;border-radius:4px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.2);transform: translate(-50%, -50%);">🎯 Destination: ${label}</div>`, className:'', iconSize:[null,22] });
-      } else if (r.role === 'pickup') {
-        iconColor = "#FF6B35"; // Orange for Pickups
-        markerIcon = L.divIcon({ html:`<div style="background:${iconColor};color:#fff;padding:4px 8px;border-radius:4px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.2);transform: translate(-50%, -50%);">📥 Pickup ${r.index}: ${label}</div>`, className:'', iconSize:[null,22] });
       } else {
-        iconColor = "#3b82f6"; // Blue for Dropoffs
-        markerIcon = L.divIcon({ html:`<div style="background:${iconColor};color:#fff;padding:4px 8px;border-radius:4px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.2);transform: translate(-50%, -50%);">📤 Drop-off ${r.index - pickups.length}: ${label}</div>`, className:'', iconSize:[null,22] });
+        // Fallback: geocode origin city if GPS is unavailable
+        const originCoord = await geocodeAddress(origin);
+        if (originCoord) {
+          validResults.push({
+            latlng: L.latLng(originCoord.lat, originCoord.lon),
+            name: origin,
+            role: 'origin',
+            index: 0
+          });
+        }
       }
 
-      const m = L.marker(r.latlng, { icon: markerIcon }).addTo(map);
-      if (r.role === 'origin') driverMarker = m;
-    });
+      // Build stops list for pickup and dropoff points + destination
+      const stopsList = [
+        ...pickups.map((stop, i) => {
+          let query = stop;
+          if (origin && !query.toLowerCase().includes(origin.toLowerCase())) {
+            query += `, ${origin}`;
+          }
+          return { name: stop, query: query, role: 'pickup', index: i + 1 };
+        }),
+        ...dropoffs.map((stop, i) => {
+          let query = stop;
+          let suffix = destination || origin;
+          if (suffix && !query.toLowerCase().includes(suffix.toLowerCase())) {
+            query += `, ${suffix}`;
+          }
+          return { name: stop, query: query, role: 'dropoff', index: pickups.length + i + 1 };
+        }),
+        { name: destination, query: destination, role: 'destination', index: pickups.length + dropoffs.length + 1 }
+      ];
 
-    const waypointsList = validResults.map(r => r.latlng);
-    calculateMultiWaypointOSRMRoute(waypointsList);
+      // Geocode stops sequentially to stay within Nominatim usage guidelines
+      for (let i = 0; i < stopsList.length; i++) {
+        const stop = stopsList[i];
+        const cacheKey = `geo_cache_${stop.query.toLowerCase().trim()}`;
+        const isCached = localStorage.getItem(cacheKey) !== null;
+        if (!isCached && i > 0) {
+          await new Promise(r => setTimeout(r, 800));
+        }
+        
+        const coord = await geocodeAddress(stop.query);
+        if (coord) {
+          validResults.push({
+            latlng: L.latLng(coord.lat, coord.lon),
+            name: stop.name,
+            role: stop.role,
+            index: stop.index
+          });
+        }
+      }
+
+      if (validResults.length < 2) {
+        document.getElementById("hud-route-info").textContent = "Could not geocode route cities";
+        return;
+      }
+
+      // Draw custom markers for each stop
+      validResults.forEach(r => {
+        let markerIcon = null;
+        let iconColor = "#FF6B35";
+        let label = r.name;
+
+        if (r.role === 'origin') {
+          iconColor = "#10b981"; // Green for Driver/Origin
+          markerIcon = L.divIcon({ html:`<div style="background:${iconColor};color:#fff;padding:4px 8px;border-radius:4px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.2);transform: translate(-50%, -50%);">🚗 ${label}</div>`, className:'', iconSize:[null,22] });
+        } else if (r.role === 'destination') {
+          iconColor = "#ef4444"; // Red for Destination
+          markerIcon = L.divIcon({ html:`<div style="background:${iconColor};color:#fff;padding:4px 8px;border-radius:4px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.2);transform: translate(-50%, -50%);">🎯 Destination: ${label}</div>`, className:'', iconSize:[null,22] });
+        } else if (r.role === 'pickup') {
+          iconColor = "#FF6B35"; // Orange for Pickups
+          markerIcon = L.divIcon({ html:`<div style="background:${iconColor};color:#fff;padding:4px 8px;border-radius:4px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.2);transform: translate(-50%, -50%);">📥 Pickup ${r.index}: ${label}</div>`, className:'', iconSize:[null,22] });
+        } else {
+          iconColor = "#3b82f6"; // Blue for Dropoffs
+          markerIcon = L.divIcon({ html:`<div style="background:${iconColor};color:#fff;padding:4px 8px;border-radius:4px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.2);transform: translate(-50%, -50%);">📤 Drop-off ${r.index - pickups.length}: ${label}</div>`, className:'', iconSize:[null,22] });
+        }
+
+        const m = L.marker(r.latlng, { icon: markerIcon }).addTo(map);
+        if (r.role === 'origin') driverMarker = m;
+      });
+
+      const waypointsList = validResults.map(r => r.latlng);
+      calculateMultiWaypointOSRMRoute(waypointsList);
+    } catch (e) {
+      console.error("Error continuing map loading:", e);
+      alert("Error loading map route: " + e.message);
+    }
   }
 
   function calculateMultiWaypointOSRMRoute(waypointsList) {
@@ -1250,13 +1350,115 @@
     });
   }
 
+  function parseCoordsString(str) {
+    if (!str) return null;
+    const parts = str.split("|||");
+    if (parts.length > 1) {
+      const coords = parts[1].split(",");
+      if (coords.length === 2) {
+        const lat = parseFloat(coords[0]);
+        const lon = parseFloat(coords[1]);
+        if (!isNaN(lat) && !isNaN(lon)) return L.latLng(lat, lon);
+      }
+    }
+    return null;
+  }
+
+  function loadPrivateVehicleRoute() {
+    clearMapLayers();
+    
+    // Add driver marker
+    if (driverLatLng) {
+      driverMarker = L.marker(driverLatLng, {
+        icon: L.divIcon({ html:`<div style="background:#10b981;color:#fff;padding:4px 8px;border-radius:4px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.2);transform: translate(-50%, -50%);">🚗 Your Location</div>`, className:'', iconSize:[null,22] })
+      }).addTo(map);
+    }
+    
+    let waypoints = [];
+    if (privateCurrentLeg === "pickup") {
+      // Leg 1: Driver -> Passenger Pickup
+      document.getElementById("hud-trip-leg").textContent = "Leg 1: Drive to Passenger Pickup";
+      document.getElementById("hud-trip-leg").style.color = "#FF6B35";
+      
+      if (privatePickupLatLng) {
+        L.marker(privatePickupLatLng, {
+          icon: L.divIcon({ html:`<div style="background:#FF6B35;color:#fff;padding:4px 8px;border-radius:4px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.2);transform: translate(-50%, -50%);">📥 Passenger Pickup: ${privatePickupName}</div>`, className:'', iconSize:[null,22] })
+        }).addTo(map);
+      }
+      
+      waypoints = [driverLatLng || L.latLng(26.9124, 75.7873), privatePickupLatLng].filter(Boolean);
+      
+      // Update override button to say "Arrived at Pickup"
+      const startTripBtn = document.getElementById("btn-start-trip");
+      if (startTripBtn) {
+        startTripBtn.style.display = "inline-block";
+        startTripBtn.textContent = "🚀 Arrived at Pickup";
+        startTripBtn.style.background = "linear-gradient(135deg, #10b981, #059669)";
+      }
+    } else {
+      // Leg 2: Passenger Pickup -> Passenger Dropoff
+      document.getElementById("hud-trip-leg").textContent = "Leg 2: Drive to Destination";
+      document.getElementById("hud-trip-leg").style.color = "#ef4444";
+      
+      if (privatePickupLatLng) {
+        L.marker(privatePickupLatLng, {
+          icon: L.divIcon({ html:`<div style="background:#FF6B35;color:#fff;padding:4px 8px;border-radius:4px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.2);transform: translate(-50%, -50%);">📥 Passenger Location: ${privatePickupName}</div>`, className:'', iconSize:[null,22] })
+        }).addTo(map);
+      }
+      if (privateDropoffLatLng) {
+        L.marker(privateDropoffLatLng, {
+          icon: L.divIcon({ html:`<div style="background:#ef4444;color:#fff;padding:4px 8px;border-radius:4px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.2);transform: translate(-50%, -50%);">🎯 Destination: ${privateDropoffName}</div>`, className:'', iconSize:[null,22] })
+        }).addTo(map);
+      }
+      
+      waypoints = [driverLatLng || privatePickupLatLng || L.latLng(26.9124, 75.7873), privateDropoffLatLng].filter(Boolean);
+      
+      // Update override button to say "Complete Trip"
+      const startTripBtn = document.getElementById("btn-start-trip");
+      if (startTripBtn) {
+        startTripBtn.style.display = "inline-block";
+        startTripBtn.textContent = "🏁 Complete Trip";
+        startTripBtn.style.background = "linear-gradient(135deg, #ef4444, #dc2626)";
+      }
+    }
+    
+    if (waypoints.length >= 2) {
+      calculateMultiWaypointOSRMRoute(waypoints);
+    }
+  }
+
   function closeMapModal() {
     document.getElementById("map-modal-overlay").classList.remove("show");
     stopNavAndWatch();
     stopTripAndWatch();
+    // Destroy map so it gets freshly created on next open (avoids stale container size)
+    if (map) {
+      map.remove();
+      map = null;
+    }
+    routingControl = null;
+    driverMarker = null;
+    cabMarker = null;
   }
 
   function toggleTripState() {
+    if (activeVehicleIsPrivate) {
+      if (privateCurrentLeg === "pickup") {
+        privateCurrentLeg = "destination";
+        // Start watching position if not already doing so
+        if (!isNavigating) {
+          startTripLeg();
+        }
+        loadPrivateVehicleRoute();
+      } else {
+        // Complete the trip
+        stopTripAndWatch();
+        closeMapModal();
+        alert("Trip completed successfully! 🎉");
+      }
+      return;
+    }
+
     const btn = document.getElementById("btn-start-trip");
     if (isNavigating) {
       stopTripAndWatch();

@@ -1115,14 +1115,24 @@
     window.showBookingConfirmationModal = function(title, message) {
       const modal = document.getElementById("booking-success-modal");
       const card = document.getElementById("booking-success-card");
-      document.getElementById("success-modal-title").textContent = title;
-      document.getElementById("success-modal-message").innerHTML = message;
+      const titleEl = document.getElementById("success-modal-title");
+      const msgEl = document.getElementById("success-modal-message");
       
-      modal.style.display = "flex";
-      setTimeout(() => {
-        modal.style.opacity = "1";
-        if (card) card.style.transform = "scale(1)";
-      }, 50);
+      if (titleEl) titleEl.textContent = title;
+      if (msgEl) msgEl.innerHTML = message;
+      
+      if (modal) {
+        modal.style.display = "flex";
+        setTimeout(() => {
+          modal.style.opacity = "1";
+          if (card) card.style.transform = "scale(1)";
+        }, 50);
+      } else {
+        alert(title + "\n\n" + message.replace(/<[^>]*>/g, ''));
+        if (window.onSuccessModalClose) {
+          window.onSuccessModalClose();
+        }
+      }
 
       // Trigger inbox refresh immediately
       refreshInbox();
