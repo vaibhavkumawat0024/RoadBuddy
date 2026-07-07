@@ -182,8 +182,10 @@
     {% set bd = [] %}
     {% set bp_raw = [] %}
     {% set bd_raw = [] %}
+    {% set ns_booking = namespace(id="") %}
     {% for b in bookings %}
-      {% if b.vehicle_id == v.id and b.status != 'Cancelled' %}
+      {% if b.vehicle_id == v.id and b.status != 'Cancelled' and b.status != 'cancelled' %}
+        {% set ns_booking.id = b.id %}
         {% if b.pickup_location and b.pickup_location.split('|||')[0] not in bp %}
           {% set _ = bp.append(b.pickup_location.split('|||')[0]) %}
         {% endif %}
@@ -238,7 +240,8 @@
               data-destination="{{ v.destination }}"
               data-pickup-points="{{ effective_pickups }}"
               data-dropoff-points="{{ effective_dropoffs }}"
-              data-is-private="{% if v.destination == 'Private' and v.driver_included %}true{% else %}false{% endif %}"
+              data-is-private="{% if (v.destination == 'Private' and v.driver_included) or not v.driver_included %}true{% else %}false{% endif %}"
+              data-booking-id="{{ ns_booking.id }}"
               onclick="openVehicleRouteMapFromButton(this)">
         🗺️ Navigate Route
       </button>
@@ -328,7 +331,7 @@
               <div id="hud-route-info" style="font-size: 14px; font-weight: 700; color: #fff; margin-top: 2px;">Locating route...</div>
             </div>
             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-              <button id="btn-start-nav" onclick="toggleNavigationState()" style="background: linear-gradient(135deg, #1DB954, #1ed760); color: #fff; border: none; border-radius: 8px; padding: 10px 16px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap;">🚀 Start Nav</button>
+              <button id="btn-start-nav" onclick="startLiveNavigation()" style="background: linear-gradient(135deg, #0ea5e9, #38bdf8); color: #fff; border: none; border-radius: 8px; padding: 10px 16px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap;">🧭 Start Navigation</button>
               <button id="btn-start-trip" onclick="toggleTripState()" style="display: none; background: linear-gradient(135deg, #FF6B35, #FF8F5E); color: #fff; border: none; border-radius: 8px; padding: 10px 16px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap;">🚀 Start Trip</button>
               <button id="btn-action-override" onclick="advanceNavigationLeg()" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #fff; border-radius: 8px; padding: 10px 14px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap;">Arrived 👤</button>
             </div>
@@ -415,6 +418,8 @@
       startTripBtn.style.display = "none";
     }
     document.getElementById("map-modal-overlay").classList.add("show");
+    window.scrollTo(0, 0);
+    document.body.style.overflow = "hidden";
     setTimeout(() => {
       if (map) {
         map.invalidateSize();
@@ -766,64 +771,123 @@
     });
   }
 
-  function toggleNavigationState() {
-    const btn = document.getElementById("btn-start-nav");
+
+  function startLiveNavigation() {
+    const navBtn = document.getElementById("btn-start-nav");
+    
+    // If already navigating, stop it
     if (isNavigating) {
       stopNavAndWatch();
+      navBtn.textContent = "🧭 Start Navigation";
+      navBtn.style.background = "linear-gradient(135deg, #0ea5e9, #38bdf8)";
+      return;
+    }
+    
+    // Need route coordinates — if none exist, alert
+    if (!routeCoords || routeCoords.length === 0) {
+      alert("No route calculated yet. Please wait for the route to load.");
+      return;
+    }
+    
+    navBtn.textContent = "🛑 Stop Navigation";
+    navBtn.style.background = "linear-gradient(135deg, #ff4a4a, #ff6b6b)";
+    
+    // Get current GPS and zoom in
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          driverLatLng = L.latLng(pos.coords.latitude, pos.coords.longitude);
+          beginLiveTracking();
+        },
+        (err) => {
+          console.warn("GPS failed for live nav:", err);
+          // Fallback to last known position
+          if (driverLatLng) {
+            beginLiveTracking();
+          } else {
+            alert("Unable to detect your location. Please enable GPS.");
+            navBtn.textContent = "🧭 Start Navigation";
+            navBtn.style.background = "linear-gradient(135deg, #0ea5e9, #38bdf8)";
+          }
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
     } else {
-      startNavigationLeg();
-      btn.textContent = "🛑 Stop Nav";
-      btn.style.background = "linear-gradient(135deg, #ff4a4a, #ff6b6b)";
+      alert("Geolocation is not supported by this browser.");
     }
   }
 
-  function startNavigationLeg() {
-    if (!routeCoords.length) return;
+  function beginLiveTracking() {
     isNavigating = true;
-
-    // Send API call to notify rider that navigation started
-    if (activeBookingId) {
-      fetch(`/api/provider/bookings/${activeBookingId}/start-nav`, {
-        method: "POST"
-      }).then(r => r.json()).then(data => {
-        console.log("Navigation started status updated in backend:", data);
-      }).catch(err => {
-        console.error("Failed to update navigation status:", err);
-      });
-    }
-
-    // Show Google Maps Green/Teal navigation banner
+    
+    // Show teal navigation banner
     const navBanner = document.getElementById("nav-banner");
     if (navBanner) {
       navBanner.style.display = "flex";
-      document.getElementById("nav-banner-instruction").textContent = "Initializing GPS navigation...";
-      document.getElementById("nav-banner-distance").textContent = "Locating satellites";
+      document.getElementById("nav-banner-instruction").textContent = "Navigation active — follow the route";
+      document.getElementById("nav-banner-distance").textContent = "GPS tracking enabled";
     }
 
+    // Create cab marker icon
     const cabIcon = L.divIcon({ 
-      html:`<div id="cab-rotator" style="font-size:28px; transition: transform 0.2s linear; display: inline-block;">🚖</div>`, 
-      className:'', iconSize:[28,28], iconAnchor:[14,14] 
+      html:`<div id="cab-rotator" style="width: 36px; height: 36px; transition: transform 0.2s linear; display: inline-block;">
+        <svg viewBox="0 0 40 40" width="36" height="36" style="filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.4));">
+          <defs>
+            <linearGradient id="navArrowLeft" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#FF7A00"/>
+              <stop offset="100%" stop-color="#D04000"/>
+            </linearGradient>
+            <linearGradient id="navArrowRight" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#FFC000"/>
+              <stop offset="100%" stop-color="#FF8A00"/>
+            </linearGradient>
+          </defs>
+          <path d="M20 2 L20 28 L4 36 Z" fill="url(#navArrowLeft)" />
+          <path d="M20 2 L36 36 L20 28 Z" fill="url(#navArrowRight)" />
+        </svg>
+      </div>`, 
+      className:'', iconSize:[36,36], iconAnchor:[18,18] 
     });
 
+    // Remove old driver marker
     if (driverMarker) {
       map.removeLayer(driverMarker);
       driverMarker = null;
     }
+    // Remove old cab marker if present
+    if (cabMarker) {
+      map.removeLayer(cabMarker);
+      cabMarker = null;
+    }
 
-    // Start by placing the cabMarker at the driver's last known location
+    // Place cab at current position and zoom in
     cabMarker = L.marker(driverLatLng, { icon: cabIcon }).addTo(map);
-    map.setView(driverLatLng, 16);
+    map.setView(driverLatLng, 16, { animate: true });
 
-    // Send coordinates update to backend immediately if driver location is already known
-    if (activeBookingId && driverLatLng) {
+    // Send initial location and start navigation to backend
+    if (activeBookingId) {
+      // 1. Mark status as enroute
+      fetch(`/api/provider/bookings/${activeBookingId}/start-nav`, {
+        method: "POST"
+      }).then(r => r.json()).then(data => {
+        console.log("Booking navigation status updated to enroute:", data);
+      }).catch(err => console.error("Failed to set navigation status to enroute:", err));
+
+      // 2. Upload initial coordinates
       fetch(`/api/provider/bookings/${activeBookingId}/location`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lat: driverLatLng.lat, lon: driverLatLng.lng })
+      }).catch(err => console.error("Failed to upload initial driver location:", err));
+    } else if (activeVehicleId) {
+      fetch(`/api/provider/vehicles/${activeVehicleId}/location`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lat: driverLatLng.lat, lon: driverLatLng.lng })
       }).catch(err => console.error("Failed to upload initial driver location:", err));
     }
 
-    // Watch position
+    // Start continuous GPS tracking
     if (navigator.geolocation) {
       watchId = navigator.geolocation.watchPosition(
         (pos) => {
@@ -836,26 +900,32 @@
             map.setView([curLat, curLon], 16);
           }
 
-          // Update driverLatLng coordinate
+          // Update driverLatLng
           driverLatLng = L.latLng(curLat, curLon);
 
-          // Send coordinates update to backend
+          // Send location to backend
           if (activeBookingId) {
             fetch(`/api/provider/bookings/${activeBookingId}/location`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ lat: curLat, lon: curLon })
             }).catch(err => console.error("Failed to upload driver location:", err));
+          } else if (activeVehicleId) {
+            fetch(`/api/provider/vehicles/${activeVehicleId}/location`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ lat: curLat, lon: curLon })
+            }).catch(err => console.error("Failed to upload driver location:", err));
           }
 
-          // Rotate cab based on movement bearing
+          // Rotate cab marker based on movement bearing
           const bearing = getBearing(prevLatLng.lat, prevLatLng.lng, curLat, curLon);
           const cabRotator = document.getElementById("cab-rotator");
           if (cabRotator && (Math.abs(prevLatLng.lat - curLat) > 0.00001 || Math.abs(prevLatLng.lng - curLon) > 0.00001)) {
             cabRotator.style.transform = `rotate(${bearing}deg)`;
           }
 
-          // Locate nearest coordinate index to update banner Turn instructions
+          // Find nearest waypoint index for turn-by-turn instructions
           let nearestIdx = 0;
           let minDist = Infinity;
           for (let i = 0; i < routeCoords.length; i++) {
@@ -867,12 +937,17 @@
           }
           updateNavigationBanner(nearestIdx);
 
-          // Check if arrived at destination coordinate (within 20 meters)
+          // Check if arrived at target (within 30 meters)
           const targetLatLng = currentLeg === "to_pickup" ? passengerPickupLatLng : passengerDropoffLatLng;
-          const distToTarget = map.distance([curLat, curLon], targetLatLng);
-          if (distToTarget < 20) {
-            stopNavAndWatch();
-            advanceNavigationLeg();
+          if (targetLatLng) {
+            const distToTarget = map.distance([curLat, curLon], targetLatLng);
+            if (distToTarget < 30) {
+              stopNavAndWatch();
+              const navBtn = document.getElementById("btn-start-nav");
+              navBtn.textContent = "🧭 Start Navigation";
+              navBtn.style.background = "linear-gradient(135deg, #0ea5e9, #38bdf8)";
+              advanceNavigationLeg();
+            }
           }
         },
         (err) => {
@@ -882,11 +957,10 @@
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
-    } else {
-      alert("Geolocation is not supported by this browser.");
-      stopNavAndWatch();
     }
   }
+
+
 
   function updateNavigationBanner(currentIndex) {
     if (routeInstructions.length > 0) {
@@ -951,6 +1025,14 @@
     if (btn) {
       btn.textContent = "🚀 Start Nav";
       btn.style.background = "linear-gradient(135deg, #1DB954, #1ed760)";
+      btn.style.display = "inline-block";
+    }
+
+    // Reset live navigation button
+    const liveNavBtn = document.getElementById("btn-live-nav");
+    if (liveNavBtn) {
+      liveNavBtn.textContent = "🧭 Start Navigation";
+      liveNavBtn.style.background = "linear-gradient(135deg, #0ea5e9, #38bdf8)";
     }
 
     // Recreate static driverMarker at driverLatLng if requested and not already present
@@ -1092,18 +1174,21 @@
     const destination = btn.getAttribute('data-destination') || '';
     const pickups = btn.getAttribute('data-pickup-points') || '';
     const dropoffs = btn.getAttribute('data-dropoff-points') || '';
+    const bookingId = btn.getAttribute('data-booking-id') || null;
     
     activeVehicleIsPrivate = btn.getAttribute('data-is-private') === 'true';
     privateCurrentLeg = "pickup"; // Reset to pickup leg
     
-    openVehicleRouteMap(vehicleId, vehicleName, origin, destination, pickups, dropoffs);
+    openVehicleRouteMap(vehicleId, vehicleName, origin, destination, pickups, dropoffs, bookingId);
   }
 
-  async function openVehicleRouteMap(vehicleId, vehicleName, origin, destination, pickupPointsStr, dropoffPointsStr) {
+  async function openVehicleRouteMap(vehicleId, vehicleName, origin, destination, pickupPointsStr, dropoffPointsStr, bookingId = null) {
     try {
       activeVehicleId = vehicleId;
-      activeBookingId = null;
+      activeBookingId = bookingId;
       document.getElementById("map-modal-overlay").classList.add("show");
+      window.scrollTo(0, 0);
+      document.body.style.overflow = "hidden";
       setTimeout(() => {
         if (map) {
           map.invalidateSize();
@@ -1209,12 +1294,40 @@
         privateDropoffName = dropoffParts.split("|||")[0] || "Destination";
         
         privatePickupLatLng = parseCoordsString(pickupParts);
+        privateDropoffLatLng = parseCoordsString(dropoffParts);
+
+        if (activeBookingId) {
+          try {
+            const res = await fetch(`/api/provider/bookings/${activeBookingId}/track`);
+            if (res.ok) {
+              const bookingData = await res.json();
+              if (bookingData.pickup_name) {
+                privatePickupName = bookingData.pickup_name;
+                if (bookingData.pickup_lat && bookingData.pickup_lon) {
+                  privatePickupLatLng = L.latLng(bookingData.pickup_lat, bookingData.pickup_lon);
+                } else {
+                  privatePickupLatLng = null;
+                }
+              }
+              if (bookingData.dropoff_name) {
+                privateDropoffName = bookingData.dropoff_name;
+                if (bookingData.dropoff_lat && bookingData.dropoff_lon) {
+                  privateDropoffLatLng = L.latLng(bookingData.dropoff_lat, bookingData.dropoff_lon);
+                } else {
+                  privateDropoffLatLng = null;
+                }
+              }
+            }
+          } catch (e) {
+            console.warn("Failed to fetch booking details for private vehicle:", e);
+          }
+        }
+        
         if (!privatePickupLatLng) {
           const coord = await geocodeAddress(privatePickupName);
           if (coord) privatePickupLatLng = L.latLng(coord.lat, coord.lon);
         }
         
-        privateDropoffLatLng = parseCoordsString(dropoffParts);
         if (!privateDropoffLatLng) {
           const coord = await geocodeAddress(privateDropoffName);
           if (coord) privateDropoffLatLng = L.latLng(coord.lat, coord.lon);
@@ -1429,6 +1542,7 @@
 
   function closeMapModal() {
     document.getElementById("map-modal-overlay").classList.remove("show");
+    document.body.style.overflow = "";
     stopNavAndWatch();
     stopTripAndWatch();
     // Destroy map so it gets freshly created on next open (avoids stale container size)
@@ -1493,8 +1607,23 @@
     }
 
     const cabIcon = L.divIcon({ 
-      html:`<div id="cab-rotator" style="font-size:28px; transition: transform 0.2s linear; display: inline-block;">🚖</div>`, 
-      className:'', iconSize:[28,28], iconAnchor:[14,14] 
+      html:`<div id="cab-rotator" style="width: 36px; height: 36px; transition: transform 0.2s linear; display: inline-block;">
+        <svg viewBox="0 0 40 40" width="36" height="36" style="filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.4));">
+          <defs>
+            <linearGradient id="navArrowLeft" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#FF7A00"/>
+              <stop offset="100%" stop-color="#D04000"/>
+            </linearGradient>
+            <linearGradient id="navArrowRight" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#FFC000"/>
+              <stop offset="100%" stop-color="#FF8A00"/>
+            </linearGradient>
+          </defs>
+          <path d="M20 2 L20 28 L4 36 Z" fill="url(#navArrowLeft)" />
+          <path d="M20 2 L36 36 L20 28 Z" fill="url(#navArrowRight)" />
+        </svg>
+      </div>`, 
+      className:'', iconSize:[36,36], iconAnchor:[18,18] 
     });
 
     if (driverMarker) {
@@ -1602,6 +1731,15 @@
       btn.style.background = "linear-gradient(135deg, #FF6B35, #FF8F5E)";
     }
   }
+
+  // Move the map modal overlay to be a direct child of <body> so that
+  // position:fixed works correctly (ancestor transforms/filters can break it)
+  document.addEventListener('DOMContentLoaded', function() {
+    const overlay = document.getElementById('map-modal-overlay');
+    if (overlay && overlay.parentElement !== document.body) {
+      document.body.appendChild(overlay);
+    }
+  });
 </script>
 
 

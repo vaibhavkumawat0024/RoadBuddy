@@ -192,6 +192,30 @@
     {% block content %}{% endblock %}
   </main>
 
+  <style>
+    @media (max-width: 480px) {
+      #driver-alert-toast {
+        right: 16px !important;
+        left: 16px !important;
+        bottom: 16px !important;
+        max-width: none !important;
+        width: auto !important;
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 10px !important;
+      }
+      #tracking-modal-overlay > div {
+        width: 100% !important;
+        height: 100% !important;
+        max-height: 100vh !important;
+        border-radius: 0 !important;
+      }
+      #tracking-map {
+        height: calc(100vh - 120px) !important;
+      }
+    }
+  </style>
+
   <!-- Global Tracking Modal Popup -->
   <div id="tracking-modal-overlay" style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 9999; opacity: 0; transition: opacity 0.2s ease;">
     <div style="background: #fff; border-radius: 16px; max-width: 700px; width: 90%; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.25);">
@@ -599,6 +623,12 @@
           const booking = bookings[0]; // focus on the first active enroute booking
           activeToastBookingId = booking.id;
 
+          // Don't show toast if dismissed in this tab session
+          const dismissed = JSON.parse(sessionStorage.getItem("dismissed_toasts") || "[]");
+          if (dismissed.includes(booking.id)) {
+            return;
+          }
+
           // Ensure red dot is shown on My Bookings
           let dot = document.querySelector("#nav-my-bookings-link .unread-dot");
           if (!dot) {
@@ -611,12 +641,21 @@
           // Customize toast text
           const title = document.getElementById("toast-title");
           const body = document.getElementById("toast-body");
+          const trackBtn = document.getElementById("btn-toast-track");
           if (booking.navigation_status === "trip_started") {
-            title.textContent = "Your vehicle is ready!";
-            body.innerHTML = `Your vehicle <strong>${booking.vehicle_name || 'xyz'}</strong> is ready to go, get to your pickup point on time.`;
+            title.textContent = "Your vehicle has started!";
+            body.innerHTML = `Vehicle <strong>${booking.vehicle_name || 'xyz'}</strong> is started from its route, get ready and available at the pickup point.`;
+            if (trackBtn) trackBtn.style.display = "inline-block";
           } else {
-            title.textContent = "Your driver is on the way!";
-            body.textContent = "Ready for a wonderful trip. Track your driver's live location now.";
+            if (booking.selected_seats === "Self-Drive Rental") {
+              title.textContent = "Self-Drive Handover";
+              body.innerHTML = `Your vehicle <strong>${booking.vehicle_name || 'xyz'}</strong> for self drive is out to your location to handover the vehicle.`;
+              if (trackBtn) trackBtn.style.display = "none";
+            } else {
+              title.textContent = "Your driver is on the way!";
+              body.innerHTML = `Your cab <strong>${booking.vehicle_name || 'xyz'}</strong> is ready and out to pick you.`;
+              if (trackBtn) trackBtn.style.display = "inline-block";
+            }
           }
 
           // Show Toast notification if tracking modal is not open
@@ -643,6 +682,16 @@
     }
 
     function closeToast() {
+      if (activeToastBookingId) {
+        let dismissed = [];
+        try {
+          dismissed = JSON.parse(sessionStorage.getItem("dismissed_toasts") || "[]");
+        } catch (e) {}
+        if (!dismissed.includes(activeToastBookingId)) {
+          dismissed.push(activeToastBookingId);
+          sessionStorage.setItem("dismissed_toasts", JSON.stringify(dismissed));
+        }
+      }
       const toast = document.getElementById("driver-alert-toast");
       if (toast) {
         toast.style.opacity = "0";

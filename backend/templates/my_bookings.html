@@ -381,7 +381,9 @@
               <div>
                 <div class="trip-detail-route" style="color: #1a1a1a;">
                   {{ b.vehicle.vehicle_name }} 
-                  {% if b.vehicle.destination == 'Private' %}
+                  {% if b.selected_seats == 'Self-Drive Rental' %}
+                  <span style="font-size: 11px; padding: 2px 6px; background: #e0e7ff; color: #4338ca; border-radius: 4px; font-weight: 600; margin-left: 6px; vertical-align: middle;">Self-Drive</span>
+                  {% elif b.vehicle.destination == 'Private' or b.selected_seats == 'Whole Vehicle' %}
                   <span style="font-size: 11px; padding: 2px 6px; background: #e0f2fe; color: #0369a1; border-radius: 4px; font-weight: 600; margin-left: 6px; vertical-align: middle;">Private Cab</span>
                   {% else %}
                   <span style="font-size: 11px; padding: 2px 6px; background: #e0f5ee; color: #0F6E56; border-radius: 4px; font-weight: 600; margin-left: 6px; vertical-align: middle;">Seat Booking</span>
@@ -400,9 +402,18 @@
                   {{ b.status | capitalize }}
                 </div>
                 {% if b.status != 'cancelled' %}
-                <form method="POST" action="/cancel-booking/{{ b.id }}" onsubmit="return confirm('Are you sure you want to cancel this booking?')">
-                  <button type="submit" style="background: rgba(255, 107, 53, 0.08); border: 1px solid rgba(255, 107, 53, 0.15); color: #ff6b6b; padding: 5px 12px; border-radius: 6px; font-size: 11.5px; font-weight: 600; cursor: pointer; transition: all 0.2s;">Cancel Booking</button>
-                </form>
+                <div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-end; margin-top: 4px;">
+                  <form method="POST" action="/cancel-booking/{{ b.id }}" onsubmit="return confirm('Are you sure you want to cancel this booking?')">
+                    <button type="submit" style="background: rgba(255, 107, 53, 0.08); border: 1px solid rgba(255, 107, 53, 0.15); color: #ff6b6b; padding: 5px 12px; border-radius: 6px; font-size: 11.5px; font-weight: 600; cursor: pointer; transition: all 0.2s; width: 110px;">Cancel Booking</button>
+                  </form>
+                  
+                  {% if b.selected_seats != 'Self-Drive Rental' %}
+                  <button onclick="handleCabTracking('{{ b.id }}')" 
+                          style="background: linear-gradient(135deg, #10b981, #059669); color: #fff; border: none; padding: 6px 12px; border-radius: 6px; font-size: 11.5px; font-weight: 700; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 6px rgba(16,185,129,0.2); width: 110px; display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
+                    🧭 {% if b.selected_seats == 'Whole Vehicle' %}Track Cab{% else %}Track Vehicle{% endif %}
+                  </button>
+                  {% endif %}
+                </div>
                 {% endif %}
               </div>
             </div>
@@ -550,6 +561,25 @@ function filterBookings(type) {
       }
     }
   });
+}
+
+async function handleCabTracking(bookingId) {
+  try {
+    const res = await fetch(`/api/provider/bookings/${bookingId}/track`);
+    if (!res.ok) {
+      alert("Unable to fetch booking tracking details.");
+      return;
+    }
+    const data = await res.json();
+    if (data.navigation_status === 'enroute' || data.navigation_status === 'trip_started') {
+      openTrackingModal(bookingId);
+    } else {
+      alert("the cab is not out yet for service");
+    }
+  } catch (err) {
+    console.error("Tracking fetch error:", err);
+    alert("Error contacting tracking service.");
+  }
 }
 </script>
 {% endblock %}

@@ -346,18 +346,17 @@ def list_cab_services(
             ProviderBooking.status != "cancelled"
         ).all()
 
-        # Private cab visibility logic:
-        if v.destination == "Private" and date_bookings_list:
-            # If booked on this date, only show if it belongs to the requesting user_id
-            if user_id is None or any(b.user_id != user_id for b in date_bookings_list):
-                continue
-
-        if v.destination == "Private":
-            seats_booked_on_date = v.total_seats if date_bookings_list else 0
+        # Private cab or self-drive vehicle logic:
+        if (v.destination == "Private" or not v.driver_included) and date_bookings_list:
+            seats_booked_on_date = v.total_seats
         else:
             seats_booked_on_date = sum(b.num_seats for b in date_bookings_list)
 
         seats_available_on_date = max(v.total_seats - seats_booked_on_date, 0)
+
+        # Filter out fully booked vehicles
+        if seats_available_on_date <= 0:
+            continue
 
         results.append(CabServiceResult(
             id=v.id,
@@ -408,7 +407,7 @@ def search_vehicles(data: VehicleSearchRequest, db: Session = Depends(get_db)):
             ProviderBooking.status != "cancelled"
         ).all()
 
-        if v.destination == "Private":
+        if v.destination == "Private" or not v.driver_included:
             seats_booked_on_date = v.total_seats if date_bookings else 0
         else:
             seats_booked_on_date = sum(b.num_seats for b in date_bookings)

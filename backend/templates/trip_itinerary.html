@@ -59,6 +59,18 @@
             <label style="font-size: 11px; color: #64748b; font-weight: 600; text-align: left; align-self: flex-start;">Select Pickup Stop *</label>
             <select id="booking-pickup-select" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; outline: none; background: #ffffff; color: #0f172a;"></select>
           </div>
+
+          <!-- Private Cab Custom Pickup Location -->
+          <div id="private-cab-pickup-container" style="display: none; flex-direction: column; gap: 4px; width: 100%;">
+            <label style="font-size: 11px; color: #64748b; font-weight: 600; text-align: left; align-self: flex-start;">Set Pickup Point *</label>
+            <div style="display: flex; gap: 8px; width: 100%;">
+              <input type="text" id="private-pickup-input" placeholder="Enter pickup address or use GPS..." style="flex: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; outline: none; background: #ffffff; color: #0f172a;" />
+              <button type="button" onclick="detectUserPickupLocation()" style="background: #0f172a; color: #fff; border: none; border-radius: 8px; padding: 0 14px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; transition: all 0.2s;" title="Detect my current location">
+                <span class="material-symbols-outlined" style="font-size: 18px;">my_location</span>
+                <span>Detect</span>
+              </button>
+            </div>
+          </div>
           
           <div style="display: flex; flex-direction: column; gap: 4px; width: 100%;">
             <label style="font-size: 11px; color: #64748b; font-weight: 600; text-align: left; align-self: flex-start;">Select Drop-off Stop *</label>
@@ -208,7 +220,7 @@
           
           <div style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 11px; font-weight: 600; color: #64748b;">Delivery Address / Location *</label>
-            <div style="display: flex; gap: 8px;">
+            <div id="sd-location-input-container" style="display: flex; gap: 8px;">
               <input type="text" id="sd-input-location" placeholder="Enter delivery address..." style="flex: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px;" required />
               <button type="button" onclick="detectUserGPS()" style="padding: 0 12px; font-size: 12.5px; background: #ecfdf5; border: 1px solid #a7f3d0; color: #059669; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; white-space: nowrap;">
                 📍 Auto Detect
@@ -480,6 +492,27 @@
     max-height: 100% !important;
     border-radius: 0 !important;
     margin: 0 !important;
+  }
+
+  #private-cab-pickup-container > div {
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+  #private-cab-pickup-container button {
+    width: 100% !important;
+    padding: 10px 0 !important;
+    height: 40px !important;
+    box-sizing: border-box !important;
+  }
+  #sd-location-input-container {
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+  #sd-location-input-container button {
+    width: 100% !important;
+    padding: 10px 0 !important;
+    height: 40px !important;
+    box-sizing: border-box !important;
   }
 
   /* Hotel tab buttons scroll */
@@ -2451,6 +2484,42 @@
     }
   }
 
+  function detectUserPickupLocation() {
+    const input = document.getElementById("private-pickup-input");
+    input.value = "Detecting your location...";
+    input.disabled = true;
+    
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
+          
+          try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+            const data = await res.json();
+            const address = data.display_name ? data.display_name.split(",")[0] + ", " + data.display_name.split(",")[1] : "Detected Location";
+            input.value = `${address} ||| ${lat},${lon}`;
+          } catch (e) {
+            input.value = `Current Location ||| ${lat},${lon}`;
+          }
+          input.disabled = false;
+        },
+        (err) => {
+          console.warn("GPS detection failed:", err);
+          input.value = "";
+          input.disabled = false;
+          alert("GPS detection failed. Please enter your pickup location manually.");
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    } else {
+      alert("Geolocation is not supported by this browser.");
+      input.value = "";
+      input.disabled = false;
+    }
+  }
+
   async function openCabBookModal(vehicleId) {
     const s = loadedCabServices.find(srv => srv.id === vehicleId);
     if (!s) return;
@@ -2494,6 +2563,8 @@
     
     const pickupSelect = document.getElementById("booking-pickup-select");
     const dropoffSelect = document.getElementById("booking-dropoff-select");
+    const privatePickupContainer = document.getElementById("private-cab-pickup-container");
+    
     pickupSelect.innerHTML = `<option value="${originCity}">${originCity} (Origin)</option>`;
     dropoffSelect.innerHTML = `<option value="${destinationCity}">${destinationCity} (Destination)</option>`;
     
@@ -2501,6 +2572,15 @@
       pickupSelect.innerHTML += `<option value="${st}">${st}</option>`;
       dropoffSelect.innerHTML += `<option value="${st}">${st}</option>`;
     });
+
+    if (isPrivateBooking) {
+      pickupSelect.parentElement.style.display = "none";
+      privatePickupContainer.style.display = "flex";
+      document.getElementById("private-pickup-input").value = "";
+    } else {
+      pickupSelect.parentElement.style.display = "flex";
+      privatePickupContainer.style.display = "none";
+    }
     
     const grid = document.getElementById("seats-grid");
     grid.innerHTML = "";
@@ -2885,6 +2965,14 @@
       alert("Please enter passenger details: Name and Age for each seat, and contact Phone & Email.");
       return;
     }
+
+    if (isPrivateBooking && activeBookMode === 'cab') {
+      const pInput = document.getElementById("private-pickup-input").value.trim();
+      if (!pInput) {
+        alert("Please enter your pickup location.");
+        return;
+      }
+    }
     
     document.getElementById("seat-step-1").style.display = "none";
     document.getElementById("seat-step-2").style.display = "flex";
@@ -2916,7 +3004,11 @@
     if (activeBookMode === 'cab') {
       pickupRow.style.display = "flex";
       dropoffRow.style.display = "flex";
-      document.getElementById("summary-pickup").textContent = document.getElementById("booking-pickup-select").value;
+      const pickupVal = isPrivateBooking 
+        ? document.getElementById("private-pickup-input").value.trim()
+        : document.getElementById("booking-pickup-select").value;
+      
+      document.getElementById("summary-pickup").textContent = pickupVal.split("|||")[0].trim();
       document.getElementById("summary-dropoff").textContent = document.getElementById("booking-dropoff-select").value;
     } else {
       pickupRow.style.display = "none";
@@ -2964,7 +3056,9 @@
         passenger_details: JSON.stringify(passengerDetailsList),
         travel_date: tripStartDate,
         num_seats: isPrivateBooking ? 1 : selectedSeats.length,
-        pickup_location: document.getElementById("booking-pickup-select").value,
+        pickup_location: isPrivateBooking 
+          ? document.getElementById("private-pickup-input").value.trim()
+          : document.getElementById("booking-pickup-select").value,
         dropoff_location: document.getElementById("booking-dropoff-select").value,
         selected_seats: isPrivateBooking ? "Whole Vehicle" : selectedSeats.join(", "),
         user_id: currentUserId,
