@@ -65,11 +65,11 @@
                 <span class="material-symbols-outlined text-[12px] leading-none">my_location</span> Detect Location
               </button>
             </div>
-            <input type="text" id="origin" value="{% if trip %}{{ trip.origin }}{% else %}{{ origin|default('') }}{% endif %}" data-lat="{% if trip %}{{ trip.origin_lat }}{% endif %}" data-lon="{% if trip %}{{ trip.origin_lon }}{% endif %}" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-slate-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-white transition-all outline-none" placeholder="e.g. Jaipur" required>
+            <input type="text" id="origin" value="{{ origin|default('') }}" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-slate-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-white transition-all outline-none" placeholder="e.g. Jaipur" required>
           </div>
           <div>
             <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Destination City</label>
-            <input type="text" id="destination" value="{% if trip %}{{ trip.destination }}{% else %}{{ destination|default('') }}{% endif %}" data-lat="{% if trip %}{{ trip.destination_lat }}{% endif %}" data-lon="{% if trip %}{{ trip.destination_lon }}{% endif %}" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-slate-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-white transition-all outline-none" placeholder="e.g. Udaipur" required>
+            <input type="text" id="destination" value="{{ destination|default('') }}" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-slate-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-white transition-all outline-none" placeholder="e.g. Udaipur" required>
           </div>
         </div>
 
@@ -87,11 +87,11 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Budget (₹)</label>
-            <input type="number" id="budget_inr" value="{% if trip %}{{ trip.budget_inr|int }}{% endif %}" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-slate-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-white transition-all outline-none" placeholder="e.g. 15000" required>
+            <input type="number" id="budget_inr" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-slate-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-white transition-all outline-none" placeholder="e.g. 15000" required>
           </div>
           <div>
             <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Number of Travelers</label>
-            <input type="number" id="num_people" value="{% if trip %}{{ trip.num_people }}{% else %}2{% endif %}" min="1" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-slate-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-white transition-all outline-none" required>
+            <input type="number" id="num_people" value="2" min="1" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-slate-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-white transition-all outline-none" required>
           </div>
         </div>
 
@@ -99,20 +99,20 @@
           <div>
             <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Travel Mode</label>
             <select id="travel_mode" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-slate-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-white transition-all outline-none" required>
-              <option value="own_vehicle" {% if trip and trip.travel_mode == 'own_vehicle' %}selected{% endif %}>Own vehicle</option>
-              <option value="cab_service" {% if trip and trip.travel_mode == 'cab_service' %}selected{% endif %}>Cab service</option>
-              <option value="bus" {% if trip and trip.travel_mode == 'bus' %}selected{% endif %}>Bus</option>
-              <option value="train" {% if trip and trip.travel_mode == 'train' %}selected{% endif %}>Train</option>
-              <option value="flight" {% if trip and trip.travel_mode == 'flight' %}selected{% endif %}>Flight</option>
+              <option value="own_vehicle">Own vehicle</option>
+              <option value="cab_service">Cab service</option>
+              <option value="bus">Bus</option>
+              <option value="train">Train</option>
+              <option value="flight">Flight</option>
             </select>
           </div>
           <div>
             <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Group Type</label>
             <select id="group_type" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-slate-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-white transition-all outline-none" required>
-              <option value="solo" {% if trip and trip.group_type == 'solo' %}selected{% endif %}>Solo</option>
-              <option value="couple" {% if trip and trip.group_type == 'couple' %}selected{% endif %}>Couple</option>
-              <option value="family" {% if trip and trip.group_type == 'family' %}selected{% endif %}>Family</option>
-              <option value="friends" {% if not trip or trip.group_type == 'friends' %}selected{% endif %}>Friends</option>
+              <option value="solo">Solo</option>
+              <option value="couple">Couple</option>
+              <option value="family">Family</option>
+              <option value="friends" selected>Friends</option>
             </select>
           </div>
         </div>
@@ -123,7 +123,7 @@
             {% if vehicles %}
             <select id="vehicle_id" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-slate-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-white transition-all outline-none">
               {% for v in vehicles %}
-              <option value="{{ v.id }}" {% if trip and trip.vehicle_id == v.id %}selected{% endif %}>{{ v.name }} ({{ v.category }}, {{ v.fuel_type }})</option>
+              <option value="{{ v.id }}">{{ v.name }} ({{ v.category }}, {{ v.fuel_type }})</option>
               {% endfor %}
             </select>
             {% else %}

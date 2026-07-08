@@ -241,17 +241,10 @@
               data-pickup-points="{{ effective_pickups }}"
               data-dropoff-points="{{ effective_dropoffs }}"
               data-is-private="{% if (v.destination == 'Private' and v.driver_included) or not v.driver_included %}true{% else %}false{% endif %}"
-              data-is-self-drive="{% if not v.driver_included %}true{% else %}false{% endif %}"
               data-booking-id="{{ ns_booking.id }}"
               onclick="openVehicleRouteMapFromButton(this)">
         🗺️ Navigate Route
       </button>
-      {% if v.driver_included and v.destination != 'Private' %}
-      <button class="btn-map-action" style="padding: 6px 12px; font-size: 11.5px; border-radius: 6px; flex-shrink: 0; background: linear-gradient(135deg, #f59e0b, #d97706); border: none; color: #fff; cursor: pointer;"
-              onclick="openProviderSeatMap({{ v.id }}, '{{ v.vehicle_name }}', {{ v.total_seats }}, '{{ v.vehicle_type }}')">
-        💺 View Seat Map
-      </button>
-      {% endif %}
     </div>
     {% endfor %}
   </div>
@@ -265,9 +258,6 @@
   <div class="booking-card">
     <div>
       <div class="booking-route">{{ b.passenger_name }} — booked {{ b.num_seats }} seat{{ 's' if b.num_seats != 1 }} from {{ b.pickup_location.split('|||')[0] if b.pickup_location else 'Origin' }} to {{ b.dropoff_location.split('|||')[0] if b.dropoff_location else 'Destination' }}</div>
-      {% if b.selected_seats and b.selected_seats != 'Whole Vehicle' and b.selected_seats != 'Self-Drive Rental' %}
-      <div style="font-size: 11.5px; color: #f59e0b; margin-top: 3px;">💺 Seats: {{ b.selected_seats }}</div>
-      {% endif %}
       <div class="booking-meta">📅 {{ b.travel_date }} &nbsp;·&nbsp; ₹{{ b.total_fare_inr|int }} &nbsp;·&nbsp; <span style="color: #1DB954;">{{ b.status|capitalize }}</span></div>
       {% if b.pickup_location %}
       <div class="booking-pickup">📍 Pickup: {{ b.pickup_location.split('|||')[0] if b.pickup_location else '' }}</div>
@@ -995,29 +985,11 @@
 
   function advanceNavigationLeg() {
     if (isSelfDrive) {
-      if (activeBookingId) {
-        fetch(`/api/provider/bookings/${activeBookingId}/arrived`, {
-          method: 'POST'
-        }).then(res => {
-          if (res.ok) console.log("Self-drive marked as arrived");
-        }).catch(err => {
-          console.error("Failed to mark self-drive as arrived:", err);
-        });
-      }
       alert("Self-drive vehicle delivered successfully to the delivery location!");
       closeMapModal();
       return;
     }
     if (currentLeg === "to_pickup") {
-      if (activeBookingId) {
-        fetch(`/api/provider/bookings/${activeBookingId}/arrived`, {
-          method: 'POST'
-        }).then(res => {
-          if (res.ok) console.log("Private cab marked as arrived");
-        }).catch(err => {
-          console.error("Failed to mark private cab as arrived:", err);
-        });
-      }
       alert("Arrived at passenger pickup location! Ready to start the passenger ride.");
       initLeg("to_dropoff");
     } else {
@@ -1205,7 +1177,6 @@
     const bookingId = btn.getAttribute('data-booking-id') || null;
     
     activeVehicleIsPrivate = btn.getAttribute('data-is-private') === 'true';
-    isSelfDrive = btn.getAttribute('data-is-self-drive') === 'true';
     privateCurrentLeg = "pickup"; // Reset to pickup leg
     
     openVehicleRouteMap(vehicleId, vehicleName, origin, destination, pickups, dropoffs, bookingId);
@@ -1588,15 +1559,6 @@
     if (activeVehicleIsPrivate) {
       if (privateCurrentLeg === "pickup") {
         privateCurrentLeg = "destination";
-        if (activeBookingId) {
-          fetch(`/api/provider/bookings/${activeBookingId}/arrived`, {
-            method: 'POST'
-          }).then(res => {
-            if (res.ok) console.log("Booking marked as arrived");
-          }).catch(err => {
-            console.error("Failed to mark booking as arrived:", err);
-          });
-        }
         // Start watching position if not already doing so
         if (!isNavigating) {
           startTripLeg();
@@ -1780,172 +1742,5 @@
   });
 </script>
 
-
-
-<!-- ═══ SEAT MAP MODAL ═══ -->
-<div class="confirm-overlay" id="seatmap-modal-overlay" style="display: none;">
-  <div class="confirm-modal" style="max-width: 420px; width: 95%; text-align: center; padding: 0; overflow: hidden;">
-    <div style="background: linear-gradient(135deg, #f59e0b, #d97706); padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;">
-      <h3 id="seatmap-modal-title" style="margin: 0; color: #fff; font-size: 15px; font-weight: 700;">💺 Seat Map</h3>
-      <button onclick="closeSeatMapModal()" style="background: none; border: none; font-size: 22px; color: rgba(255,255,255,0.8); cursor: pointer; line-height: 1;">&times;</button>
-    </div>
-    <div style="padding: 20px;">
-      <!-- Legend -->
-      <div style="display: flex; gap: 16px; justify-content: center; margin-bottom: 16px; font-size: 11px; color: #a0a0c0;">
-        <div style="display: flex; align-items: center; gap: 5px;">
-          <span style="width: 16px; height: 16px; background: #10b981; border-radius: 4px; display: inline-block;"></span> Available
-        </div>
-        <div style="display: flex; align-items: center; gap: 5px;">
-          <span style="width: 16px; height: 16px; background: #ef4444; border-radius: 4px; display: inline-block;"></span> Booked
-        </div>
-        <div style="display: flex; align-items: center; gap: 5px;">
-          <span style="width: 16px; height: 16px; background: #64748b; border-radius: 4px; display: inline-block;"></span> Driver
-        </div>
-      </div>
-      <div id="seatmap-grid" style="display: grid; gap: 8px; justify-items: center; max-width: 320px; margin: 0 auto;"></div>
-      <div id="seatmap-summary" style="margin-top: 16px; font-size: 12px; color: #a0a0c0;"></div>
-    </div>
-  </div>
-</div>
-
-<script>
-  function closeSeatMapModal() {
-    document.getElementById('seatmap-modal-overlay').style.display = 'none';
-  }
-
-  async function openProviderSeatMap(vehicleId, vehicleName, totalSeats, vehicleType) {
-    const overlay = document.getElementById('seatmap-modal-overlay');
-    const grid = document.getElementById('seatmap-grid');
-    const title = document.getElementById('seatmap-modal-title');
-    const summary = document.getElementById('seatmap-summary');
-
-    title.textContent = `💺 ${vehicleName} — Seat Map`;
-    grid.innerHTML = '<div style="color: #7878a0; font-size: 12px; padding: 20px;">Loading...</div>';
-    summary.textContent = '';
-    overlay.style.display = 'flex';
-
-    // Fetch booked seats — use today's date by default
-    let bookedSeats = [];
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      const res = await fetch(`/api/provider/vehicles/${vehicleId}/booked-seats?travel_date=${today}`);
-      if (res.ok) {
-        const data = await res.json();
-        bookedSeats = data.booked_seats || [];
-      }
-    } catch(err) {
-      console.warn('Could not fetch booked seats:', err);
-    }
-
-    // Build visual seat map
-    grid.innerHTML = '';
-    let layoutHTML = '';
-
-    if (totalSeats <= 4) {
-      grid.style.gridTemplateColumns = 'repeat(3, 1fr)';
-      if (totalSeats >= 1) layoutHTML += provSeatCell('1', bookedSeats);
-      else layoutHTML += '<div></div>';
-      layoutHTML += '<div></div>';
-      layoutHTML += provDriverCell();
-      if (totalSeats >= 2) layoutHTML += provSeatCell('2', bookedSeats);
-      else layoutHTML += '<div></div>';
-      if (totalSeats >= 3) layoutHTML += provSeatCell('3', bookedSeats);
-      else layoutHTML += '<div></div>';
-      if (totalSeats >= 4) layoutHTML += provSeatCell('4', bookedSeats);
-      else layoutHTML += '<div></div>';
-    } else if (totalSeats <= 7) {
-      grid.style.gridTemplateColumns = 'repeat(3, 1fr)';
-      layoutHTML += provSeatCell('1', bookedSeats);
-      layoutHTML += '<div></div>';
-      layoutHTML += provDriverCell();
-      layoutHTML += provSeatCell('2', bookedSeats);
-      layoutHTML += provSeatCell('3', bookedSeats);
-      layoutHTML += provSeatCell('4', bookedSeats);
-      if (totalSeats >= 5) layoutHTML += provSeatCell('5', bookedSeats);
-      else layoutHTML += '<div></div>';
-      if (totalSeats >= 7) layoutHTML += provSeatCell('6', bookedSeats);
-      else layoutHTML += '<div></div>';
-      if (totalSeats >= 6) layoutHTML += provSeatCell(totalSeats >= 7 ? '7' : '6', bookedSeats);
-      else layoutHTML += '<div></div>';
-    } else {
-      // Bus / Traveller layout
-      const use4Cols = totalSeats <= 15;
-      const gridCols = use4Cols ? 4 : 5;
-      grid.style.gridTemplateColumns = `repeat(${gridCols}, 1fr)`;
-
-      if (use4Cols) {
-        layoutHTML += provSeatCell('1', bookedSeats);
-        layoutHTML += '<div></div>';
-        layoutHTML += '<div></div>';
-        layoutHTML += provDriverCell();
-      } else {
-        layoutHTML += provSeatCell('1', bookedSeats);
-        layoutHTML += provSeatCell('2', bookedSeats);
-        layoutHTML += '<div></div>';
-        layoutHTML += '<div></div>';
-        layoutHTML += provDriverCell();
-      }
-
-      let seatNum = use4Cols ? 2 : 3;
-      const seatsPerRow = gridCols - 1; // minus aisle
-      const rowCount = Math.ceil((totalSeats - (use4Cols ? 1 : 2)) / seatsPerRow);
-
-      for (let r = 0; r < rowCount; r++) {
-        if (use4Cols) {
-          // 2 + aisle + 1
-          layoutHTML += (seatNum <= totalSeats) ? provSeatCell(seatNum.toString(), bookedSeats) : '<div></div>';
-          if (seatNum <= totalSeats) seatNum++;
-          layoutHTML += (seatNum <= totalSeats) ? provSeatCell(seatNum.toString(), bookedSeats) : '<div></div>';
-          if (seatNum <= totalSeats) seatNum++;
-          layoutHTML += '<div></div>';
-          layoutHTML += (seatNum <= totalSeats) ? provSeatCell(seatNum.toString(), bookedSeats) : '<div></div>';
-          if (seatNum <= totalSeats) seatNum++;
-        } else {
-          // 2 + aisle + 2
-          layoutHTML += (seatNum <= totalSeats) ? provSeatCell(seatNum.toString(), bookedSeats) : '<div></div>';
-          if (seatNum <= totalSeats) seatNum++;
-          layoutHTML += (seatNum <= totalSeats) ? provSeatCell(seatNum.toString(), bookedSeats) : '<div></div>';
-          if (seatNum <= totalSeats) seatNum++;
-          layoutHTML += '<div></div>';
-          layoutHTML += (seatNum <= totalSeats) ? provSeatCell(seatNum.toString(), bookedSeats) : '<div></div>';
-          if (seatNum <= totalSeats) seatNum++;
-          layoutHTML += (seatNum <= totalSeats) ? provSeatCell(seatNum.toString(), bookedSeats) : '<div></div>';
-          if (seatNum <= totalSeats) seatNum++;
-        }
-      }
-    }
-
-    grid.innerHTML = layoutHTML;
-
-    const bookedCount = bookedSeats.length;
-    const availCount = totalSeats - bookedCount;
-    summary.innerHTML = `<strong>${bookedCount}</strong> booked &nbsp;·&nbsp; <strong>${availCount}</strong> available &nbsp;·&nbsp; <strong>${totalSeats}</strong> total seats`;
-  }
-
-  function provSeatCell(id, bookedSeats) {
-    const isBooked = bookedSeats.includes(id);
-    const bg = isBooked ? '#ef4444' : '#10b981';
-    const label = isBooked ? `${id} ✗` : `${id} ✓`;
-    return `
-      <div style="width: 48px; height: 42px; background: ${bg}; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; font-size: 11px; font-weight: 700; gap: 1px; box-shadow: 0 2px 6px rgba(0,0,0,0.2);">
-        <span>${label}</span>
-      </div>
-    `;
-  }
-
-  function provDriverCell() {
-    return `
-      <div style="width: 48px; height: 42px; background: #64748b; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 2px 6px rgba(0,0,0,0.2);">🛞</div>
-    `;
-  }
-
-  // Move seat map modal to body
-  document.addEventListener('DOMContentLoaded', function() {
-    const seatOverlay = document.getElementById('seatmap-modal-overlay');
-    if (seatOverlay && seatOverlay.parentElement !== document.body) {
-      document.body.appendChild(seatOverlay);
-    }
-  });
-</script>
 
 {% endblock %}

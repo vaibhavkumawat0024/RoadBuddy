@@ -814,27 +814,6 @@
     ">
       💰 <span class="btn-text">Split Expenses</span>
     </button>
-    {% if trip_id %}
-    <form method="POST" action="/end-trip/{{ trip_id }}" style="margin: 0; display: inline-block;" onsubmit="return confirm('Are you sure you want to end and save this trip? After ending, you will not be able to start/plan it again.')">
-      <button type="submit" style="
-        font-size: 13px;
-        font-weight: 700;
-        color: #ffffff;
-        background: #ef4444;
-        border: 1.5px solid #ef4444;
-        padding: 8px 14px;
-        border-radius: 8px;
-        cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        transition: all 0.2s;
-        outline: none;
-      " onmouseover="this.style.background='#dc2626'; this.style.borderColor='#dc2626';" onmouseout="this.style.background='#ef4444'; this.style.borderColor='#ef4444';">
-        🏁 <span class="btn-text">End & Save Trip</span>
-      </button>
-    </form>
-    {% endif %}
     <a class="back-to-itinerary" href="{% if trip_id %}/my-trips/{{ trip_id }}/itinerary{% else %}/my-trips{% endif %}" style="
       font-size: 13px;
       font-weight: 700;
@@ -2428,72 +2407,127 @@
     updateSeatSummary();
 
     let layoutHTML = "";
-    const use4Cols = totalSeats <= 15;
-    const gridCols = use4Cols ? 4 : 5;
-    grid.style.gridTemplateColumns = `repeat(${gridCols}, 1fr)`;
 
-    // Row 1: Front seats and Driver Steering Wheel
-    if (use4Cols) {
+    if (totalSeats <= 4) {
+      // 4-Seater Car Layout
+      grid.style.gridTemplateColumns = "repeat(3, 1fr)";
+      
+      // Row 1: Co-driver (Seat 1), Empty, Driver
       layoutHTML += createSeatHTML("1", farePerSeat, bookedSeatsList);
       layoutHTML += `<div></div>`;
+      layoutHTML += `<div class="steering-wheel" style="width: 44px; height: 44px; background: #e2e8f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px;">🛞</div>`;
+
+      // Row 2: Back Passenger Seats
+      for (let sNum = 2; sNum <= 4; sNum++) {
+        if (sNum <= totalSeats) {
+          layoutHTML += createSeatHTML(sNum.toString(), farePerSeat, bookedSeatsList);
+        } else {
+          layoutHTML += `<div></div>`;
+        }
+      }
+      
+    } else if (totalSeats > 4 && totalSeats <= 7) {
+      // 6 or 7-Seater SUV Layout
+      grid.style.gridTemplateColumns = "repeat(3, 1fr)";
+      
+      // Row 1: Front Co-driver, Empty, Driver
+      layoutHTML += createSeatHTML("1", farePerSeat, bookedSeatsList);
       layoutHTML += `<div></div>`;
       layoutHTML += `<div class="steering-wheel" style="width: 44px; height: 44px; background: #e2e8f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px;">🛞</div>`;
+
+      // Row 2: Middle seats (2, 3, 4)
+      for (let sNum = 2; sNum <= 4; sNum++) {
+        if (sNum <= totalSeats) {
+          layoutHTML += createSeatHTML(sNum.toString(), farePerSeat, bookedSeatsList);
+        } else {
+          layoutHTML += `<div></div>`;
+        }
+      }
+
+      // Row 3: Back seats (5, 6, 7)
+      if (totalSeats === 5) {
+        layoutHTML += createSeatHTML("5", farePerSeat, bookedSeatsList);
+        layoutHTML += `<div></div>`;
+        layoutHTML += `<div></div>`;
+      } else if (totalSeats === 6) {
+        layoutHTML += createSeatHTML("5", farePerSeat, bookedSeatsList);
+        layoutHTML += `<div></div>`;
+        layoutHTML += createSeatHTML("6", farePerSeat, bookedSeatsList);
+      } else if (totalSeats === 7) {
+        layoutHTML += createSeatHTML("5", farePerSeat, bookedSeatsList);
+        layoutHTML += createSeatHTML("6", farePerSeat, bookedSeatsList);
+        layoutHTML += createSeatHTML("7", farePerSeat, bookedSeatsList);
+      }
+      
     } else {
-      layoutHTML += createSeatHTML("1", farePerSeat, bookedSeatsList);
-      layoutHTML += createSeatHTML("2", farePerSeat, bookedSeatsList);
-      layoutHTML += `<div></div>`;
-      layoutHTML += `<div></div>`;
-      layoutHTML += `<div class="steering-wheel" style="width: 44px; height: 44px; background: #e2e8f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px;">🛞</div>`;
-    }
+      // Bus / Traveller Layout
+      const use4Cols = totalSeats <= 15;
+      const gridCols = use4Cols ? 4 : 5;
+      grid.style.gridTemplateColumns = `repeat(${gridCols}, 1fr)`;
 
-    // Generate rows
-    let seatNum = use4Cols ? 2 : 3;
-    const rowCount = Math.ceil((totalSeats - 1) / (gridCols - 1));
-
-    for (let r = 1; r <= rowCount; r++) {
+      // Row 1: Front seats and Driver Steering Wheel
       if (use4Cols) {
-        // 2 + Aisle + 1 layout
-        if (seatNum <= totalSeats) {
-          layoutHTML += createSeatHTML(seatNum.toString(), farePerSeat, bookedSeatsList);
-          seatNum++;
-        } else { layoutHTML += "<div></div>"; }
-        
-        if (seatNum <= totalSeats) {
-          layoutHTML += createSeatHTML(seatNum.toString(), farePerSeat, bookedSeatsList);
-          seatNum++;
-        } else { layoutHTML += "<div></div>"; }
-
-        // Aisle
-        layoutHTML += "<div></div>";
-
-        if (seatNum <= totalSeats) {
-          layoutHTML += createSeatHTML(seatNum.toString(), farePerSeat, bookedSeatsList);
-          seatNum++;
-        } else { layoutHTML += "<div></div>"; }
+        layoutHTML += createSeatHTML("1", farePerSeat, bookedSeatsList);
+        layoutHTML += `<div></div>`;
+        layoutHTML += `<div></div>`;
+        layoutHTML += `<div class="steering-wheel" style="width: 44px; height: 44px; background: #e2e8f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px;">🛞</div>`;
       } else {
-        // 2 + Aisle + 2 layout
-        if (seatNum <= totalSeats) {
-          layoutHTML += createSeatHTML(seatNum.toString(), farePerSeat, bookedSeatsList);
-          seatNum++;
-        } else { layoutHTML += "<div></div>"; }
-        
-        if (seatNum <= totalSeats) {
-          layoutHTML += createSeatHTML(seatNum.toString(), farePerSeat, bookedSeatsList);
-          seatNum++;
-        } else { layoutHTML += "<div></div>"; }
+        layoutHTML += createSeatHTML("1", farePerSeat, bookedSeatsList);
+        layoutHTML += createSeatHTML("2", farePerSeat, bookedSeatsList);
+        layoutHTML += `<div></div>`;
+        layoutHTML += `<div></div>`;
+        layoutHTML += `<div class="steering-wheel" style="width: 44px; height: 44px; background: #e2e8f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px;">🛞</div>`;
+      }
 
-        // Aisle
-        layoutHTML += "<div></div>";
+      // Generate rows
+      let seatNum = use4Cols ? 2 : 3;
+      const rowCount = Math.ceil((totalSeats - 1) / (gridCols - 1));
 
-        if (seatNum <= totalSeats) {
-          layoutHTML += createSeatHTML(seatNum.toString(), farePerSeat, bookedSeatsList);
-          seatNum++;
-        } else { layoutHTML += "<div></div>"; }
-        
-        if (seatNum <= totalSeats) {
-          layoutHTML += createSeatHTML(seatNum.toString(), farePerSeat, bookedSeatsList);
-          seatNum++;
-        } else { layoutHTML += "<div></div>"; }
+      for (let r = 1; r <= rowCount; r++) {
+        if (use4Cols) {
+          // 2 + Aisle + 1 layout
+          if (seatNum <= totalSeats) {
+            layoutHTML += createSeatHTML(seatNum.toString(), farePerSeat, bookedSeatsList);
+            seatNum++;
+          } else { layoutHTML += "<div></div>"; }
+          
+          if (seatNum <= totalSeats) {
+            layoutHTML += createSeatHTML(seatNum.toString(), farePerSeat, bookedSeatsList);
+            seatNum++;
+          } else { layoutHTML += "<div></div>"; }
+
+          // Aisle
+          layoutHTML += "<div></div>";
+
+          if (seatNum <= totalSeats) {
+            layoutHTML += createSeatHTML(seatNum.toString(), farePerSeat, bookedSeatsList);
+            seatNum++;
+          } else { layoutHTML += "<div></div>"; }
+        } else {
+          // 2 + Aisle + 2 layout
+          if (seatNum <= totalSeats) {
+            layoutHTML += createSeatHTML(seatNum.toString(), farePerSeat, bookedSeatsList);
+            seatNum++;
+          } else { layoutHTML += "<div></div>"; }
+          
+          if (seatNum <= totalSeats) {
+            layoutHTML += createSeatHTML(seatNum.toString(), farePerSeat, bookedSeatsList);
+            seatNum++;
+          } else { layoutHTML += "<div></div>"; }
+
+          // Aisle
+          layoutHTML += "<div></div>";
+
+          if (seatNum <= totalSeats) {
+            layoutHTML += createSeatHTML(seatNum.toString(), farePerSeat, bookedSeatsList);
+            seatNum++;
+          } else { layoutHTML += "<div></div>"; }
+          
+          if (seatNum <= totalSeats) {
+            layoutHTML += createSeatHTML(seatNum.toString(), farePerSeat, bookedSeatsList);
+            seatNum++;
+          } else { layoutHTML += "<div></div>"; }
+        }
       }
     }
 
