@@ -516,6 +516,7 @@
     let hasDriverReachedPickup = false;
     
     let activeToastBookingId = null;
+    let activeToastBookingStatus = null;
 
     function geocodeAddress(query) {
       if (!query) return Promise.resolve(null);
@@ -624,10 +625,12 @@
         if (bookings && bookings.length > 0) {
           const booking = bookings[0]; // focus on the first active enroute booking
           activeToastBookingId = booking.id;
+          activeToastBookingStatus = booking.navigation_status;
 
           // Don't show toast if dismissed in this tab session
           const dismissed = JSON.parse(sessionStorage.getItem("dismissed_toasts") || "[]");
-          if (dismissed.includes(booking.id)) {
+          const key = booking.id + "_" + booking.navigation_status;
+          if (dismissed.includes(key)) {
             return;
           }
 
@@ -644,7 +647,20 @@
           const title = document.getElementById("toast-title");
           const body = document.getElementById("toast-body");
           const trackBtn = document.getElementById("btn-toast-track");
-          if (booking.navigation_status === "trip_started") {
+          if (booking.navigation_status === "arrived") {
+            if (booking.selected_seats === "Self-Drive Rental") {
+              title.textContent = "Self-Drive Arrived";
+              body.innerHTML = `Your vehicle <strong>${booking.vehicle_name || 'xyz'}</strong> is at your location, get the keys and enjoy your trip.`;
+              if (trackBtn) trackBtn.style.display = "none";
+            } else if (booking.selected_seats === "Whole Vehicle") {
+              title.textContent = "Vehicle Arrived!";
+              body.innerHTML = `Your vehicle <strong>${booking.vehicle_name || 'xyz'}</strong> has arrived at your destination to pick u.`;
+              if (trackBtn) trackBtn.style.display = "none";
+            } else {
+              // Ignore arrived state for public vehicles
+              return;
+            }
+          } else if (booking.navigation_status === "trip_started") {
             title.textContent = "Your vehicle has started!";
             body.innerHTML = `Vehicle <strong>${booking.vehicle_name || 'xyz'}</strong> is started from its route, get ready and available at the pickup point.`;
             if (trackBtn) trackBtn.style.display = "inline-block";
@@ -663,7 +679,7 @@
           // Show Toast notification if tracking modal is not open
           const modalOverlay = document.getElementById("tracking-modal-overlay");
           const toast = document.getElementById("driver-alert-toast");
-          if (modalOverlay.style.display !== "flex" && toast.style.display !== "flex") {
+          if (modalOverlay.style.display !== "flex") {
             toast.style.display = "flex";
             setTimeout(() => {
               toast.style.opacity = "1";
@@ -684,13 +700,14 @@
     }
 
     function closeToast() {
-      if (activeToastBookingId) {
+      if (activeToastBookingId && typeof activeToastBookingStatus !== 'undefined') {
         let dismissed = [];
         try {
           dismissed = JSON.parse(sessionStorage.getItem("dismissed_toasts") || "[]");
         } catch (e) {}
-        if (!dismissed.includes(activeToastBookingId)) {
-          dismissed.push(activeToastBookingId);
+        const key = activeToastBookingId + "_" + activeToastBookingStatus;
+        if (!dismissed.includes(key)) {
+          dismissed.push(key);
           sessionStorage.setItem("dismissed_toasts", JSON.stringify(dismissed));
         }
       }

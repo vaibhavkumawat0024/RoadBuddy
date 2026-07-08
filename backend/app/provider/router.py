@@ -683,6 +683,16 @@ def start_booking_navigation(booking_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "success"}
 
+@router.post("/bookings/{booking_id}/arrived")
+def mark_booking_arrived(booking_id: int, db: Session = Depends(get_db)):
+    booking = db.query(ProviderBooking).filter(ProviderBooking.id == booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    booking.navigation_status = "arrived"
+    booking.message_unread = True
+    db.commit()
+    return {"status": "success"}
+
 @router.post("/bookings/{booking_id}/location")
 def update_booking_location(booking_id: int, data: LocationUpdateSchema, db: Session = Depends(get_db)):
     booking = db.query(ProviderBooking).filter(ProviderBooking.id == booking_id).first()
@@ -737,7 +747,7 @@ def list_active_enroute_bookings(
 ):
     query = db.query(ProviderBooking).filter(
         ProviderBooking.status != "cancelled",
-        ProviderBooking.navigation_status.in_(["enroute", "trip_started"])
+        ProviderBooking.navigation_status.in_(["enroute", "trip_started", "arrived"])
     )
     if user_id:
         query = query.filter(ProviderBooking.user_id == user_id)

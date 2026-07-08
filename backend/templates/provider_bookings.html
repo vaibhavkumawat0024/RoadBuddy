@@ -241,6 +241,7 @@
               data-pickup-points="{{ effective_pickups }}"
               data-dropoff-points="{{ effective_dropoffs }}"
               data-is-private="{% if (v.destination == 'Private' and v.driver_included) or not v.driver_included %}true{% else %}false{% endif %}"
+              data-is-self-drive="{% if not v.driver_included %}true{% else %}false{% endif %}"
               data-booking-id="{{ ns_booking.id }}"
               onclick="openVehicleRouteMapFromButton(this)">
         🗺️ Navigate Route
@@ -994,11 +995,29 @@
 
   function advanceNavigationLeg() {
     if (isSelfDrive) {
+      if (activeBookingId) {
+        fetch(`/api/provider/bookings/${activeBookingId}/arrived`, {
+          method: 'POST'
+        }).then(res => {
+          if (res.ok) console.log("Self-drive marked as arrived");
+        }).catch(err => {
+          console.error("Failed to mark self-drive as arrived:", err);
+        });
+      }
       alert("Self-drive vehicle delivered successfully to the delivery location!");
       closeMapModal();
       return;
     }
     if (currentLeg === "to_pickup") {
+      if (activeBookingId) {
+        fetch(`/api/provider/bookings/${activeBookingId}/arrived`, {
+          method: 'POST'
+        }).then(res => {
+          if (res.ok) console.log("Private cab marked as arrived");
+        }).catch(err => {
+          console.error("Failed to mark private cab as arrived:", err);
+        });
+      }
       alert("Arrived at passenger pickup location! Ready to start the passenger ride.");
       initLeg("to_dropoff");
     } else {
@@ -1186,6 +1205,7 @@
     const bookingId = btn.getAttribute('data-booking-id') || null;
     
     activeVehicleIsPrivate = btn.getAttribute('data-is-private') === 'true';
+    isSelfDrive = btn.getAttribute('data-is-self-drive') === 'true';
     privateCurrentLeg = "pickup"; // Reset to pickup leg
     
     openVehicleRouteMap(vehicleId, vehicleName, origin, destination, pickups, dropoffs, bookingId);
@@ -1568,6 +1588,15 @@
     if (activeVehicleIsPrivate) {
       if (privateCurrentLeg === "pickup") {
         privateCurrentLeg = "destination";
+        if (activeBookingId) {
+          fetch(`/api/provider/bookings/${activeBookingId}/arrived`, {
+            method: 'POST'
+          }).then(res => {
+            if (res.ok) console.log("Booking marked as arrived");
+          }).catch(err => {
+            console.error("Failed to mark booking as arrived:", err);
+          });
+        }
         // Start watching position if not already doing so
         if (!isNavigating) {
           startTripLeg();

@@ -709,10 +709,13 @@
     // Open confirm popup
     const overlay = document.getElementById("overlay-confirm");
     overlay.classList.add("show");
+    document.body.style.overflow = "hidden";
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function closeConfirmModal() {
     document.getElementById("overlay-confirm").classList.remove("show");
+    document.body.style.overflow = "";
     activeSubmitEvent = null;
     activeFormType = null;
   }
@@ -722,6 +725,7 @@
     
     // Close confirmation modal
     document.getElementById("overlay-confirm").classList.remove("show");
+    document.body.style.overflow = "";
 
     const form = activeSubmitEvent.target;
     const formData = new FormData(form);
@@ -764,6 +768,8 @@
 
         // Open success modal
         document.getElementById("overlay-success").classList.add("show");
+        document.body.style.overflow = "hidden";
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
         alert("Failed to add vehicle. Please try again.");
       }
@@ -814,6 +820,15 @@
   }
 
   document.addEventListener("DOMContentLoaded", function() {
+    // Append modals directly to body to avoid CSS transform containment context issues
+    const overlays = ["overlay-confirm", "overlay-success", "overlay-edit-vehicle"];
+    overlays.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        document.body.appendChild(el);
+      }
+    });
+
     const showPublic = {{ 'true' if bmode in ('route_based', 'both_services', 'self_drive_public', 'self_drive_both') else 'false' }};
     const showSelfDrive = {{ 'true' if bmode in ('self_drive_only', 'self_drive_private', 'self_drive_both', 'self_drive_public') else 'false' }};
     const showPrivateChauffeur = {{ 'true' if bmode in ('solo_owner', 'both_services', 'self_drive_private', 'self_drive_both') or not bmode else 'false' }};
@@ -945,6 +960,7 @@
   // ── Edit Vehicle Modal Logic ──
   window.closeEditVehicleModal = function() {
     document.getElementById("overlay-edit-vehicle").classList.remove("show");
+    document.body.style.overflow = "";
   }
 
   // Helper functions to add pickup/dropoff/dates inside the edit modal
@@ -1104,6 +1120,8 @@
 
         // Show edit modal
         document.getElementById("overlay-edit-vehicle").classList.add("show");
+        document.body.style.overflow = "hidden";
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       });
     });
 
