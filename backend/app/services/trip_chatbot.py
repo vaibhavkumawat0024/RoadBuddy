@@ -152,13 +152,22 @@ def mock_chat_response(message: str, user_context: str = None) -> str:
                 "Try: 'Plan a 3-day trip from Jaipur to Udaipur for 2 people' 😊")
 
 
-from app.services.groq_client import call_gemini_native
+from app.services.groq_client import call_groq_native, call_gemini_native
 
 async def call_groq_chat(messages: list[dict], user_context: str = None) -> str:
     sys_prompt = SYSTEM_PROMPT
     if user_context:
         sys_prompt += f"\n\n[USER CONTEXT]\nThe user is logged in. Use this context to answer questions about their name, profile, registered vehicles, active trips, and booking details (hotels, buses, trains, flights, cabs, transits). Be specific and match their queries with these details:\n{user_context}"
     combined_messages = [{"role": "system", "content": sys_prompt}] + messages
+    
+    # Try Groq API first
+    if settings.groq_api_key.strip():
+        try:
+            return await call_groq_native(combined_messages, temperature=0.8, max_tokens=1000)
+        except Exception as e:
+            print(f"Groq native chat failed ({e}). Falling back to Gemini.")
+            
+    # Fallback to Gemini API
     return await call_gemini_native(combined_messages, temperature=0.8, max_tokens=1000)
 
 
