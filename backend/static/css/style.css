@@ -2386,7 +2386,7 @@ h2 {
 /* Dashboard Scenic Background Overlay */
 @keyframes fadeInBg {
   from { opacity: 0; }
-  to { opacity: 1; }
+  to { opacity: 0.75; }
 }
 
 .page-bg {
@@ -2418,33 +2418,22 @@ h2 {
 .dashboard-bg-overlay {
   position: fixed;
   inset: 0;
+  background-image: url('/static/images/dashboard_bg.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  opacity: 0.75;
   z-index: -1;
   pointer-events: none;
-  opacity: 1;
   animation: fadeInBg 1.2s ease-in-out forwards;
-}
-
-/* Looping Video Background styles */
-.page-bg-video {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  opacity: 1;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .page-bg-video {
-    display: none;
-  }
 }
 
 .dashboard-bg-overlay::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: rgba(10, 15, 30, 0.15);
+  background: linear-gradient(to bottom, transparent 60%, rgba(16, 24, 43, 0.25));
 }
 
 @keyframes waveWiggle {
