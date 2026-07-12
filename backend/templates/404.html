@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Page Not Found — RoadBuddy{% endblock %}
+{% block content %}
+<div style="max-width: 600px; margin: 80px auto; text-align: center; padding: 40px 24px; background: #ffffff; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); border: 1.5px solid var(--border-color);">
+  <div style="font-size: 80px; margin-bottom: 24px; animation: floatIllustration 3s ease-in-out infinite; display: inline-block;">🗺️</div>
+  <h1 style="font-size: 32px; font-weight: 800; color: var(--text-dark); margin-bottom: 12px;">Lost Your Route?</h1>
+  <p style="font-size: 16px; color: var(--text-muted); line-height: 1.6; margin-bottom: 30px;">
+    The page you are looking for doesn't exist or has been moved to a new destination. Let's get you back on track!
+  </p>
+  <div style="display: flex; gap: 16px; justify-content: center;">
+    <a href="/dashboard" class="btn-primary" style="padding: 12px 24px; font-weight: 700; font-size: 14.5px; text-decoration: none;">Go to Dashboard</a>
+    <a href="/plan-trip" class="btn-secondary" style="padding: 12px 24px; font-weight: 700; font-size: 14.5px; text-decoration: none;">Plan a New Trip</a>
+  </div>
+</div>
+{% endblock %}

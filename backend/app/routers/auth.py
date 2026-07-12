@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 from typing import Optional
 
@@ -24,7 +24,7 @@ class SignupRequest(BaseModel):
     name: str
     email: EmailStr
     phone: Optional[str] = None
-    password: str
+    password: str = Field(..., min_length=8)
     
     # Transport Provider specific
     company_name: Optional[str] = None
@@ -64,7 +64,7 @@ def signup(payload: SignupRequest, response: Response, db: Session = Depends(get
         
         # Set cookies
         response.set_cookie(key="roadbuddy_token", value=token, httponly=True, samesite="lax", path="/")
-        response.set_cookie(key="access_token", value=token, httponly=False, samesite="lax", path="/")
+        response.set_cookie(key="access_token", value=token, httponly=True, samesite="lax", path="/")
         
         return {
             "role": "traveler",
@@ -93,7 +93,7 @@ def signup(payload: SignupRequest, response: Response, db: Session = Depends(get
         token = create_provider_token(provider.id)
         
         response.set_cookie(key="roadbuddy_token", value=token, httponly=True, samesite="lax", path="/")
-        response.set_cookie(key="provider_access_token", value=token, httponly=False, samesite="lax", path="/")
+        response.set_cookie(key="provider_access_token", value=token, httponly=True, samesite="lax", path="/")
         
         return {
             "role": "provider",
@@ -134,7 +134,7 @@ def signup(payload: SignupRequest, response: Response, db: Session = Depends(get
         token = create_provider_token(provider.id)
         
         response.set_cookie(key="roadbuddy_token", value=token, httponly=True, samesite="lax", path="/")
-        response.set_cookie(key="food_provider_access_token", value=token, httponly=False, samesite="lax", path="/")
+        response.set_cookie(key="food_provider_access_token", value=token, httponly=True, samesite="lax", path="/")
         
         return {
             "role": "food_provider",
@@ -156,7 +156,7 @@ def login(payload: LoginRequest, response: Response, db: Session = Depends(get_d
         token = create_user_token({"sub": str(user.id)})
         
         response.set_cookie(key="roadbuddy_token", value=token, httponly=True, samesite="lax", path="/")
-        response.set_cookie(key="access_token", value=token, httponly=False, samesite="lax", path="/")
+        response.set_cookie(key="access_token", value=token, httponly=True, samesite="lax", path="/")
         
         return {
             "role": "traveler",
@@ -175,7 +175,7 @@ def login(payload: LoginRequest, response: Response, db: Session = Depends(get_d
         token = create_provider_token(provider.id)
         
         response.set_cookie(key="roadbuddy_token", value=token, httponly=True, samesite="lax", path="/")
-        response.set_cookie(key="provider_access_token", value=token, httponly=False, samesite="lax", path="/")
+        response.set_cookie(key="provider_access_token", value=token, httponly=True, samesite="lax", path="/")
         
         return {
             "role": "provider",
@@ -194,7 +194,7 @@ def login(payload: LoginRequest, response: Response, db: Session = Depends(get_d
         token = create_provider_token(provider.id)
         
         response.set_cookie(key="roadbuddy_token", value=token, httponly=True, samesite="lax", path="/")
-        response.set_cookie(key="food_provider_access_token", value=token, httponly=False, samesite="lax", path="/")
+        response.set_cookie(key="food_provider_access_token", value=token, httponly=True, samesite="lax", path="/")
         
         return {
             "role": "food_provider",

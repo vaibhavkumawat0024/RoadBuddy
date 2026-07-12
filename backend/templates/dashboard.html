@@ -27,30 +27,37 @@
 </div>
 
 <!-- Recent Trips -->
-<h2 style="margin-top: 32px; font-weight: 700; color: #ffffff; font-size: 20px; margin-bottom: 16px; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);">Recent Trips</h2>
+<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 32px; margin-bottom: 16px;">
+  <h2 style="margin: 0; font-weight: 700; color: #ffffff; font-size: 20px; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);">Recent Trips</h2>
+  {% if trips %}
+  <a href="/my-trips" style="color: var(--primary); font-size: 13.5px; font-weight: 700; text-decoration: none; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);">View All Trips →</a>
+  {% endif %}
+</div>
 {% if trips %}
   <div class="trip-list">
     {% for trip in trips %}
-    <div class="trip-card" style="--i: {{ loop.index0 }};">
-      <div style="display: flex; align-items: center; gap: 16px;">
-        <div class="trip-icon-chip">
-          <span class="material-symbols-outlined">
-            {% if trip.travel_mode == 'own_vehicle' %}directions_car
-            {% elif trip.travel_mode == 'cab_service' %}local_taxi
-            {% elif trip.travel_mode == 'bus' %}directions_bus
-            {% elif trip.travel_mode == 'train' %}train
-            {% elif trip.travel_mode == 'flight' %}flight
-            {% else %}map
-            {% endif %}
-          </span>
+    <a href="/my-trips/{{ trip.id }}/itinerary" style="text-decoration: none; color: inherit; display: block;">
+      <div class="trip-card" style="--i: {{ loop.index0 }};">
+        <div style="display: flex; align-items: center; gap: 16px;">
+          <div class="trip-icon-chip">
+            <span class="material-symbols-outlined">
+              {% if trip.travel_mode == 'own_vehicle' %}directions_car
+              {% elif trip.travel_mode == 'cab_service' %}local_taxi
+              {% elif trip.travel_mode == 'bus' %}directions_bus
+              {% elif trip.travel_mode == 'train' %}train
+              {% elif trip.travel_mode == 'flight' %}flight
+              {% else %}map
+              {% endif %}
+            </span>
+          </div>
+          <div>
+            <div class="trip-route" style="text-transform: capitalize;">{{ trip.origin }} → {{ trip.destination }}</div>
+            <div class="trip-meta">{{ trip.travel_mode.replace('_', ' ') | title }} &nbsp;·&nbsp; <span class="trip-date">{{ trip.start_date }}</span></div>
+          </div>
         </div>
-        <div>
-          <div class="trip-route" style="text-transform: capitalize;">{{ trip.origin }} → {{ trip.destination }}</div>
-          <div class="trip-meta">{{ trip.travel_mode.replace('_', ' ') | title }} &nbsp;·&nbsp; <span class="trip-date">{{ trip.start_date }}</span></div>
-        </div>
+        <div class="trip-price">₹{{ trip.total_cost_inr | int }}</div>
       </div>
-      <div class="trip-price">₹{{ trip.total_cost_inr | int }}</div>
-    </div>
+    </a>
     {% endfor %}
   </div>
 {% else %}

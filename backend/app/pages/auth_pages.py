@@ -67,6 +67,20 @@ def verify_otp_submit(
     return RedirectResponse("/login?success=Account created! Please login.", status_code=303)
 
 
+@router.post("/resend-otp")
+def resend_otp(
+    email: str = Form(...)
+):
+    record = _otp_store.get(email)
+    if not record:
+        return {"success": False, "error": "Session expired. Please register again."}
+    try:
+        generate_and_send_otp(email, record.get("name", "Traveler"))
+    except ValueError as e:
+        return {"success": False, "error": str(e)}
+    return {"success": True}
+
+
 @router.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
     success = request.query_params.get("success")

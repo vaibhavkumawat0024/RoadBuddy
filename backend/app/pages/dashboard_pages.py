@@ -678,11 +678,16 @@ async def update_profile(
     name: str = Form(...),
     email: str = Form(...),
     password: str = Form(""),
+    current_password: str = Form(...),
     db: Session = Depends(get_db)
 ):
     user = get_user_from_cookie(request, db)
     if not user:
         return RedirectResponse("/login", status_code=303)
+
+    from app.core.auth import verify_password
+    if not verify_password(current_password, user.password_hash):
+        return RedirectResponse("/profile?error=Incorrect current password.", status_code=303)
 
     if email != user.email:
         existing = db.query(User).filter(User.email == email).first()
@@ -693,6 +698,8 @@ async def update_profile(
     user.name = name
 
     if password:
+        if len(password) < 8:
+            return RedirectResponse("/profile?error=New password must be at least 8 characters long.", status_code=303)
         user.password_hash = hash_password(password)
 
     db.commit()

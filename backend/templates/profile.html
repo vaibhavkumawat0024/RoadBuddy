@@ -43,11 +43,23 @@
         style="width: 100%; padding: 11px 14px; margin-bottom: 18px; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); font-size: 13.5px; background: #f1f5f9; color: var(--text-muted); cursor: not-allowed; transition: var(--transition);"
       >
 
-      <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">New Password</label>
+      <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">New Password (Min 8 Chars)</label>
       <input 
         type="password"
         name="password"
+        minlength="8"
         placeholder="Leave blank to keep current password"
+        style="width: 100%; padding: 11px 14px; margin-bottom: 18px; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); font-size: 13.5px; background: #f8fafc; transition: var(--transition);"
+        onfocus="this.style.borderColor='var(--primary)'; this.style.boxShadow='0 0 0 4px rgba(16, 185, 129, 0.1)';"
+        onblur="this.style.borderColor='var(--border-color)'; this.style.boxShadow='none';"
+      >
+
+      <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Current Password</label>
+      <input 
+        type="password"
+        name="current_password"
+        required
+        placeholder="Enter current password to confirm changes"
         style="width: 100%; padding: 11px 14px; margin-bottom: 24px; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); font-size: 13.5px; background: #f8fafc; transition: var(--transition);"
         onfocus="this.style.borderColor='var(--primary)'; this.style.boxShadow='0 0 0 4px rgba(16, 185, 129, 0.1)';"
         onblur="this.style.borderColor='var(--border-color)'; this.style.boxShadow='none';"

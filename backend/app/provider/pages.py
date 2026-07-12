@@ -157,10 +157,10 @@ def forgot_password_reset_submit(
             "error": "Invalid or expired OTP code. Please try again."
         })
 
-    if len(new_password) < 6:
+    if len(new_password) < 8:
         return templates.TemplateResponse(request, "provider_forgot_password_reset.html", {
             "email": email,
-            "error": "New password must be at least 6 characters long."
+            "error": "New password must be at least 8 characters long."
         })
 
     provider.password_hash = hash_password(new_password)
@@ -176,6 +176,8 @@ def provider_send_otp(
     password: str = Form(...),
     db: Session = Depends(get_db)
 ):
+    if len(password) < 8:
+        return {"success": False, "error": "Password must be at least 8 characters long."}
     existing = db.query(Provider).filter(Provider.email == email).first()
     if existing:
         return {"success": False, "error": "Email already registered."}

@@ -570,16 +570,11 @@ async def trip_chat(
     Supports multi-turn conversation with history.
     """
     try:
-        print(f"[CHAT DEBUG] Headers: {dict(request.headers)}")
-        print(f"[CHAT DEBUG] Cookies: {dict(request.cookies)}")
-        
         user_context = None
         opt_user = get_optional_user(request)
-        print(f"[CHAT DEBUG] Resolved opt_user: {opt_user}")
         
         if opt_user:
             user_context = build_user_context(int(opt_user["user_id"]), db)
-            print(f"[CHAT DEBUG] Compiled context size: {len(user_context)} characters")
             
         result = await chat_with_roadbuddy(
             message=body.message,

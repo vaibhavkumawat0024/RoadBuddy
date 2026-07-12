@@ -10,17 +10,118 @@
     <p class="error">{{ error }}</p>
   {% endif %}
 
-  <form method="POST" action="/verify-otp">
-    <input type="hidden" name="email" value="{{ email }}">
+  <form method="POST" action="/verify-otp" id="verify-form">
+    <input type="hidden" name="email" id="email-hidden" value="{{ email }}">
 
-    <label>Enter OTP</label>
-    <input type="text" name="otp" required placeholder="Enter verification code"
-           maxlength="6" inputmode="numeric" autocomplete="one-time-code">
-    <p style="font-size: 12px; color: #7878a0; margin-top: 4px; margin-bottom: 12px;"></p>
+    <label for="otp">Enter OTP</label>
+    <input type="text" id="otp" name="otp" required placeholder="Enter verification code"
+           maxlength="6" inputmode="numeric" autocomplete="one-time-code" style="text-align: center; letter-spacing: 4px; font-size: 18px; font-weight: 700;">
+    
+    <div style="margin-top: 14px; margin-bottom: 18px; font-size: 13px; min-height: 20px;">
+      <span id="cooldown-text" style="color: var(--text-muted);">Resend OTP in <strong id="timer-sec">60</strong>s</span>
+      <button type="button" id="resend-btn" style="display: none; background: none; border: none; color: var(--primary); font-weight: 700; cursor: pointer; padding: 0; font-size: 13px; text-decoration: underline;">Resend OTP</button>
+      <span id="resend-loader" style="display: none; color: var(--text-muted);">Sending...</span>
+      <div id="resend-status" style="margin-top: 6px; font-weight: 600;"></div>
+    </div>
 
-    <button type="submit">Verify & Create Account</button>
+    <button type="submit" id="submit-btn" style="display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;">
+      <span class="btn-text">Verify & Create Account</span>
+      <span class="btn-loader" style="display: none; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff; animation: spin 0.8s linear infinite;"></span>
+    </button>
   </form>
 
   <p>Wrong email? <a href="/register">Go back</a></p>
 </div>
+
+<style>
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+</style>
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const verifyForm = document.getElementById("verify-form");
+    const submitBtn = document.getElementById("submit-btn");
+    const btnText = submitBtn.querySelector(".btn-text");
+    const btnLoader = submitBtn.querySelector(".btn-loader");
+
+    const email = document.getElementById("email-hidden").value;
+    const cooldownText = document.getElementById("cooldown-text");
+    const timerSec = document.getElementById("timer-sec");
+    const resendBtn = document.getElementById("resend-btn");
+    const resendLoader = document.getElementById("resend-loader");
+    const resendStatus = document.getElementById("resend-status");
+
+    let timerInterval = null;
+    let secondsLeft = 60;
+
+    function startTimer() {
+      secondsLeft = 60;
+      timerSec.textContent = secondsLeft;
+      cooldownText.style.display = "inline";
+      resendBtn.style.display = "none";
+      resendLoader.style.display = "none";
+
+      if (timerInterval) clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        secondsLeft--;
+        timerSec.textContent = secondsLeft;
+        if (secondsLeft <= 0) {
+          clearInterval(timerInterval);
+          cooldownText.style.display = "none";
+          resendBtn.style.display = "inline";
+        }
+      }, 1000);
+    }
+
+    // Start timer on load
+    startTimer();
+
+    // Verify form submit loading state
+    if (verifyForm && submitBtn) {
+      verifyForm.addEventListener("submit", () => {
+        submitBtn.disabled = true;
+        btnText.textContent = "Verifying...";
+        btnLoader.style.display = "inline-block";
+      });
+    }
+
+    // Resend button click handler
+    if (resendBtn) {
+      resendBtn.addEventListener("click", async () => {
+        resendBtn.style.display = "none";
+        resendLoader.style.display = "inline";
+        resendStatus.textContent = "";
+
+        try {
+          const formData = new FormData();
+          formData.append("email", email);
+
+          const res = await fetch("/resend-otp", {
+            method: "POST",
+            body: formData
+          });
+          const data = await res.json();
+
+          if (data.success) {
+            resendStatus.style.color = "#10b981";
+            resendStatus.textContent = "✓ OTP resent successfully!";
+            startTimer();
+          } else {
+            resendStatus.style.color = "#ef4444";
+            resendStatus.textContent = `✗ Error: ${data.error || "Failed to resend OTP"}`;
+            resendBtn.style.display = "inline";
+            resendLoader.style.display = "none";
+          }
+        } catch (err) {
+          resendStatus.style.color = "#ef4444";
+          resendStatus.textContent = "✗ Network error. Please try again.";
+          resendBtn.style.display = "inline";
+          resendLoader.style.display = "none";
+        }
+      });
+    }
+  });
+</script>
 {% endblock %}

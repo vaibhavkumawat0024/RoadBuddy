@@ -2418,7 +2418,7 @@ h2 {
 .dashboard-bg-overlay {
   position: fixed;
   inset: 0;
-  background-image: url('/static/images/dashboard_bg.png');
+  background-image: url('/static/images/dashboard_bg.webp');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;

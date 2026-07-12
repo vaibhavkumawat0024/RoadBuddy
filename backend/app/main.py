@@ -1,5 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse, HTMLResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.provider.router import router as provider_router
 from fastapi.middleware.cors import CORSMiddleware
 from app.provider.pages import router as provider_pages_router
@@ -17,6 +19,47 @@ app = FastAPI(
     description="India's Ultimate Road Trip Companion — API Backend",
     version="1.0.0",
 )
+
+@app.exception_handler(StarletteHTTPException)
+async def custom_http_exception_handler(request: Request, exc: StarletteHTTPException):
+    if exc.status_code == 404:
+        if request.url.path.startswith("/api"):
+            return JSONResponse(status_code=404, content={"detail": exc.detail})
+        
+        from fastapi.templating import Jinja2Templates
+        templates = Jinja2Templates(directory="templates")
+        user = None
+        try:
+            from app.core.database import SessionLocal
+            from app.pages.dashboard_pages import get_user_from_cookie
+            db = SessionLocal()
+            user = get_user_from_cookie(request, db)
+            db.close()
+        except Exception:
+            pass
+        return templates.TemplateResponse(request, "404.html", {"user": user}, status_code=404)
+    
+    if request.url.path.startswith("/api"):
+        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+    return HTMLResponse(content=f"<h1>Error {exc.status_code}</h1><p>{exc.detail}</p>", status_code=exc.status_code)
+
+@app.exception_handler(Exception)
+async def custom_global_exception_handler(request: Request, exc: Exception):
+    if request.url.path.startswith("/api"):
+        return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+    
+    from fastapi.templating import Jinja2Templates
+    templates = Jinja2Templates(directory="templates")
+    user = None
+    try:
+        from app.core.database import SessionLocal
+        from app.pages.dashboard_pages import get_user_from_cookie
+        db = SessionLocal()
+        user = get_user_from_cookie(request, db)
+        db.close()
+    except Exception:
+        pass
+    return templates.TemplateResponse(request, "500.html", {"user": user, "error": str(exc) if settings.debug else "Internal Server Error"}, status_code=500)
 
 # Run schema updates on startup
 @app.on_event("startup")

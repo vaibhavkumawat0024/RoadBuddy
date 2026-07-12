@@ -144,18 +144,20 @@ def setup_submit(
             MenuItem(restaurant_id=restaurant.id, name="Masala Chai", description="A spiced Indian tea beverage brewed with a mixture of aromatic herbs and spices.", price_inr=40.0, category="Beverage", rating=4.5)
         ]
         db.add_all(default_items)
+        db.commit()
         
         # Add a default review to make rating look organic
-        from app.models.models import FoodReview
-        review = FoodReview(
-            menu_item_id=None,  # Restaurant level review
-            restaurant_id=restaurant.id,
-            user_name="Rajesh Kumar",
-            rating=4,
-            comment="Excellent family dhaba, very fast service and clean food."
-        )
-        db.add(review)
-        db.commit()
+        from app.models.models import FoodReview, User
+        user = db.query(User).first()
+        if user:
+            review = FoodReview(
+                user_id=user.id,
+                menu_item_id=default_items[0].id,
+                rating=5,
+                comment="Excellent family dhaba, very fast service and clean food."
+            )
+            db.add(review)
+            db.commit()
 
     return RedirectResponse("/food-provider/dashboard", status_code=303)
 

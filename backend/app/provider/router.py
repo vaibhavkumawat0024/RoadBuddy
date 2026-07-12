@@ -475,8 +475,9 @@ def _calculate_geodesic_distance(p1_str: str, p2_str: str) -> float:
 def book_vehicle(
     data: ProviderBookingCreate,
     db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
-    """Book a provider vehicle. In production wire this to get_current_user (the rider)."""
+    """Book a provider vehicle."""
     vehicle = db.query(ProviderVehicle).filter(ProviderVehicle.id == data.vehicle_id).first()
     if not vehicle:
         raise HTTPException(status_code=404, detail="Vehicle not found")
@@ -512,10 +513,9 @@ def book_vehicle(
         fare = vehicle.fixed_fare_inr if vehicle.fixed_fare_inr else (vehicle.price_per_km_inr or 0) * 100
         total_fare = fare * data.num_seats
 
-    # NOTE: user_id hardcoded to 1 here as placeholder — wire to get_current_user in trips router
     booking = ProviderBooking(
         vehicle_id=data.vehicle_id,
-        user_id=data.user_id if data.user_id else 1,
+        user_id=int(current_user["user_id"]),
         passenger_name=data.passenger_name,
         passenger_phone=data.passenger_phone,
         passenger_email=data.passenger_email,

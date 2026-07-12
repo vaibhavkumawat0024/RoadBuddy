@@ -601,8 +601,6 @@
     }
 
     {% if user %}
-    window.currentUserId = "{{ user.id }}";
-    
     // Check for enroute bookings on page load and poll periodically
     window.addEventListener("DOMContentLoaded", () => {
       checkEnrouteBookings();
