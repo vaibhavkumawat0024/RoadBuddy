@@ -1,6 +1,15 @@
 {% extends "base.html" %}
 {% block title %}Trip Itinerary — RoadBuddy{% endblock %}
 
+{% if trip.status == 'completed' %}
+<style>
+  /* Hide chatbot widget on completed/saved trips */
+  .chat-badge, .chatbot-fab, #chatbot-fab, .floating-chatbot-card {
+    display: none !important;
+  }
+</style>
+{% endif %}
+
 {% block navbar_menu %}
   <div style="display: flex; align-items: center; gap: 8px;">
     
@@ -580,9 +589,11 @@
 <div class="max-w-6xl mx-auto space-y-6 my-6 p-4 animate-fade-in-up">
   <!-- Edit Trip Details button -->
   <div class="text-left">
+    {% if trip.status != 'completed' %}
     <button onclick="openEditTripModal()" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-lg inline-flex items-center gap-1.5 transition-all shadow-md hover:shadow-lg active:scale-95 duration-100">
       <span class="material-symbols-outlined text-sm">edit</span> Edit Trip Details
     </button>
+    {% endif %}
   </div>
 
   <!-- Heading Banner -->
@@ -599,6 +610,7 @@
   </div>
 
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    {% if trip.status != 'completed' %}
     <!-- Left Column: Transport & Hotel Booking -->
     <div class="lg:col-span-1 space-y-6">
       {% if trip.travel_mode != 'own_vehicle' %}
@@ -701,9 +713,10 @@
       </section>
       {% endif %}
     </div>
+    {% endif %}
 
     <!-- Right Column: Itinerary Stops & Parameters -->
-    <div class="lg:col-span-2 space-y-6">
+    <div class="{% if trip.status == 'completed' %}lg:col-span-3{% else %}lg:col-span-2{% endif %} space-y-6">
       <!-- AI Itinerary Timeline -->
       <section class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6 text-left">
         <div class="flex items-center gap-2 border-b border-slate-100 pb-2">
@@ -869,10 +882,17 @@
 
         <!-- Launch Navigation controls -->
         <div class="flex flex-wrap gap-3 pt-6 border-t border-slate-100">
+          {% if trip.status != 'completed' %}
           <a href="/start-trip?trip_id={{ trip.id }}&origin={{ trip.origin|urlencode }}&destination={{ trip.destination|urlencode }}&date={{ trip.start_date }}" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-5 py-3 rounded-lg transition-all active:scale-95 duration-100 inline-flex items-center gap-1.5 shadow-sm">
             <span class="material-symbols-outlined text-sm">navigation</span>
             Start Map Navigation
           </a>
+          {% else %}
+          <a href="/start-trip?trip_id={{ trip.id }}&origin={{ trip.origin|urlencode }}&destination={{ trip.destination|urlencode }}&date={{ trip.start_date }}" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-5 py-3 rounded-lg transition-all active:scale-95 duration-100 inline-flex items-center gap-1.5 shadow-sm">
+            <span class="material-symbols-outlined text-sm">map</span>
+            Show Route
+          </a>
+          {% endif %}
           <a href="/my-trips" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold px-5 py-3 rounded-lg transition-all active:scale-95 duration-100 inline-flex items-center gap-1.5">
             <span class="material-symbols-outlined text-sm">list</span>
             All Trips

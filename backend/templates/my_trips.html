@@ -63,7 +63,14 @@
     <!-- Trip Header -->
     <div class="trip-detail-header">
       <div>
-        <div class="trip-detail-route">{{ trip.origin }} → {{ trip.destination }}</div>
+        <div class="trip-detail-route">
+          {{ trip.origin }} → {{ trip.destination }}
+          {% if trip.status == 'completed' %}
+          <span style="background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 800; text-transform: uppercase; margin-left: 8px; display: inline-block; border: 1px solid rgba(16, 185, 129, 0.3);">Completed 🏁</span>
+          {% else %}
+          <span style="background: rgba(59, 130, 246, 0.15); color: #3b82f6; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 800; text-transform: uppercase; margin-left: 8px; display: inline-block; border: 1px solid rgba(59, 130, 246, 0.3);">Active 🚗</span>
+          {% endif %}
+        </div>
         <div class="trip-detail-meta">
           📅 {{ trip.start_date }} &nbsp;·&nbsp;
           🚗 {{ trip.travel_mode | replace('_', ' ') | title }} &nbsp;·&nbsp;
@@ -138,7 +145,11 @@
 
     <!-- Actions -->
     <div class="trip-actions" style="display: flex; gap: 8px;">
+      {% if trip.status != 'completed' %}
       <a href="/my-trips/{{ trip.id }}/itinerary" class="btn-primary" style="font-size: 12px; padding: 6px 12px; text-decoration: none; display: inline-block; background: #1d9e75; color: #fff; border-radius: 4px; font-weight: 700;">🚀 Start Trip</a>
+      {% else %}
+      <a href="/my-trips/{{ trip.id }}/itinerary" class="btn-secondary" style="font-size: 12px; padding: 6px 12px; text-decoration: none; display: inline-block; background: #64748b; color: #fff; border-radius: 4px; font-weight: 700; border: none;">📖 View Itinerary</a>
+      {% endif %}
       <a href="/plan-trip" class="btn-secondary" style="font-size:12px;padding:6px 12px;">🔄 Plan Similar</a>
     </div>
 

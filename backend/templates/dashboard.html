@@ -52,7 +52,13 @@
           </div>
           <div>
             <div class="trip-route" style="text-transform: capitalize;">{{ trip.origin }} → {{ trip.destination }}</div>
-            <div class="trip-meta">{{ trip.travel_mode.replace('_', ' ') | title }} &nbsp;·&nbsp; <span class="trip-date">{{ trip.start_date }}</span></div>
+            <div class="trip-meta">
+              {{ trip.travel_mode.replace('_', ' ') | title }} &nbsp;·&nbsp; 
+              <span class="trip-date">{{ trip.start_date }}</span>
+              {% if trip.status == 'completed' %}
+              &nbsp;·&nbsp; <span style="background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 1px 4px; border-radius: 3px; font-size: 9px; font-weight: 700; text-transform: uppercase;">Completed</span>
+              {% endif %}
+            </div>
           </div>
         </div>
         <div class="trip-price">₹{{ trip.total_cost_inr | int }}</div>

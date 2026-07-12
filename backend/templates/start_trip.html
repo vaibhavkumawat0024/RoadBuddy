@@ -787,6 +787,13 @@
     box-shadow: 0 0 0 2px var(--primary) !important;
     background-color: #f0fdf4 !important;
   }
+
+  {% if trip and trip.status == 'completed' %}
+  /* Hide navigation controls, triggers, and panel options for completed trips */
+  #nav-toggle-btn, .nav-hud, #nav-hud, #gps-btn-wrap, #gps-status-row, #search-summary-bar {
+    display: none !important;
+  }
+  {% endif %}
 </style>
 </head>
 <body>
@@ -829,6 +836,25 @@
       transition: all 0.2s;
     ">← <span class="btn-text">AI Itinerary</span></a>
     <a href="/dashboard" style="text-decoration: none; color: var(--text-muted); font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 8px; border: 1.5px solid var(--border-color); background: var(--surface); transition: all 0.2s ease;" onmouseover="this.style.borderColor='var(--primary)'; this.style.color='var(--primary)';" onmouseout="this.style.borderColor='var(--border-color)'; this.style.color='var(--text-muted)';">🏠 <span class="btn-text">Dashboard</span></a>
+    {% if trip_id and (not trip or trip.status != 'completed') %}
+    <button onclick="endTrip()" style="
+      font-size: 13px;
+      font-weight: 700;
+      color: #ffffff;
+      background: #ef4444;
+      border: 1.5px solid #ef4444;
+      padding: 8px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+      outline: none;
+    " onmouseover="this.style.background='#dc2626'; this.style.borderColor='#dc2626';" onmouseout="this.style.background='#ef4444'; this.style.borderColor='#ef4444';">
+      🏁 <span class="btn-text">End Trip</span>
+    </button>
+    {% endif %}
   </div>
 </div>
 
@@ -1003,6 +1029,7 @@
   const bookedFlight = {% if booked_flight %} {{ booked_flight | tojson | safe }} {% else %} null {% endif %};
   const bookedCab = {% if booked_cab %} {{ booked_cab | tojson | safe }} {% else %} null {% endif %};
   const tripId = "{{ trip_id|default('') }}";
+  const tripStatus = "{{ trip.status if trip else 'active' }}";
   const prefillOrigin = "{{ origin|default('') }}";
   const prefillDestination = "{{ destination|default('') }}";
   const prefillDate = "{{ date|default('') }}";
@@ -1019,6 +1046,43 @@
   let activeTransitOrigin = "";
   let activeTransitDestination = "";
   let currentMode = 'car';
+
+  function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return "";
+  }
+
+  async function endTrip() {
+    if (!confirm("Are you sure you want to end this trip? All confirmed bookings (cab, hotel, bus, train, flights) associated with this trip's date will be marked as 'completed' and this trip will be saved as completed.")) {
+      return;
+    }
+    const activeTripId = tripId || "";
+    if (!activeTripId) {
+      alert("No active trip to end.");
+      return;
+    }
+    try {
+      const token = getCookie("access_token");
+      const response = await fetch(`/api/trips/${activeTripId}/end`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        alert("🎉 Congratulations on completing your road trip! Your bookings and expenses have been compiled in your trip journal.");
+        window.location.href = "/my-trips";
+      } else {
+        alert("Error: " + (data.detail || "Could not end trip."));
+      }
+    } catch (error) {
+      console.error("Error ending trip:", error);
+      alert("Network error. Please try again.");
+    }
+  }
   function isGPSModeActive() {
     const isPrivateCab = bookedCab && (bookedCab.selected_seats === "Whole Vehicle" || bookedCab.selected_seats === "Whole Vehicle (Private Cab)");
     return currentMode === 'car' || (currentMode === 'cab' && isPrivateCab);

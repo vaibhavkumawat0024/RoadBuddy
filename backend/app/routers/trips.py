@@ -643,3 +643,90 @@ async def trip_recommendations(request: RecommendationRequest):
         return result
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{trip_id}/end")
+def end_trip(
+    trip_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Mark a trip and all its associated bookings as completed.
+    """
+    user_id = int(current_user["user_id"])
+    trip = db.query(Trip).filter(Trip.id == trip_id, Trip.user_id == user_id).first()
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip not found or unauthorized access")
+
+    # 1. Update trip status
+    trip.status = "completed"
+
+    # 2. Find and update travel bookings associated with this trip's start_date / route
+    from app.models.models import Booking, ProviderBooking, FoodOrder, Journal, HotelBooking
+
+    # Update general transit bookings (bus, train, flight) on the trip date to completed
+    transit_bookings = db.query(Booking).filter(
+        Booking.user_id == user_id,
+        Booking.travel_date == trip.start_date,
+        Booking.status == "confirmed"
+    ).all()
+    for b in transit_bookings:
+        b.status = "completed"
+
+    # Update hotel bookings checking in on this trip date to completed
+    hotel_bookings = db.query(HotelBooking).filter(
+        HotelBooking.user_id == user_id,
+        HotelBooking.check_in_date == trip.start_date,
+        HotelBooking.status == "confirmed"
+    ).all()
+    for hb in hotel_bookings:
+        hb.status = "completed"
+
+    # Update cab provider bookings on the trip date to completed
+    cab_bookings = db.query(ProviderBooking).filter(
+        ProviderBooking.user_id == user_id,
+        ProviderBooking.travel_date == trip.start_date,
+        ProviderBooking.status == "confirmed"
+    ).all()
+    for cb in cab_bookings:
+        cb.status = "completed"
+
+    # Update food orders to completed
+    food_orders = db.query(FoodOrder).filter(
+        FoodOrder.user_id == user_id,
+        FoodOrder.status == "confirmed"
+    ).all()
+    for order in food_orders:
+        order.status = "completed"
+
+    # 3. Create or update a Journal summary for the trip
+    journal = db.query(Journal).filter(Journal.trip_id == str(trip_id)).first()
+    if not journal:
+        journal = Journal(
+            trip_id=str(trip_id),
+            user_id=user_id,
+            total_expense_inr=0.0
+        )
+        db.add(journal)
+        db.commit()
+        db.refresh(journal)
+
+    # Compile total expenses from all travel bookings and food orders
+    total_hotel_cost = sum(hb.total_price_inr for hb in hotel_bookings)
+    total_transit_cost = sum(b.total_fare_inr for b in transit_bookings)
+    total_cab_cost = sum(cb.total_fare_inr for cb in cab_bookings)
+    total_food_cost = sum(order.total_price_inr for order in food_orders)
+
+    # Save expenses directly into the trip record
+    trip.hotel_cost_inr = total_hotel_cost
+    trip.transport_fare_inr = total_transit_cost + total_cab_cost
+    trip.food_cost_inr = total_food_cost
+    
+    trip.total_cost_inr = trip.fuel_cost_inr + trip.toll_cost_inr + trip.hotel_cost_inr + trip.transport_fare_inr + trip.food_cost_inr
+
+    # Save to journal
+    journal.total_expense_inr = trip.total_cost_inr
+
+    db.commit()
+    return {"success": True, "message": "Trip and all associated bookings marked as completed."}

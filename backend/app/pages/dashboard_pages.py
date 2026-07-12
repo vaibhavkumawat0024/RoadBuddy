@@ -339,7 +339,7 @@ async def trip_itinerary_page(trip_id: int, request: Request, db: Session = Depe
     from app.models.models import HotelBooking, Hotel, Booking, ProviderBooking
     booked_hotel = db.query(HotelBooking).join(Hotel).filter(
         HotelBooking.user_id == user.id,
-        HotelBooking.status == "confirmed",
+        HotelBooking.status == ("completed" if trip.status == "completed" else "confirmed"),
         Hotel.city.ilike(f"%{trip.destination}%"),
         HotelBooking.check_in_date == trip.start_date
     ).first()
@@ -364,7 +364,7 @@ async def trip_itinerary_page(trip_id: int, request: Request, db: Session = Depe
     transit_bookings = db.query(Booking).filter(
         Booking.user_id == user.id,
         Booking.travel_date == trip.start_date,
-        Booking.status == "confirmed"
+        Booking.status == ("completed" if trip.status == "completed" else "confirmed")
     ).all()
 
     for b in transit_bookings:
@@ -405,7 +405,7 @@ async def trip_itinerary_page(trip_id: int, request: Request, db: Session = Depe
     cab_bookings = db.query(ProviderBooking).filter(
         ProviderBooking.user_id == user.id,
         ProviderBooking.travel_date == trip.start_date,
-        ProviderBooking.status == "confirmed"
+        ProviderBooking.status == ("completed" if trip.status == "completed" else "confirmed")
     ).all()
 
     for cb in cab_bookings:

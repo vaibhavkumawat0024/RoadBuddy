@@ -64,6 +64,7 @@ class Trip(Base):
     food_cost_inr      = Column(Float, default=0)
     total_cost_inr     = Column(Float, default=0)
     ai_summary         = Column(String, nullable=True)
+    status             = Column(String, default="active")
     created_at         = Column(DateTime, server_default=func.now())
 
     user    = relationship("User",    back_populates="trips")
