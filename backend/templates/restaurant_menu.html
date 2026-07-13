@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   <script>
     tailwind.config = {
       theme: {
@@ -186,6 +187,83 @@
   </main>
 
   <script>
+    function startRazorpayCheckout(amountInr, bookingType, details, successCallback) {
+      const headers = { 'Content-Type': 'application/json' };
+      const token = "{{ token }}";
+      if (token) {
+        headers['Authorization'] = 'Bearer ' + token;
+      }
+
+      fetch("/api/payment/create-order", {
+        method: "POST",
+        headers: headers,
+        body: JSON.stringify({
+          amount_inr: amountInr,
+          booking_type: bookingType,
+          details: details
+        })
+      })
+      .then(async res => {
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || "Could not create payment order");
+        }
+        return res.json();
+      })
+      .then(orderData => {
+        const options = {
+          "key": orderData.key_id,
+          "amount": orderData.amount,
+          "currency": orderData.currency,
+          "name": "RoadBuddy AI",
+          "description": `${bookingType.toUpperCase()} Booking Payment`,
+          "order_id": orderData.order_id,
+          "handler": function (response) {
+            fetch("/api/payment/verify", {
+              method: "POST",
+              headers: headers,
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                booking_type: bookingType,
+                details: details
+              })
+            })
+            .then(async verifyRes => {
+              if (!verifyRes.ok) {
+                const err = await verifyRes.json().catch(() => ({}));
+                throw new Error(err.detail || "Payment verification failed");
+              }
+              return verifyRes.json();
+            })
+            .then(verifyData => {
+              successCallback(verifyData);
+            })
+            .catch(err => {
+              alert("Payment Verification Failed: " + err.message);
+              window.location.reload();
+            });
+          },
+          "prefill": {
+            "name": "{{ user.name if user else '' }}",
+            "email": "{{ user.email if user else '' }}",
+            "contact": "{{ user.phone if user else '' }}"
+          },
+          "theme": {
+            "color": "#10b981"
+          }
+        };
+        
+        const rzp = new Razorpay(options);
+        rzp.open();
+      })
+      .catch(err => {
+        alert("Payment Error: " + err.message);
+        window.location.reload();
+      });
+    }
+
     const restId = {{ restaurant.id }};
     const tripId = {{ trip.id }};
     let menuItems = [];
@@ -334,7 +412,7 @@
       if (btn.disabled) return;
       btn.disabled = true;
       const origText = btn.innerHTML;
-      btn.innerHTML = `<span class="material-symbols-outlined text-lg animate-spin">sync</span> Placing Order...`;
+      btn.innerHTML = `<span class="material-symbols-outlined text-lg animate-spin">sync</span> Processing Payment...`;
 
       const total = parseFloat(document.getElementById("cart-total-amount").textContent.replace("₹", ""));
       const items = keys.map(k => ({
@@ -346,42 +424,17 @@
 
       const arrivalTime = parseInt(document.getElementById("cart-arrival-time").value) || 30;
 
-      const payload = {
+      const details = {
         restaurant_id: restId,
         items: items,
-        total_amount: total,
-        payment_method: document.getElementById("cart-payment-method").value,
+        total_price_inr: total,
         user_arrival_time_mins: arrivalTime
       };
 
-      const headers = { "Content-Type": "application/json" };
-      const token = "{{ token }}";
-      if (token) {
-        headers["Authorization"] = token.startsWith("Bearer ") ? token : "Bearer " + token;
-      }
-
-      try {
-        const res = await fetch("/api/food/orders", {
-          method: "POST",
-          headers: headers,
-          body: JSON.stringify(payload)
-        });
-
-        if (res.ok) {
-          alert("Order placed successfully! Pre-paid via RoadBuddy wallet.");
-          window.location.href = `/my-trips/${tripId}/itinerary`;
-        } else {
-          const err = await res.json();
-          alert("Failed to place order: " + (err.detail || "Insufficient funds"));
-          btn.disabled = false;
-          btn.innerHTML = origText;
-        }
-      } catch (err) {
-        console.error(err);
-        alert("Connection error occurred.");
-        btn.disabled = false;
-        btn.innerHTML = origText;
-      }
+      startRazorpayCheckout(total, "food", details, (verifyData) => {
+        alert("Order placed successfully via Razorpay! 🍳");
+        window.location.href = `/my-trips/${tripId}/itinerary`;
+      });
     }
 
     // Ratings

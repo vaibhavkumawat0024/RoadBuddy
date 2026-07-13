@@ -6,7 +6,7 @@ from app.provider.router import router as provider_router
 from fastapi.middleware.cors import CORSMiddleware
 from app.provider.pages import router as provider_pages_router
 from app.provider.food_pages import router as food_provider_pages_router
-from app.routers import booking
+from app.routers import booking, payment
 
 from app.routers import trips, fuel, users, community, journal, transport, food, auth
 from app.pages import auth_pages, dashboard_pages
@@ -181,6 +181,7 @@ app.include_router(provider_router, prefix="/api/provider", tags=["Provider"])
 app.include_router(provider_pages_router)
 app.include_router(food_provider_pages_router)
 app.include_router(booking.router, prefix="/api/booking", tags=["Booking"])
+app.include_router(payment.router, prefix="/api/payment", tags=["Payment Gateway"])
 app.include_router(food.router, prefix="/api/food", tags=["Food & Restaurant"])
 
 # UI page routes

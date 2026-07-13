@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Trip Itinerary — RoadBuddy{% endblock %}
 
+
 {% if trip.status == 'completed' %}
 <style>
   /* Hide chatbot widget on completed/saved trips */
@@ -34,6 +35,7 @@
 {% endblock %}
 
 {% block page_overlay %}
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <div class="seat-overlay" id="seat-select-overlay">
   <div class="seat-modal">
     <div class="seat-modal-header">
@@ -1774,6 +1776,77 @@
     document.getElementById('modal-total-price').textContent = '₹' + totalPrice.toLocaleString('en-IN');
   }
 
+  function startRazorpayCheckout(amountInr, bookingType, details, successCallback) {
+    fetch("/api/payment/create-order", {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify({
+        amount_inr: amountInr,
+        booking_type: bookingType,
+        details: details
+      })
+    })
+    .then(async res => {
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Could not create payment order");
+      }
+      return res.json();
+    })
+    .then(orderData => {
+      const options = {
+        "key": orderData.key_id,
+        "amount": orderData.amount,
+        "currency": orderData.currency,
+        "name": "RoadBuddy AI",
+        "description": `${bookingType.toUpperCase()} Booking Payment`,
+        "order_id": orderData.order_id,
+        "handler": function (response) {
+          fetch("/api/payment/verify", {
+            method: "POST",
+            headers: getHeaders(),
+            body: JSON.stringify({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              booking_type: bookingType,
+              details: details
+            })
+          })
+          .then(async verifyRes => {
+            if (!verifyRes.ok) {
+              const err = await verifyRes.json().catch(() => ({}));
+              throw new Error(err.detail || "Payment verification failed");
+            }
+            return verifyRes.json();
+          })
+          .then(verifyData => {
+            successCallback(verifyData);
+          })
+          .catch(err => {
+            alert("Payment Verification Failed: " + err.message);
+            window.location.reload();
+          });
+        },
+        "prefill": {
+          "name": "{{ user.name if user else '' }}",
+          "email": "{{ user.email if user else '' }}",
+          "contact": "{{ user.phone if user else '' }}"
+        },
+        "theme": {
+          "color": "#1d9e75"
+        }
+      };
+      
+      const rzp = new Razorpay(options);
+      rzp.open();
+    })
+    .catch(err => {
+      alert("Payment Error: " + err.message);
+      window.location.reload();
+    });
+  }
+
   async function submitHotelBooking(event) {
     event.preventDefault();
     const hotelId = parseInt(document.getElementById('modal-hotel-id').value);
@@ -1782,40 +1855,32 @@
     const rooms = parseInt(document.getElementById('modal-rooms').value) || 1;
     const guests = parseInt(document.getElementById('modal-guests').value) || 1;
     
+    const hotelPriceText = document.getElementById('modal-hotel-price').textContent;
+    const pricePerNight = parseFloat(hotelPriceText.replace(/[^0-9.]/g, '')) || 1000.0;
+    
+    const d1 = new Date(checkIn);
+    const d2 = new Date(checkOut);
+    const nights = Math.max(Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24)), 1);
+    const totalFare = pricePerNight * rooms * nights;
+
+    const details = {
+      hotel_id: hotelId,
+      check_in_date: checkIn,
+      check_out_date: checkOut,
+      num_rooms: rooms,
+      num_guests: guests,
+      total_price_inr: totalFare
+    };
+
     const submitBtn = document.getElementById('modal-submit-btn');
     submitBtn.disabled = true;
-    submitBtn.textContent = 'Booking...';
-    
-    try {
-      const url = "/api/booking/hotels/book";
-      const res = await fetch(url, {
-        method: "POST",
-        headers: getHeaders(),
-        body: JSON.stringify({
-          hotel_id: hotelId,
-          check_in_date: checkIn,
-          check_out_date: checkOut,
-          num_rooms: rooms,
-          num_guests: guests
-        })
-      });
-      
-      if (res.ok) {
-        alert('Hotel booked successfully!');
-        closeBookModal();
-        window.location.reload();
-      } else {
-        const err = await res.json();
-        alert('Error booking hotel: ' + (err.detail || 'Unknown error'));
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Confirm Booking';
-      }
-    } catch (err) {
-      console.error('Error booking hotel:', err);
-      alert('Failed to submit booking request.');
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Confirm Booking';
-    }
+    submitBtn.textContent = 'Processing Payment...';
+
+    startRazorpayCheckout(totalFare, "hotel", details, (verifyData) => {
+      alert('Hotel booked successfully! 🎉');
+      closeBookModal();
+      window.location.reload();
+    });
   }
 
 
@@ -2409,11 +2474,11 @@
 
     const confirmBtn = document.getElementById("btn-selfdrive-confirm-final");
     confirmBtn.disabled = true;
-    confirmBtn.textContent = "Booking...";
+    confirmBtn.textContent = "Processing Payment...";
 
     const passengerDetailsList = [{ name: name, age: age }];
 
-    const payload = {
+    const details = {
       vehicle_id: activeSelfDriveVehicle.id,
       passenger_name: name,
       passenger_phone: phone,
@@ -2424,81 +2489,57 @@
       pickup_location: location,
       dropoff_location: location,
       selected_seats: "Self-Drive Rental",
-      user_id: window.currentUserId,
       total_fare_inr: activeSelfDriveTotalRent
     };
 
-    const finalUrl = IS_BACKEND ? "/api/provider/book" : "/bookings/cabs/services";
+    startRazorpayCheckout(activeSelfDriveTotalRent, "cab", details, (verifyData) => {
+      // Transition to WAITING step
+      document.getElementById("sd-step-form").style.display = "none";
+      document.getElementById("sd-step-waiting").style.display = "flex";
+      document.getElementById("sd-modal-close-btn").style.display = "none"; // prevent closing during wait
 
-    try {
-      const res = await fetch(finalUrl, {
-        method: 'POST',
-        headers: getHeaders(),
-        body: JSON.stringify(payload),
-      });
+      // Polling loop
+      const pollInterval = setInterval(async () => {
+        try {
+          const statusRes = await fetch(`/api/provider/bookings/${verifyData.booking_id}/status`, {
+            headers: getHeaders()
+          });
+          if (statusRes.ok) {
+            const statusData = await statusRes.json();
+            if (statusData.status === "confirmed") {
+              clearInterval(pollInterval);
 
-      if (res.ok) {
-        const bookingData = await res.json();
-        
-        // Transition to WAITING step
-        document.getElementById("sd-step-form").style.display = "none";
-        document.getElementById("sd-step-waiting").style.display = "flex";
-        document.getElementById("sd-modal-close-btn").style.display = "none"; // prevent closing during wait
+              // Populate invoice bill details
+              document.getElementById("sd-bill-vehicle").textContent = statusData.vehicle_name;
+              document.getElementById("sd-bill-renter").textContent = statusData.passenger_name;
+              document.getElementById("sd-bill-dates").textContent = `${document.getElementById("sd-rent-duration").textContent}`;
+              document.getElementById("sd-bill-days").textContent = `${activeSelfDriveTotalDays} Day(s)`;
+              document.getElementById("sd-bill-location").textContent = statusData.pickup_location;
+              document.getElementById("sd-bill-total").textContent = `₹${statusData.total_fare_inr.toLocaleString('en-IN')}`;
 
-        // Polling loop
-        const pollInterval = setInterval(async () => {
-          try {
-            const statusRes = await fetch(`/api/provider/bookings/${bookingData.id}/status`, {
-              headers: getHeaders()
-            });
-            if (statusRes.ok) {
-              const statusData = await statusRes.json();
-              if (statusData.status === "confirmed") {
-                clearInterval(pollInterval);
+              // Show CONFIRMED step
+              document.getElementById("sd-step-waiting").style.display = "none";
+              document.getElementById("sd-step-confirmed").style.display = "flex";
+            } else if (statusData.status === "cancelled") {
+              clearInterval(pollInterval);
 
-                // Populate invoice bill details
-                document.getElementById("sd-bill-vehicle").textContent = statusData.vehicle_name;
-                document.getElementById("sd-bill-renter").textContent = statusData.passenger_name;
-                document.getElementById("sd-bill-dates").textContent = `${document.getElementById("sd-rent-duration").textContent}`;
-                document.getElementById("sd-bill-days").textContent = `${activeSelfDriveTotalDays} Day(s)`;
-                document.getElementById("sd-bill-location").textContent = statusData.pickup_location;
-                document.getElementById("sd-bill-total").textContent = `₹${statusData.total_fare_inr.toLocaleString('en-IN')}`;
+              // Populate invoice decline details
+              document.getElementById("sd-decline-vehicle").textContent = statusData.vehicle_name;
+              document.getElementById("sd-decline-renter").textContent = statusData.passenger_name;
+              document.getElementById("sd-decline-dates").textContent = `${document.getElementById("sd-rent-duration").textContent}`;
+              document.getElementById("sd-decline-days").textContent = `${activeSelfDriveTotalDays} Day(s)`;
+              document.getElementById("sd-decline-location").textContent = statusData.pickup_location;
+              document.getElementById("sd-decline-total").textContent = `₹${statusData.total_fare_inr.toLocaleString('en-IN')}`;
 
-                // Show CONFIRMED step
-                document.getElementById("sd-step-waiting").style.display = "none";
-                document.getElementById("sd-step-confirmed").style.display = "flex";
-              } else if (statusData.status === "cancelled") {
-                clearInterval(pollInterval);
-
-                // Populate invoice decline details
-                document.getElementById("sd-decline-vehicle").textContent = statusData.vehicle_name;
-                document.getElementById("sd-decline-renter").textContent = statusData.passenger_name;
-                document.getElementById("sd-decline-dates").textContent = `${document.getElementById("sd-rent-duration").textContent}`;
-                document.getElementById("sd-decline-days").textContent = `${activeSelfDriveTotalDays} Day(s)`;
-                document.getElementById("sd-decline-location").textContent = statusData.pickup_location;
-                document.getElementById("sd-decline-total").textContent = `₹${statusData.total_fare_inr.toLocaleString('en-IN')}`;
-
-                document.getElementById("sd-step-waiting").style.display = "none";
-                document.getElementById("sd-step-declined").style.display = "flex";
-              }
+              document.getElementById("sd-step-waiting").style.display = "none";
+              document.getElementById("sd-step-declined").style.display = "flex";
             }
-          } catch (pollErr) {
-            console.error("Error polling booking status:", pollErr);
           }
-        }, 3000);
-
-      } else {
-        const err = await res.json().catch(() => ({}));
-        alert('Booking failed: ' + (err.detail || res.status));
-        confirmBtn.disabled = false;
-        confirmBtn.textContent = "Confirm & Book";
-      }
-    } catch (err) {
-      console.error(err);
-      alert('Booking failed due to a network connection error: ' + err.message);
-      confirmBtn.disabled = false;
-      confirmBtn.textContent = "Confirm & Book";
-    }
+        } catch (pollErr) {
+          console.error("Error polling booking status:", pollErr);
+        }
+      }, 3000);
+    });
   }
 
   function detectUserPickupLocation() {
@@ -3099,10 +3140,11 @@
     
     const confirmBtn = document.getElementById("btn-confirm-seats-final");
     confirmBtn.disabled = true;
-    confirmBtn.textContent = "Booking...";
+    confirmBtn.textContent = "Processing Payment...";
     
     if (activeBookMode === 'cab') {
-      const payload = {
+      const totalFare = isPrivateBooking ? activeBookFare : selectedSeats.length * activeBookFare;
+      const details = {
         vehicle_id: activeBookingVehicleId,
         passenger_name: firstPassengerName,
         passenger_phone: passengerPhone,
@@ -3115,84 +3157,52 @@
           : document.getElementById("booking-pickup-select").value,
         dropoff_location: document.getElementById("booking-dropoff-select").value,
         selected_seats: isPrivateBooking ? "Whole Vehicle" : selectedSeats.join(", "),
-        user_id: window.currentUserId,
-        total_fare_inr: isPrivateBooking ? activeBookFare : selectedSeats.length * activeBookFare
+        total_fare_inr: totalFare
       };
       
-      const finalUrl = IS_BACKEND ? "/api/provider/book" : "/bookings/cabs/services"; // Direct
-      
-      try {
-        const res = await fetch(finalUrl, {
-          method: 'POST',
-          headers: getHeaders(),
-          body: JSON.stringify(payload),
-        });
-        if (res.ok) {
-          closeSeatModal();
-          window.onSuccessModalClose = () => {
-            window.location.reload();
-          };
-          showBookingConfirmation(
-            'Cab Booked Successfully! 🎉',
-            isPrivateBooking 
-              ? 'Your private cab has been booked. Your driver is preparing the vehicle.' 
-              : `Your cab seat ticket is confirmed for seats: <strong>${selectedSeats.join(", ")}</strong>.`
-          );
-        } else {
-          const err = await res.json().catch(() => ({}));
-          alert('Booking failed: ' + (err.detail || res.status));
-          confirmBtn.disabled = false;
-          confirmBtn.textContent = "Confirm & Book";
-        }
-      } catch (e) {
-        console.error("Cab booking error details:", e);
-        alert('Booking failed: network error (' + e.message + ')');
-        confirmBtn.disabled = false;
-        confirmBtn.textContent = "Confirm & Book";
-      }
+      startRazorpayCheckout(totalFare, "cab", details, (verifyData) => {
+        closeSeatModal();
+        window.onSuccessModalClose = () => {
+          window.location.reload();
+        };
+        showBookingConfirmation(
+          'Cab Booked Successfully! 🎉',
+          isPrivateBooking 
+            ? 'Your private cab has been booked. Your driver is preparing the vehicle.' 
+            : `Your cab seat ticket is confirmed for seats: <strong>${selectedSeats.join(", ")}</strong>.`
+        );
+      });
     } else {
       const includeReturn = document.getElementById("booking-include-return-checkbox").checked;
       const returnDate = includeReturn ? document.getElementById("booking-return-date-input").value : null;
       
-      const payload = {
+      const option = loadedTransitOptions.find(o => o.id === activeBookOptionId);
+      const singleFare = option ? option.fare_inr : 0;
+      const totalFare = includeReturn ? (singleFare * selectedSeats.length * 2) : (singleFare * selectedSeats.length);
+
+      const details = {
         transport_option_id: activeBookOptionId,
         passenger_name: firstPassengerName,
         travel_date: tripStartDate,
         include_return: includeReturn,
         return_date: returnDate,
+        going_fare_inr: singleFare,
+        return_fare_inr: includeReturn ? singleFare : 0,
+        total_fare_inr: totalFare,
         selected_seats: selectedSeats.join(", "),
         travel_class: selectedTransitClass || "Standard"
       };
       
-      try {
-        const bookUrl = IS_BACKEND ? "/api/transport/book" : "/bookings/transport/book";
-        const res = await fetch(bookUrl, {
-          method: "POST",
-          headers: getHeaders(),
-          body: JSON.stringify(payload)
-        });
-        if (res.ok) {
-          const data = await res.json();
-          closeSeatModal();
-          window.onSuccessModalClose = () => {
-            window.location.reload();
-          };
-          showBookingConfirmation(
-            'Ticket Booked Successfully! 🎉',
-            `Your ticket reference ID is <strong>${data.id}</strong>. Check your inbox for booking details.`
-          );
-        } else {
-          const err = await res.json().catch(() => ({}));
-          alert('Booking failed: ' + (err.detail || res.status));
-          confirmBtn.disabled = false;
-          confirmBtn.textContent = "Confirm & Book";
-        }
-      } catch (e) {
-        console.error("Transit booking error details:", e);
-        alert('Booking failed: network error (' + e.message + ')');
-        confirmBtn.disabled = false;
-        confirmBtn.textContent = "Confirm & Book";
-      }
+      startRazorpayCheckout(totalFare, "transit", details, (verifyData) => {
+        closeSeatModal();
+        window.onSuccessModalClose = () => {
+          window.location.reload();
+        };
+        showBookingConfirmation(
+          'Ticket Booked Successfully! 🎉',
+          `Your ticket reference ID is <strong>${verifyData.booking_id}</strong>. Check your inbox for booking details.`
+        );
+      });
     }
   }
 
@@ -3484,33 +3494,20 @@
     }
 
     let total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const payMethod = document.getElementById("food-payment-method").value;
-
-    const payload = {
+    const itemsList = items.map(i => ({ menu_item_id: i.id, name: i.name, quantity: i.quantity, price: i.price }));
+    
+    const details = {
       restaurant_id: currentRestId,
-      items: items.map(i => ({ menu_item_id: i.id, name: i.name, quantity: i.quantity, price: i.price })),
-      total_amount: total,
-      payment_method: payMethod
+      items: itemsList,
+      total_price_inr: total,
+      user_arrival_time_mins: parseInt(document.getElementById("food-payment-method").value) || 30
     };
 
-    try {
-      const res = await fetch("/api/food/orders", {
-        method: "POST",
-        headers: getHeaders(),
-        body: JSON.stringify(payload)
-      });
-
-      if (res.ok) {
-        alert("Pre-payment successful! Your order has been placed.");
-        closeFoodModal();
-        loadActiveFoodOrders();
-      } else {
-        const errData = await res.json();
-        alert(`Order failed: ${errData.detail || "Internal Server Error"}`);
-      }
-    } catch (err) {
-      alert("Connection error. Could not place order.");
-    }
+    startRazorpayCheckout(total, "food", details, (verifyData) => {
+      alert("Pre-payment successful! Your order has been placed. 🎉");
+      closeFoodModal();
+      loadActiveFoodOrders();
+    });
   }
 
   function setReviewRating(rating) {
