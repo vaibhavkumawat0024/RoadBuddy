@@ -7,11 +7,9 @@
   <link rel="stylesheet" href="/static/css/style.css?v=3.0">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
   
-  <!-- Leaflet Maps CSS & JS Imports -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
-  <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+  <!-- Mapbox GL JS v3 Imports -->
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.css" rel="stylesheet">
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.js"></script>
 
   <style>
     /* Hide Leaflet routing text control panels */
@@ -719,6 +717,89 @@
       }
     }
 
+    function getDistanceMeters(p1, p2) {
+      if (!p1 || !p2) return 0;
+      const lat1 = p1.lat;
+      const lon1 = p1.lon || p1.lng || p1[0];
+      const lat2 = p2.lat;
+      const lon2 = p2.lon || p2.lng || p2[0];
+
+      const R = 6371e3; // metres
+      const phi1 = lat1 * Math.PI/180;
+      const phi2 = lat2 * Math.PI/180;
+      const deltaPhi = (lat2-lat1) * Math.PI/180;
+      const deltaLambda = (lon2-lon1) * Math.PI/180;
+
+      const a = Math.sin(deltaPhi/2) * Math.sin(deltaPhi/2) +
+                Math.cos(phi1) * Math.cos(phi2) *
+                Math.sin(deltaLambda/2) * Math.sin(deltaLambda/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+      return R * c;
+    }
+
+    function getMapboxCoords(latLngObj) {
+      if (!latLngObj) return null;
+      if (Array.isArray(latLngObj)) {
+        return [latLngObj[0], latLngObj[1]];
+      }
+      return [
+        latLngObj.lon !== undefined ? latLngObj.lon : (latLngObj.lng !== undefined ? latLngObj.lng : latLngObj[0]),
+        latLngObj.lat !== undefined ? latLngObj.lat : latLngObj[1]
+      ];
+    }
+
+    function drawRouteLayer(id, geometry, color, width, dashArray) {
+      if (!trackingMap) return;
+      const sourceId = id + '-source';
+      
+      if (trackingMap.getSource(sourceId)) {
+        trackingMap.getSource(sourceId).setData({
+          type: 'Feature',
+          geometry: geometry
+        });
+      } else {
+        trackingMap.addSource(sourceId, {
+          type: 'geojson',
+          data: {
+            type: 'Feature',
+            geometry: geometry
+          }
+        });
+        
+        const paintOpts = {
+          'line-color': color,
+          'line-width': width,
+          'line-opacity': 0.85
+        };
+        if (dashArray) {
+          paintOpts['line-dasharray'] = dashArray;
+        }
+        
+        trackingMap.addLayer({
+          id: id,
+          type: 'line',
+          source: sourceId,
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round'
+          },
+          paint: paintOpts
+        });
+      }
+    }
+
+    function removeRouteLayer(id) {
+      if (!trackingMap) return;
+      if (trackingMap.getLayer(id)) {
+        trackingMap.removeLayer(id);
+      }
+      const sourceId = id + '-source';
+      if (trackingMap.getSource(sourceId)) {
+        trackingMap.getSource(sourceId).remove();
+      }
+    }
+
     function openTrackingModal(bookingId) {
       closeToast();
       isFirstTrackingLoad = true;
@@ -730,13 +811,26 @@
         overlay.style.opacity = "1";
       }, 50);
 
-      // Initialize Leaflet Map if not done
+      // Initialize Mapbox Map if not done
       setTimeout(() => {
         if (!trackingMap) {
-          trackingMap = L.map('tracking-map').setView([26.9124, 75.7873], 13);
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors'
-          }).addTo(trackingMap);
+          mapboxgl.accessToken = '{{ MAPBOX_ACCESS_TOKEN }}';
+          if (!mapboxgl.accessToken) {
+             console.warn("Mapbox Access Token is missing.");
+             const mapEl = document.getElementById('tracking-map');
+             if (mapEl) {
+               mapEl.innerHTML = `<div style="padding: 20px; text-align: center; color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px;">
+                 <strong>Mapbox Access Token Missing</strong><br/>Please set <code>MAPBOX_ACCESS_TOKEN</code> in your <code>.env</code> file.
+               </div>`;
+             }
+             return;
+          }
+          trackingMap = new mapboxgl.Map({
+            container: 'tracking-map',
+            style: 'mapbox://styles/mapbox/streets-v12',
+            center: [75.7873, 26.9124],
+            zoom: 13
+          });
         } else {
           clearTrackingLayers();
         }
@@ -759,7 +853,7 @@
         // Resolve Pickup LatLng (either direct or client-side geocoding fallback)
         let pickupLatLng = null;
         if (data.pickup_lat && data.pickup_lon) {
-          pickupLatLng = L.latLng(data.pickup_lat, data.pickup_lon);
+          pickupLatLng = { lat: parseFloat(data.pickup_lat), lon: parseFloat(data.pickup_lon) };
         } else if (data.pickup_name) {
           let query = data.pickup_name;
           if (data.origin && !query.toLowerCase().includes(data.origin.toLowerCase())) {
@@ -767,14 +861,14 @@
           }
           const coord = await geocodeAddress(query);
           if (coord) {
-            pickupLatLng = L.latLng(coord.lat, coord.lon);
+            pickupLatLng = coord;
           }
         }
 
         // Resolve Drop-off LatLng (either direct or client-side geocoding fallback)
         let dropoffLatLng = null;
         if (data.dropoff_lat && data.dropoff_lon) {
-          dropoffLatLng = L.latLng(data.dropoff_lat, data.dropoff_lon);
+          dropoffLatLng = { lat: parseFloat(data.dropoff_lat), lon: parseFloat(data.dropoff_lon) };
         } else if (data.dropoff_name) {
           let query = data.dropoff_name;
           const suffix = data.destination || data.origin;
@@ -783,7 +877,7 @@
           }
           const coord = await geocodeAddress(query);
           if (coord) {
-            dropoffLatLng = L.latLng(coord.lat, coord.lon);
+            dropoffLatLng = coord;
           }
         }
 
@@ -791,18 +885,17 @@
         if (!dropoffLatLng && data.destination) {
           const coord = await geocodeAddress(data.destination);
           if (coord) {
-            dropoffLatLng = L.latLng(coord.lat, coord.lon);
+            dropoffLatLng = coord;
           }
         }
 
-        let driverLatLng = (data.driver_lat && data.driver_lon) ? L.latLng(data.driver_lat, data.driver_lon) : null;
+        let driverLatLng = (data.driver_lat && data.driver_lon) ? { lat: parseFloat(data.driver_lat), lon: parseFloat(data.driver_lon) } : null;
         if (!driverLatLng && data.origin) {
           const coord = await geocodeAddress(data.origin);
           if (coord) {
-            driverLatLng = L.latLng(coord.lat, coord.lon);
+            driverLatLng = coord;
           }
         }
-
 
         const statusTitle = document.getElementById("tracking-status-title");
         const hudEta = document.getElementById("tracking-hud-eta");
@@ -828,46 +921,60 @@
           hudEta.textContent = "Driver is preparing your cab...";
         }
 
-
         // Markers
-        if (pickupLatLng && !trackingPickupMarker) {
-          const pickupIcon = L.divIcon({ html:`<div style="background:#1DB954;color:#fff;padding:4px 8px;border-radius:4px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.2);transform: translate(-50%, -50%);">📥 Pickup: ${data.pickup_name || 'Passenger'}</div>`, className:'', iconSize:[null,22] });
-          trackingPickupMarker = L.marker(pickupLatLng, { icon: pickupIcon }).addTo(trackingMap);
+        if (pickupLatLng) {
+          if (!trackingPickupMarker) {
+            const el = document.createElement('div');
+            el.innerHTML = `<div style="background:#1DB954;color:#fff;padding:4px 8px;border-radius:4px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.2);">📥 Pickup: ${data.pickup_name || 'Passenger'}</div>`;
+            trackingPickupMarker = new mapboxgl.Marker({ element: el })
+              .setLngLat(getMapboxCoords(pickupLatLng))
+              .addTo(trackingMap);
+          } else {
+            trackingPickupMarker.setLngLat(getMapboxCoords(pickupLatLng));
+          }
         }
 
         if (hasDriverReachedPickup && dropoffLatLng) {
           if (!trackingDropoffMarker) {
-            const destIcon = L.divIcon({ html:`<div style="background:#ef4444;color:#fff;padding:4px 8px;border-radius:4px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.2);transform: translate(-50%, -50%);">🏁 Drop-off: ${data.dropoff_name || data.destination || 'Destination'}</div>`, className:'', iconSize:[null,22] });
-            trackingDropoffMarker = L.marker(dropoffLatLng, { icon: destIcon }).addTo(trackingMap);
+            const el = document.createElement('div');
+            el.innerHTML = `<div style="background:#ef4444;color:#fff;padding:4px 8px;border-radius:4px;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.2);">🏁 Drop-off: ${data.dropoff_name || data.destination || 'Destination'}</div>`;
+            trackingDropoffMarker = new mapboxgl.Marker({ element: el })
+              .setLngLat(getMapboxCoords(dropoffLatLng))
+              .addTo(trackingMap);
+          } else {
+            trackingDropoffMarker.setLngLat(getMapboxCoords(dropoffLatLng));
           }
         } else {
           if (trackingDropoffMarker) {
-            trackingMap.removeLayer(trackingDropoffMarker);
+            trackingDropoffMarker.remove();
             trackingDropoffMarker = null;
           }
         }
 
         if (driverLatLng) {
-          const driverIcon = L.divIcon({ html:`<div style="font-size:28px; transform: translate(-50%, -50%);">🚖</div>`, className:'', iconSize:[28,28] });
           if (!trackingDriverMarker) {
-            trackingDriverMarker = L.marker(driverLatLng, { icon: driverIcon }).addTo(trackingMap);
+            const el = document.createElement('div');
+            el.innerHTML = `<div style="font-size:28px;">🚖</div>`;
+            trackingDriverMarker = new mapboxgl.Marker({ element: el })
+              .setLngLat(getMapboxCoords(driverLatLng))
+              .addTo(trackingMap);
           } else {
-            trackingDriverMarker.setLatLng(driverLatLng);
+            trackingDriverMarker.setLngLat(getMapboxCoords(driverLatLng));
           }
         }
 
         // Check if driver has reached/passed pickup
         if (driverLatLng && pickupLatLng && dropoffLatLng && !hasDriverReachedPickup) {
-          const distToPickup = trackingMap.distance(driverLatLng, pickupLatLng);
-          const distToDestination = trackingMap.distance(driverLatLng, dropoffLatLng);
-          const pickupToDestination = trackingMap.distance(pickupLatLng, dropoffLatLng);
+          const distToPickup = getDistanceMeters(driverLatLng, pickupLatLng);
+          const distToDestination = getDistanceMeters(driverLatLng, dropoffLatLng);
+          const pickupToDestination = getDistanceMeters(pickupLatLng, dropoffLatLng);
 
           if (distToPickup < 150 || distToDestination < (pickupToDestination - 150)) {
             hasDriverReachedPickup = true;
             isFirstTrackingLoad = true; // Trigger map refit for the whole route!
           }
         } else if (driverLatLng && pickupLatLng && !hasDriverReachedPickup) {
-          const distToPickup = trackingMap.distance(driverLatLng, pickupLatLng);
+          const distToPickup = getDistanceMeters(driverLatLng, pickupLatLng);
           if (distToPickup < 150) {
             hasDriverReachedPickup = true;
             isFirstTrackingLoad = true; // Trigger map refit for the whole route!
@@ -880,84 +987,73 @@
         if (pickupLatLng) activeCoords.push(pickupLatLng);
         if (hasDriverReachedPickup && dropoffLatLng) activeCoords.push(dropoffLatLng);
 
-        // 1. Segment 1: Driver to Pickup (only shown before reaching pickup)
-        if (driverLatLng && pickupLatLng && !hasDriverReachedPickup) {
-          if (trackingRoutingControl) {
-            trackingRoutingControl.setWaypoints([driverLatLng, pickupLatLng]);
-          } else {
-            trackingRoutingControl = L.Routing.control({
-              waypoints: [driverLatLng, pickupLatLng],
-              routeWhileDragging: false,
-              addWaypoints: false,
-              createMarker: () => null,
-              fitSelectedRoutes: false,
-              router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1', profile: 'driving' }),
-              lineOptions: { styles: [{ color: '#FF6B35', opacity:0.85, weight:6 }] }
-            }).addTo(trackingMap);
+        const token = '{{ MAPBOX_ACCESS_TOKEN }}';
 
-            trackingRoutingControl.on('routeselected', function(e) {
-              const route = e.route;
-              const distKm = (route.summary.totalDistance / 1000).toFixed(1);
-              const durMins = Math.round(route.summary.totalTime / 60);
-              hudEta.textContent = `Driver is ${distKm} km away (approx. ${durMins} mins)`;
-            });
-          }
+        // 1. Segment 1: Driver to Pickup (only shown before reaching pickup)
+        if (driverLatLng && pickupLatLng && !hasDriverReachedPickup && token) {
+          const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${driverLatLng.lon},${driverLatLng.lat};${pickupLatLng.lon},${pickupLatLng.lat}?geometries=geojson&access_token=${token}`;
+          fetch(url)
+            .then(res => res.json())
+            .then(routeData => {
+              if (routeData.routes && routeData.routes.length > 0) {
+                const route = routeData.routes[0];
+                drawRouteLayer('route-driver-pickup', route.geometry, '#FF6B35', 6);
+                const distKm = (route.distance / 1000).toFixed(1);
+                const durMins = Math.round(route.duration / 60);
+                hudEta.textContent = `Driver is ${distKm} km away (approx. ${durMins} mins)`;
+              }
+            })
+            .catch(err => console.warn("Error fetching directions:", err));
         } else {
-          if (trackingRoutingControl) {
-            trackingMap.removeControl(trackingRoutingControl);
-            trackingRoutingControl = null;
-          }
+          removeRouteLayer('route-driver-pickup');
         }
 
         // 2. Segment 2: Pickup to Destination (only shown once reaching pickup)
-        //    Always route through the pickup point so the line covers the pickup marker
-        if (hasDriverReachedPickup && pickupLatLng && dropoffLatLng) {
-          const waypts = driverLatLng ? [driverLatLng, pickupLatLng, dropoffLatLng] : [pickupLatLng, dropoffLatLng];
-          if (trackingDestRoutingControl) {
-            trackingDestRoutingControl.setWaypoints(waypts);
-          } else {
-            trackingDestRoutingControl = L.Routing.control({
-              waypoints: waypts,
-              routeWhileDragging: false,
-              addWaypoints: false,
-              createMarker: () => null,
-              fitSelectedRoutes: false,
-              router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1', profile: 'driving' }),
-              lineOptions: { styles: [{ color: '#3b82f6', opacity:0.75, weight:5, dashArray: '10, 5' }] }
-            }).addTo(trackingMap);
-
-            trackingDestRoutingControl.on('routeselected', function(e) {
-              const route = e.route;
-              const distKm = (route.summary.totalDistance / 1000).toFixed(1);
-              const durMins = Math.round(route.summary.totalTime / 60);
-              hudEta.textContent = `Heading to destination: ${distKm} km away (approx. ${durMins} mins)`;
-            });
-          }
+        if (hasDriverReachedPickup && pickupLatLng && dropoffLatLng && token) {
+          const coordsStr = driverLatLng 
+            ? `${driverLatLng.lon},${driverLatLng.lat};${pickupLatLng.lon},${pickupLatLng.lat};${dropoffLatLng.lon},${dropoffLatLng.lat}`
+            : `${pickupLatLng.lon},${pickupLatLng.lat};${dropoffLatLng.lon},${dropoffLatLng.lat}`;
+          const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordsStr}?geometries=geojson&access_token=${token}`;
+          fetch(url)
+            .then(res => res.json())
+            .then(routeData => {
+              if (routeData.routes && routeData.routes.length > 0) {
+                const route = routeData.routes[0];
+                drawRouteLayer('route-pickup-destination', route.geometry, '#3b82f6', 5, [2, 2]);
+                const distKm = (route.distance / 1000).toFixed(1);
+                const durMins = Math.round(route.duration / 60);
+                hudEta.textContent = `Heading to destination: ${distKm} km away (approx. ${durMins} mins)`;
+              }
+            })
+            .catch(err => console.warn("Error fetching directions:", err));
         } else {
-          if (trackingDestRoutingControl) {
-            trackingMap.removeControl(trackingDestRoutingControl);
-            trackingDestRoutingControl = null;
-          }
+          removeRouteLayer('route-pickup-destination');
         }
 
         // Centering bounds (executed only on initial load to prevent resetting user zoom/pan)
-        if (isFirstTrackingLoad) {
+        if (isFirstTrackingLoad && trackingMap) {
           if (activeCoords.length >= 2) {
-            const bounds = L.latLngBounds(activeCoords);
-            trackingMap.fitBounds(bounds, { padding: [50, 50] });
+            const bounds = new mapboxgl.LngLatBounds();
+            activeCoords.forEach(coord => {
+              bounds.extend(getMapboxCoords(coord));
+            });
+            trackingMap.fitBounds(bounds, { padding: 50 });
             isFirstTrackingLoad = false;
           } else if (driverLatLng) {
-            trackingMap.setView(driverLatLng, 14);
+            trackingMap.setCenter(getMapboxCoords(driverLatLng));
+            trackingMap.setZoom(14);
             isFirstTrackingLoad = false;
           } else if (pickupLatLng) {
-            trackingMap.setView(pickupLatLng, 14);
+            trackingMap.setCenter(getMapboxCoords(pickupLatLng));
+            trackingMap.setZoom(14);
             isFirstTrackingLoad = false;
           } else {
             // Fallback to geocode vehicle origin
             if (data.origin) {
               geocodeAddress(data.origin).then(coord => {
                 if (coord && trackingMap && isFirstTrackingLoad) {
-                  trackingMap.setView(L.latLng(coord.lat, coord.lon), 12);
+                  trackingMap.setCenter(getMapboxCoords(coord));
+                  trackingMap.setZoom(12);
                   isFirstTrackingLoad = false;
                 }
               });
@@ -980,24 +1076,19 @@
     }
 
     function clearTrackingLayers() {
-      if (trackingRoutingControl) {
-        trackingMap.removeControl(trackingRoutingControl);
-        trackingRoutingControl = null;
-      }
-      if (trackingDestRoutingControl) {
-        trackingMap.removeControl(trackingDestRoutingControl);
-        trackingDestRoutingControl = null;
-      }
+      removeRouteLayer('route-driver-pickup');
+      removeRouteLayer('route-pickup-destination');
+      
       if (trackingDriverMarker) {
-        trackingMap.removeLayer(trackingDriverMarker);
+        trackingDriverMarker.remove();
         trackingDriverMarker = null;
       }
       if (trackingPickupMarker) {
-        trackingMap.removeLayer(trackingPickupMarker);
+        trackingPickupMarker.remove();
         trackingPickupMarker = null;
       }
       if (trackingDropoffMarker) {
-        trackingMap.removeLayer(trackingDropoffMarker);
+        trackingDropoffMarker.remove();
         trackingDropoffMarker = null;
       }
     }
@@ -1015,6 +1106,7 @@
       }
       clearTrackingLayers();
     }
+
 
     async function refreshInbox() {
       if (!window.currentUserId) return;

@@ -10,6 +10,8 @@ from app.core.config import settings
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
+templates.env.globals['MAPBOX_ACCESS_TOKEN'] = settings.mapbox_access_token
+
 
 
 @router.get("/register", response_class=HTMLResponse)

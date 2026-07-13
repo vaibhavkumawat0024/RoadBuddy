@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     razorpay_key_id: str = ""
     razorpay_key_secret: str = ""
 
+    # Mapbox API
+    mapbox_access_token: str = ""
+
     # JWT Auth
     secret_key: str
     algorithm: str = "HS256"

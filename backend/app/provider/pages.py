@@ -26,6 +26,9 @@ from app.core.email_otp import generate_and_send_otp, verify_otp, clear_otp, _ot
 
 router = APIRouter(prefix="/provider")
 templates = Jinja2Templates(directory="templates")
+from app.core.config import settings
+templates.env.globals['MAPBOX_ACCESS_TOKEN'] = settings.mapbox_access_token
+
 
 
 def check_provider_unread_bookings(provider, db: Session) -> bool:
