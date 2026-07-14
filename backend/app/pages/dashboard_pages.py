@@ -8,6 +8,9 @@ from app.models.models import User, Trip, Vehicle
 from app.core.auth import hash_password
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
+from app.core.config import settings
+templates.env.globals['MAPBOX_ACCESS_TOKEN'] = settings.mapbox_access_token
+
 
 # ---------------- USER FROM COOKIE ----------------
 
