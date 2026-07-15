@@ -730,3 +730,82 @@ def end_trip(
 
     db.commit()
     return {"success": True, "message": "Trip and all associated bookings marked as completed."}
+
+
+# ---------------- QUICK ITINERARY GENERATOR ----------------
+
+class QuickItineraryRequest(BaseModel):
+    destination: str
+    days: int
+
+@router.post("/quick-itinerary")
+async def generate_quick_itinerary(
+    data: QuickItineraryRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Generate a quick day-by-day itinerary without times for a given destination and number of days."""
+    destination = data.destination.strip()
+    days = data.days
+
+    if not destination:
+        raise HTTPException(status_code=400, detail="Destination cannot be empty")
+    if days < 1 or days > 14:
+        raise HTTPException(status_code=400, detail="Days must be between 1 and 14")
+
+    prompt = f"""You are RoadBuddy AI, an expert travel planner. Generate the ultimate high-quality, impressive day-by-day travel itinerary for a trip to {destination} for exactly {days} days.
+
+CRITICAL INSTRUCTIONS:
+1. Group nearby tourist places, activities, and dining spots logically for each day to minimize travel time.
+2. For each day, provide:
+   - A list of best tourist attractions/activities to visit.
+   - Recommended places to eat.
+   - A descriptive, engaging summary paragraph of the day's theme/plan.
+3. DO NOT include specific timestamps or time slots (no "Morning", "Afternoon", "09:00 AM", etc.). Just structure it as:
+   - Day X:
+     - Attractions: [List of places/activities]
+     - Dining: [Recommended food/eateries]
+     - Summary: [A rich, 3-4 sentence paragraph describing the flow of the day]
+4. Make sure the destinations, spots, and dhabas/restaurants are real and located in or near {destination}.
+5. Return ONLY a valid JSON object matching this structure:
+{{
+  "destination": "{destination}",
+  "days_count": {days},
+  "title": "A catchy title for the trip, e.g. Magical Goa Getaway",
+  "itinerary": [
+    {{
+      "day": 1,
+      "attractions": ["Place 1", "Place 2", "Activity 3"],
+      "dining": ["Restaurant/Cafe A", "Local food recommendation B"],
+      "summary": "Start your trip by exploring the historic charm of..."
+    }}
+  ]
+}}
+Do not include any explanation, markdown formatting (no ```json, no ```), or notes. Return raw JSON only.
+"""
+
+    from app.services.groq_client import call_groq
+    from app.core.config import settings
+
+    try:
+        if settings.gemini_api_key or settings.groq_api_key:
+            result = await call_groq(prompt)
+            return result
+        else:
+            # Fallback mock itinerary if no API keys are set
+            itinerary = []
+            for day in range(1, days + 1):
+                itinerary.append({
+                    "day": day,
+                    "attractions": [f"Famous Landmark {day}A", f"Scenic Viewpoint {day}B", f"Cultural Activity {day}C"],
+                    "dining": [f"Popular Local Cafe {day}", f"Traditional Dinner spot {day}"],
+                    "summary": f"Discover the wonderful sights of {destination} on Day {day}. Start with a visit to the local landmark followed by a scenic walk. Enjoy authentic cuisine for lunch and wrap up the evening exploring markets."
+                })
+            return {
+                "destination": destination,
+                "days_count": days,
+                "title": f"Explore the Best of {destination}",
+                "itinerary": itinerary
+            }
+    except Exception as e:
+        print(f"Quick itinerary generation failed: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate itinerary. Please try again.")

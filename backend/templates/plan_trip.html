@@ -4,7 +4,11 @@
 {% block content %}
 <style>
   body {
-    background-color: #f3f4f6 !important; /* Lite grey (gray-100) */
+    background-color: #0b1120 !important; /* Dark slate background */
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    cursor: pointer;
   }
 </style>
 <!-- Load Tailwind CSS CDN locally for rich layout styling -->
@@ -50,94 +54,120 @@
 
   <div class="grid grid-cols-1 gap-6">
     <!-- Planning Card -->
-    <section class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4 text-left">
-      <div class="flex items-center gap-2 border-b border-slate-100 pb-3">
-        <span class="text-xs bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded font-mono font-bold">KM</span>
-        <h3 class="font-bold text-slate-800 text-base">Journey Parameters</h3>
+    <section class="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-2xl space-y-6 text-left relative overflow-hidden">
+      <!-- Glow effect -->
+      <div class="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+      
+      <div class="flex items-center gap-2.5 border-b border-white/10 pb-4 relative z-10">
+        <span class="text-[10px] bg-emerald-500/20 text-emerald-400 px-2.5 py-1 rounded font-mono font-black tracking-wider uppercase">AI Plan</span>
+        <h3 class="font-extrabold text-white text-lg tracking-tight">Journey Parameters</h3>
       </div>
       
-      <form id="trip-form" class="space-y-4">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <form id="trip-form" class="space-y-6 relative z-10">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <div class="flex justify-between items-center mb-1">
-              <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Origin City</label>
-              <button type="button" id="detect-gps-btn" class="text-[10px] text-emerald-600 hover:underline font-bold flex items-center gap-0.5 focus:outline-none">
+            <label class="block text-[11px] font-bold text-slate-100 uppercase tracking-wider mb-1.5">Origin City</label>
+            <div class="relative">
+              <input type="text" id="origin" value="{{ origin|default('') }}" class="w-full text-xs border border-white/10 rounded-xl pl-3 pr-32 py-3 bg-slate-950/60 text-white placeholder-slate-500 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-slate-950 outline-none transition-all duration-200" placeholder="e.g. Jaipur" required>
+              <button type="button" id="detect-gps-btn" class="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-emerald-400 hover:text-emerald-300 font-extrabold flex items-center gap-1 focus:outline-none bg-emerald-950/40 hover:bg-emerald-900/60 px-3 py-1.5 rounded-lg border border-emerald-500/20 transition-all duration-200 shadow-sm">
                 <span class="material-symbols-outlined text-[12px] leading-none">my_location</span> Detect Location
               </button>
             </div>
-            <input type="text" id="origin" value="{{ origin|default('') }}" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-slate-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-white transition-all outline-none" placeholder="e.g. Jaipur" required>
           </div>
           <div>
-            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Destination City</label>
-            <input type="text" id="destination" value="{{ destination|default('') }}" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-slate-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-white transition-all outline-none" placeholder="e.g. Udaipur" required>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Start Date</label>
-            <input type="date" id="start_date" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-slate-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-white transition-all outline-none" required>
-          </div>
-          <div>
-            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">End Date</label>
-            <input type="date" id="end_date" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-slate-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-white transition-all outline-none" required>
+            <label class="block text-[11px] font-bold text-slate-100 uppercase tracking-wider mb-1.5">Destination City</label>
+            <input type="text" id="destination" value="{{ destination|default('') }}" class="w-full text-xs border border-white/10 rounded-xl p-3 bg-slate-950/60 text-white placeholder-slate-500 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-slate-950 outline-none transition-all duration-200" placeholder="e.g. Udaipur" required>
           </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Budget (₹)</label>
-            <input type="number" id="budget_inr" min="100" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-slate-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-white transition-all outline-none" placeholder="e.g. 15000" required>
+            <label class="block text-[11px] font-bold text-slate-100 uppercase tracking-wider mb-1.5">Start Date</label>
+            <input type="date" id="start_date" class="w-full text-xs border border-white/10 rounded-xl p-3 bg-slate-950/60 text-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-slate-950 outline-none transition-all duration-200" required>
           </div>
           <div>
-            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Number of Travelers</label>
-            <input type="number" id="num_people" value="2" min="1" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-slate-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-white transition-all outline-none" required>
+            <label class="block text-[11px] font-bold text-slate-100 uppercase tracking-wider mb-1.5">End Date</label>
+            <input type="date" id="end_date" class="w-full text-xs border border-white/10 rounded-xl p-3 bg-slate-950/60 text-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-slate-950 outline-none transition-all duration-200" required>
           </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Travel Mode</label>
-            <select id="travel_mode" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-slate-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-white transition-all outline-none" required>
-              <option value="own_vehicle">Own vehicle</option>
-              <option value="cab_service">Cab service</option>
-              <option value="bus">Bus</option>
-              <option value="train">Train</option>
-              <option value="flight">Flight</option>
+            <label class="block text-[11px] font-bold text-slate-100 uppercase tracking-wider mb-1.5">Budget (₹)</label>
+            <input type="number" id="budget_inr" min="100" class="w-full text-xs border border-white/10 rounded-xl p-3 bg-slate-950/60 text-white placeholder-slate-500 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-slate-950 outline-none transition-all duration-200" placeholder="e.g. 15000" required>
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-slate-100 uppercase tracking-wider mb-1.5">Number of Travelers</label>
+            <input type="number" id="num_people" value="2" min="1" class="w-full text-xs border border-white/10 rounded-xl p-3 bg-slate-950/60 text-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-slate-950 outline-none transition-all duration-200" required>
+          </div>
+        </div>
+
+        <!-- Travel Mode block buttons (full width row) -->
+        <div class="grid grid-cols-1 gap-6">
+          <div>
+            <label class="block text-[11px] font-bold text-slate-100 uppercase tracking-wider mb-2">Travel Mode</label>
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-3" id="travel-mode-container">
+              <!-- Own Vehicle -->
+              <button type="button" data-value="own_vehicle" class="travel-mode-btn active flex flex-col items-center justify-center p-4 rounded-xl border border-emerald-500/35 bg-emerald-950/20 text-emerald-400 font-bold hover:bg-emerald-950/30 transition-all duration-200 gap-2 focus:outline-none">
+                <span class="material-symbols-outlined text-2xl">directions_car</span>
+                <span class="text-[10px] tracking-wider uppercase">Own Vehicle</span>
+              </button>
+              <!-- Cab Service -->
+              <button type="button" data-value="cab_service" class="travel-mode-btn flex flex-col items-center justify-center p-4 rounded-xl border border-white/5 bg-slate-950/40 text-slate-400 font-bold hover:bg-slate-900/60 hover:text-slate-200 transition-all duration-200 gap-2 focus:outline-none">
+                <span class="material-symbols-outlined text-2xl">local_taxi</span>
+                <span class="text-[10px] tracking-wider uppercase">Cab Service</span>
+              </button>
+              <!-- Bus -->
+              <button type="button" data-value="bus" class="travel-mode-btn flex flex-col items-center justify-center p-4 rounded-xl border border-white/5 bg-slate-950/40 text-slate-400 font-bold hover:bg-slate-900/60 hover:text-slate-200 transition-all duration-200 gap-2 focus:outline-none">
+                <span class="material-symbols-outlined text-2xl">directions_bus</span>
+                <span class="text-[10px] tracking-wider uppercase">Bus</span>
+              </button>
+              <!-- Train -->
+              <button type="button" data-value="train" class="travel-mode-btn flex flex-col items-center justify-center p-4 rounded-xl border border-white/5 bg-slate-950/40 text-slate-400 font-bold hover:bg-slate-900/60 hover:text-slate-200 transition-all duration-200 gap-2 focus:outline-none">
+                <span class="material-symbols-outlined text-2xl">train</span>
+                <span class="text-[10px] tracking-wider uppercase">Train</span>
+              </button>
+              <!-- Flight -->
+              <button type="button" data-value="flight" class="travel-mode-btn flex flex-col items-center justify-center p-4 rounded-xl border border-white/5 bg-slate-950/40 text-slate-400 font-bold hover:bg-slate-900/60 hover:text-slate-200 transition-all duration-200 gap-2 focus:outline-none">
+                <span class="material-symbols-outlined text-2xl">flight</span>
+                <span class="text-[10px] tracking-wider uppercase">Flight</span>
+              </button>
+            </div>
+            <input type="hidden" id="travel_mode" value="own_vehicle">
+          </div>
+        </div>
+
+        <!-- Group Type & Vehicle Selection (side-by-side) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label class="block text-[11px] font-bold text-slate-100 uppercase tracking-wider mb-1.5">Group Type</label>
+            <select id="group_type" class="w-full text-xs border border-white/10 rounded-xl p-3 bg-slate-950/60 text-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-slate-950 outline-none transition-all duration-200" required style="color-scheme: dark;">
+              <option value="solo" class="bg-slate-900 text-white">Solo</option>
+              <option value="couple" class="bg-slate-900 text-white">Couple</option>
+              <option value="family" class="bg-slate-900 text-white">Family</option>
+              <option value="friends" selected class="bg-slate-900 text-white">Friends</option>
             </select>
           </div>
-          <div>
-            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Group Type</label>
-            <select id="group_type" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-slate-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-white transition-all outline-none" required>
-              <option value="solo">Solo</option>
-              <option value="couple">Couple</option>
-              <option value="family">Family</option>
-              <option value="friends" selected>Friends</option>
-            </select>
-          </div>
-        </div>
-
-        <div id="vehicle-row" class="grid grid-cols-1 gap-4">
-          <div>
-            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Vehicle Selection</label>
+          <div id="vehicle-row">
+            <label class="block text-[11px] font-bold text-slate-100 uppercase tracking-wider mb-1.5">Vehicle Selection</label>
             {% if vehicles %}
-            <select id="vehicle_id" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-slate-50 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-white transition-all outline-none">
+            <select id="vehicle_id" class="w-full text-xs border border-white/10 rounded-xl p-3 bg-slate-950/60 text-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-slate-950 outline-none transition-all duration-200" style="color-scheme: dark;">
               {% for v in vehicles %}
-              <option value="{{ v.id }}">{{ v.name }} ({{ v.category }}, {{ v.fuel_type }})</option>
+              <option value="{{ v.id }}" class="bg-slate-900 text-white">{{ v.name }} ({{ v.category }}, {{ v.fuel_type }})</option>
               {% endfor %}
             </select>
             {% else %}
-            <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
+            <div class="p-3 bg-amber-950/40 border border-amber-500/20 rounded-xl text-xs text-amber-300">
               No vehicles found on your profile. Change travel mode to transit options or 
-              <a href="/add-vehicle" class="font-bold underline text-emerald-600">add a vehicle first</a>.
+              <a href="/add-vehicle" class="font-bold underline text-emerald-400">add a vehicle first</a>.
             </div>
             {% endif %}
           </div>
         </div>
 
-        <div id="error-box" class="hidden p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg text-left"></div>
+        <div id="error-box" class="hidden p-3 bg-red-950/40 border border-red-500/20 text-red-300 text-xs rounded-xl text-left"></div>
 
-        <button type="submit" id="submit-btn" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-5 py-3 rounded-lg transition-all active:scale-95 duration-100 flex items-center gap-2 shadow-sm">
+        <button type="submit" id="submit-btn" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-6 py-3.5 rounded-xl transition-all active:scale-95 duration-100 flex items-center gap-2 shadow-lg shadow-emerald-950/40 border border-emerald-500/10">
           <span class="material-symbols-outlined text-sm">play_arrow</span> Save & Start Trip
         </button>
       </form>
@@ -168,7 +198,26 @@
   function toggleVehicleRow() {
     vehicleRow.style.display = travelModeSelect.value === "own_vehicle" ? "" : "none";
   }
-  travelModeSelect.addEventListener("change", toggleVehicleRow);
+
+  // Handle travel mode button clicks
+  const travelModeBtns = document.querySelectorAll(".travel-mode-btn");
+  travelModeBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      // Deactivate all button styles
+      travelModeBtns.forEach(b => {
+        b.classList.remove("active", "border-emerald-500/35", "bg-emerald-950/20", "text-emerald-400");
+        b.classList.add("border-white/5", "bg-slate-950/40", "text-slate-400");
+      });
+      // Activate selected button styles
+      btn.classList.add("active", "border-emerald-500/35", "bg-emerald-950/20", "text-emerald-400");
+      btn.classList.remove("border-white/5", "bg-slate-950/40", "text-slate-400");
+      
+      // Update hidden input value and toggle vehicle selector
+      travelModeSelect.value = btn.dataset.value;
+      toggleVehicleRow();
+    });
+  });
+
   toggleVehicleRow();
 
   const originInput = document.getElementById("origin");

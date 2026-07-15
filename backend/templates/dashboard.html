@@ -16,59 +16,76 @@
 
 <!-- Stats Row -->
 <div class="stats-row">
-  <div class="stat-card">
+  <a href="/my-trips" class="stat-card" style="text-decoration: none;">
     <span class="stat-num" data-target="{{ trip_count }}">{{ trip_count }}</span>
     <span class="stat-label">Trips planned</span>
-  </div>
-  <div class="stat-card">
+  </a>
+  <a href="/add-vehicle" class="stat-card" style="text-decoration: none;">
     <span class="stat-num" data-target="{{ vehicle_count }}">{{ vehicle_count }}</span>
     <span class="stat-label">Vehicles added</span>
+  </a>
+</div>
+
+<!-- Quick AI Itinerary Generator Section -->
+<div style="margin-top: 40px; background: rgba(20, 29, 47, 0.88); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: var(--rb-shadow-lg), 0 20px 40px rgba(0,0,0,0.3); border-radius: var(--rb-radius-lg); padding: 32px; position: relative; overflow: hidden; text-align: left;">
+  <!-- Subtle glowing background orb -->
+  <div style="position: absolute; top: -40%; right: -20%; width: 300px; height: 300px; background: radial-gradient(circle, rgba(16, 185, 129, 0.15) 0%, transparent 70%); pointer-events: none; z-index: 1; border-radius: 50%;"></div>
+  
+  <div style="position: relative; z-index: 2;">
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+      <span class="material-symbols-outlined" style="color: var(--rb-primary); font-size: 20px;">magic_button</span>
+      <span style="font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.15em; color: var(--rb-primary);">Instant Travel Planner</span>
+    </div>
+    <h2 style="margin: 0 0 10px 0; font-family: 'Outfit', sans-serif; font-size: 24px; font-weight: 800; color: #ffffff; letter-spacing: -0.02em; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);">Make AI Generated Best Itinerary</h2>
+    <p style="margin: 0 0 28px 0; font-size: 14px; color: #94a3b8; max-width: 600px; line-height: 1.6;">Enter any destination in India and the number of days. Our advanced AI will group nearby attractions, recommend restaurants, and construct a high-quality travel plan in seconds.</p>
+    
+    <form id="quick-itinerary-form" onsubmit="generateQuickItinerary(event)" style="display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end;">
+      <div style="flex: 2; min-width: 250px; display: flex; flex-direction: column; gap: 6px;">
+        <label for="quick-destination" style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.05em;">Dream Destination</label>
+        <input type="text" id="quick-destination" placeholder="e.g. Manali, Ooty, Rishikesh, Mumbai" required style="width: 100%; background: rgba(15, 23, 42, 0.6); border: 1.5px solid rgba(255,255,255,0.1); border-radius: var(--rb-radius-md); padding: 12px 16px; color: #ffffff; font-size: 14px; outline: none; transition: all 0.2s;" onfocus="this.style.borderColor='var(--rb-primary)'" onblur="this.style.borderColor='rgba(255,255,255,0.1)'" />
+      </div>
+      <div style="flex: 1; min-width: 120px; display: flex; flex-direction: column; gap: 6px;">
+        <label for="quick-days" style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.05em;">Duration (Days)</label>
+        <input type="number" id="quick-days" value="3" min="1" max="14" required style="width: 100%; background: rgba(15, 23, 42, 0.6); border: 1.5px solid rgba(255,255,255,0.1); border-radius: var(--rb-radius-md); padding: 12px 16px; color: #ffffff; font-size: 14px; outline: none; transition: all 0.2s;" onfocus="this.style.borderColor='var(--rb-primary)'" onblur="this.style.borderColor='rgba(255,255,255,0.1)'" />
+      </div>
+      <button type="submit" id="quick-gen-btn" class="btn-primary" style="padding: 13.5px 28px; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; border: none; border-radius: var(--rb-radius-md); cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);">
+        <span class="material-symbols-outlined" style="font-size: 18px;">auto_awesome</span> Generate Plan
+      </button>
+    </form>
+    
+    <!-- Loading Animation -->
+    <div id="quick-itinerary-loading" style="margin-top: 36px; display: none; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 28px; text-align: center; color: #94a3b8;">
+      <div class="loader-circle" style="display: inline-block; width: 44px; height: 44px; border: 3.5px solid rgba(16, 185, 129, 0.1); border-radius: 50%; border-top-color: var(--rb-primary); animation: spin 1s linear infinite; margin-bottom: 14px;"></div>
+      <p style="margin: 0; font-size: 14px; font-weight: 700; color: #f1f5f9;">Drafting the ultimate itinerary for your trip...</p>
+      <p style="margin: 4px 0 0 0; font-size: 12px; color: #64748b;">This may take up to a few seconds</p>
+    </div>
+    
+    <!-- Result Display Container -->
+    <div id="quick-itinerary-result" style="margin-top: 36px; display: none; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 28px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 28px;">
+        <div>
+          <h3 id="result-title" style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 22px; font-weight: 800; color: #ffffff; letter-spacing: -0.01em;"></h3>
+          <p id="result-meta" style="margin: 4px 0 0 0; font-size: 11px; color: var(--rb-primary); font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em;"></p>
+        </div>
+        <button onclick="copyItinerary()" class="btn-secondary" style="padding: 8px 16px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; font-weight: 700; border-radius: var(--rb-radius-md);">
+          <span class="material-symbols-outlined" style="font-size: 16px;">content_copy</span> Copy Plan
+        </button>
+      </div>
+      
+      <!-- Day wise cards -->
+      <div id="result-days-container" style="display: grid; grid-template-columns: 1fr; gap: 24px;">
+        <!-- Days loaded dynamically -->
+      </div>
+    </div>
   </div>
 </div>
 
-<!-- Recent Trips -->
-<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 32px; margin-bottom: 16px;">
-  <h2 style="margin: 0; font-weight: 700; color: #ffffff; font-size: 20px; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);">Recent Trips</h2>
-  {% if trips %}
-  <a href="/my-trips" style="color: var(--primary); font-size: 13.5px; font-weight: 700; text-decoration: none; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);">View All Trips →</a>
-  {% endif %}
-</div>
-{% if trips %}
-  <div class="trip-list">
-    {% for trip in trips %}
-    <a href="/my-trips/{{ trip.id }}/itinerary" style="text-decoration: none; color: inherit; display: block;">
-      <div class="trip-card" style="--i: {{ loop.index0 }};">
-        <div style="display: flex; align-items: center; gap: 16px;">
-          <div class="trip-icon-chip">
-            <span class="material-symbols-outlined">
-              {% if trip.travel_mode == 'own_vehicle' %}directions_car
-              {% elif trip.travel_mode == 'cab_service' %}local_taxi
-              {% elif trip.travel_mode == 'bus' %}directions_bus
-              {% elif trip.travel_mode == 'train' %}train
-              {% elif trip.travel_mode == 'flight' %}flight
-              {% else %}map
-              {% endif %}
-            </span>
-          </div>
-          <div>
-            <div class="trip-route" style="text-transform: capitalize;">{{ trip.origin }} → {{ trip.destination }}</div>
-            <div class="trip-meta">
-              {{ trip.travel_mode.replace('_', ' ') | title }} &nbsp;·&nbsp; 
-              <span class="trip-date">{{ trip.start_date }}</span>
-              {% if trip.status == 'completed' %}
-              &nbsp;·&nbsp; <span style="background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 1px 4px; border-radius: 3px; font-size: 9px; font-weight: 700; text-transform: uppercase;">Completed</span>
-              {% endif %}
-            </div>
-          </div>
-        </div>
-        <div class="trip-price">₹{{ trip.total_cost_inr | int }}</div>
-      </div>
-    </a>
-    {% endfor %}
-  </div>
-{% else %}
-  <p class="empty">No trips yet. <a href="/plan-trip" style="color: var(--rb-primary); font-weight: 600;">Plan your first trip!</a></p>
-{% endif %}
+<style>
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+</style>
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
@@ -98,6 +115,139 @@ document.addEventListener("DOMContentLoaded", () => {
     requestAnimationFrame(updateCounter);
   });
 });
+
+window.lastGeneratedItinerary = null;
+
+async function generateQuickItinerary(event) {
+  event.preventDefault();
+  const destination = document.getElementById('quick-destination').value.trim();
+  const days = parseInt(document.getElementById('quick-days').value) || 3;
+  
+  if (!destination) return;
+  
+  const btn = document.getElementById('quick-gen-btn');
+  const loading = document.getElementById('quick-itinerary-loading');
+  const result = document.getElementById('quick-itinerary-result');
+  const daysContainer = document.getElementById('result-days-container');
+  
+  // Disable btn and show loading
+  btn.disabled = true;
+  loading.style.display = 'block';
+  result.style.display = 'none';
+  
+  try {
+    const response = await fetch('/api/trips/quick-itinerary', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer {{ token }}'
+      },
+      body: JSON.stringify({ destination, days })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || 'Failed to generate itinerary');
+    }
+    
+    const data = await response.json();
+    
+    // Update header
+    document.getElementById('result-title').innerText = data.title || `${data.destination} Custom Tour`;
+    document.getElementById('result-meta').innerText = `✨ ${data.days_count} Days Premium Itinerary`;
+    
+    // Render days
+    let html = '';
+    data.itinerary.forEach(dayInfo => {
+      const attractionsHtml = dayInfo.attractions && dayInfo.attractions.length 
+        ? dayInfo.attractions.map(attr => `<li style="margin-bottom: 6px; display: flex; align-items: flex-start; gap: 8px;"><span style="color: var(--rb-primary); margin-top: 2px;">•</span><span>${attr}</span></li>`).join('')
+        : '<li>No specific attractions listed.</li>';
+        
+      const diningHtml = dayInfo.dining && dayInfo.dining.length 
+        ? dayInfo.dining.map(dine => `<li style="margin-bottom: 6px; display: flex; align-items: flex-start; gap: 8px;"><span style="color: #f43f5e; margin-top: 2px;">•</span><span>${dine}</span></li>`).join('')
+        : '<li>No dining recommendations listed.</li>';
+      
+      html += `
+        <div class="quick-day-card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: var(--rb-radius-lg); padding: 24px; transition: all 0.3s ease;">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px;">
+            <span style="background: linear-gradient(135deg, var(--rb-primary), #059669); color: #ffffff; font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 11px; padding: 4px 12px; border-radius: var(--rb-radius-sm); text-transform: uppercase; letter-spacing: 0.05em; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2);">Day ${dayInfo.day}</span>
+          </div>
+          <p style="margin: 0 0 20px 0; font-size: 14px; color: #cbd5e1; line-height: 1.6; text-align: left; font-weight: 450;">${dayInfo.summary}</p>
+          
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; border-top: 1px solid rgba(255, 255, 255, 0.06); padding-top: 18px;">
+            <div style="text-align: left;">
+              <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--rb-primary); display: flex; align-items: center; gap: 6px; margin-bottom: 10px; letter-spacing: 0.05em;">
+                <span class="material-symbols-outlined" style="font-size: 16px;">explore</span> Attractions to Visit
+              </span>
+              <ul style="margin: 0; padding: 0; list-style: none; font-size: 13.5px; color: #f8fafc;">
+                ${attractionsHtml}
+              </ul>
+            </div>
+            <div style="text-align: left;">
+              <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #f43f5e; display: flex; align-items: center; gap: 6px; margin-bottom: 10px; letter-spacing: 0.05em;">
+                <span class="material-symbols-outlined" style="font-size: 16px;">restaurant</span> Recommended Dining
+              </span>
+              <ul style="margin: 0; padding: 0; list-style: none; font-size: 13.5px; color: #f8fafc;">
+                ${diningHtml}
+              </ul>
+            </div>
+          </div>
+        </div>
+      `;
+    });
+    
+    // Append CTA banner at the end of the itinerary list
+    html += `
+      <div class="itinerary-footer-cta" style="margin-top: 32px; background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(99, 102, 241, 0.15)); border: 1.5px dashed rgba(16, 185, 129, 0.4); border-radius: var(--rb-radius-lg); padding: 24px; text-align: center; position: relative; overflow: hidden;">
+        <div style="position: relative; z-index: 2;">
+          <h4 style="margin: 0 0 8px 0; font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 800; color: #ffffff; letter-spacing: -0.01em;">Love this plan? Let RoadBuddy pilot your entire journey! 🚀</h4>
+          <p style="margin: 0 0 20px 0; font-size: 13.5px; color: #cbd5e1; line-height: 1.6; max-width: 580px; margin-left: auto; margin-right: auto; text-align: center;">
+            Take your travel experience to the next level. Use our full <strong>Plan Trip</strong> feature to generate detailed, time-based itineraries, book hotels, flights, trains, or cabs, and track budgets. Got questions or inquiries? Chat with our AI assistant anytime!
+          </p>
+          <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+            <a href="/plan-trip" class="btn-primary" style="padding: 10px 20px; font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border-radius: var(--rb-radius-md); transition: all 0.2s;">
+              <span class="material-symbols-outlined" style="font-size: 18px;">map</span> Plan Full Trip
+            </a>
+            <button onclick="document.getElementById('chatbot-fab').click()" class="btn-secondary" style="padding: 10px 20px; font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; border-radius: var(--rb-radius-md); background: rgba(255,255,255,0.05); color: #fff; border: 1px solid rgba(255,255,255,0.1); cursor: pointer; transition: all 0.2s;">
+              <span class="material-symbols-outlined" style="font-size: 18px;">smart_toy</span> Ask Chatbot
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    daysContainer.innerHTML = html;
+    window.lastGeneratedItinerary = data;
+    result.style.display = 'block';
+  } catch (e) {
+    console.error(e);
+    alert(e.message || 'Error generating itinerary. Please try again.');
+  } finally {
+    btn.disabled = false;
+    loading.style.display = 'none';
+  }
+}
+
+function copyItinerary() {
+  if (!window.lastGeneratedItinerary) return;
+  const data = window.lastGeneratedItinerary;
+  let text = `✨ ${data.title} ✨\n${data.days_count} Days Premium Itinerary for ${data.destination}\n\n`;
+  
+  data.itinerary.forEach(dayInfo => {
+    text += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    text += `DAY ${dayInfo.day}\n`;
+    text += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    text += `Summary: ${dayInfo.summary}\n\n`;
+    text += `📍 Attractions to Visit:\n` + (dayInfo.attractions ? dayInfo.attractions.map(a => `  • ${a}`).join('\n') : '') + `\n\n`;
+    text += `🍽️ Recommended Dining:\n` + (dayInfo.dining ? dayInfo.dining.map(d => `  • ${d}`).join('\n') : '') + `\n\n`;
+  });
+  
+  navigator.clipboard.writeText(text).then(() => {
+    alert('Itinerary copied to clipboard!');
+  }).catch(err => {
+    console.error('Failed to copy: ', err);
+  });
+}
 </script>
 
 {% endblock %}

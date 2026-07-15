@@ -59,7 +59,8 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
         "trips": trips,
         "trip_count": trip_count,
         "vehicle_count": len(vehicles),
-        "has_unread_bookings": has_unread_bookings
+        "has_unread_bookings": has_unread_bookings,
+        "token": request.cookies.get("access_token")
     })
 
 
