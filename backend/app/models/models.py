@@ -124,6 +124,7 @@ class Booking(Base):
     status              = Column(String,  default="confirmed")
     selected_seats      = Column(String,  nullable=True)
     travel_class        = Column(String,  nullable=True)
+    duffel_order_id     = Column(String,  nullable=True)
     created_at          = Column(DateTime, server_default=func.now())
 
     user = relationship("User")
@@ -237,6 +238,7 @@ class HotelBooking(Base):
     num_guests    = Column(Integer, default=1)
     total_price_inr = Column(Float, nullable=False)
     status        = Column(String, default="confirmed")
+    duffel_booking_id = Column(String, nullable=True)
     created_at    = Column(DateTime, server_default=func.now())
  
     hotel = relationship("Hotel", back_populates="bookings")

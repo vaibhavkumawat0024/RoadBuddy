@@ -1,13 +1,15 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
+import asyncio
 from app.schemas.schemas import (
     TransportSearch, TransportOption,
-    TransportBooking, BookingOut
+    TransportBooking, BookingOut, TransportMode
 )
 from app.services.transport_service import search_transport, calculate_total_fare, get_transport_option_by_id
 from app.core.auth import get_current_user
 from app.core.database import get_db
 from app.models.models import Booking
+from app.services import duffel_client
 
 router = APIRouter()
 
@@ -15,18 +17,33 @@ router = APIRouter()
 # ── Search ────────────────────────────────────────────────────────────────────
 
 @router.post("/search", response_model=list[TransportOption])
-def search(
+async def search(
     data: TransportSearch,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Search available buses, trains or flights."""
-    results = search_transport(
-        origin=data.origin,
-        destination=data.destination,
-        mode=data.mode,
-        db=db
-    )
+    if data.mode == TransportMode.flight or data.mode == "flight":
+        try:
+            results = await duffel_client.search_flights(
+                origin=data.origin,
+                destination=data.destination,
+                travel_date=data.travel_date,
+                num_seats=1
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Duffel Flight Search Error: {str(e)}"
+            )
+    else:
+        results = search_transport(
+            origin=data.origin,
+            destination=data.destination,
+            mode=data.mode,
+            db=db
+        )
+        
     if not results:
         raise HTTPException(
             status_code=404,
@@ -136,7 +153,7 @@ def book_ticket(
 # ── My Bookings ───────────────────────────────────────────────────────────────
 
 @router.get("/bookings", response_model=list[BookingOut])
-def my_bookings(
+async def my_bookings(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -152,6 +169,24 @@ def my_bookings(
     hotel_bookings = db.query(HotelBooking).filter(
         HotelBooking.user_id == uid
     ).all()
+
+    # Concurrent fetch of live Duffel flight order statuses
+    duffel_statuses = {}
+    flight_bookings = [b for b in bookings if getattr(b, "duffel_order_id", None)]
+    if flight_bookings:
+        tasks = [duffel_client.get_flight_order(b.duffel_order_id) for b in flight_bookings]
+        try:
+            orders_data = await asyncio.gather(*tasks, return_exceptions=True)
+            for b, order in zip(flight_bookings, orders_data):
+                if not isinstance(order, Exception):
+                    is_cancelled = bool(order.get("cancelled_at"))
+                    new_status = "cancelled" if is_cancelled else "confirmed"
+                    if b.status != new_status:
+                        b.status = new_status
+                        db.commit()
+                    duffel_statuses[b.duffel_order_id] = new_status
+        except Exception as e:
+            print(f"Error fetching live Duffel order statuses: {e}")
 
     results = []
     

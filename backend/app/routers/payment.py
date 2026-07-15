@@ -4,6 +4,7 @@ import json
 import httpx
 import base64
 import uuid
+import zlib
 from typing import Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.orm import Session
@@ -11,6 +12,7 @@ from app.core.database import get_db
 from app.core.auth import get_current_user
 from app.core.config import settings
 from pydantic import BaseModel
+from app.services import duffel_client
 
 router = APIRouter()
 
@@ -91,7 +93,7 @@ async def create_payment_order(
             }
 
 @router.post("/verify")
-def verify_payment_signature(
+async def verify_payment_signature(
     req: PaymentVerifyRequest,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
@@ -120,73 +122,198 @@ def verify_payment_signature(
     
     try:
         if b_type == "hotel":
-            from app.models.models import Hotel, HotelBooking
-            hotel_id = int(details["hotel_id"])
+            from app.models.models import Hotel, HotelBooking, User
+            hotel_id_raw = str(details["hotel_id"])
             num_rooms = int(details["num_rooms"])
             
-            hotel = db.query(Hotel).filter(Hotel.id == hotel_id).with_for_update().first()
-            if not hotel or hotel.rooms_available < num_rooms:
-                raise HTTPException(400, "Hotel rooms unavailable")
+            # Fetch user details for Stays booking
+            db_user = db.query(User).filter(User.id == user_id).first()
+            user_name = db_user.name if db_user else "Traveler"
+            user_email = db_user.email if db_user else "traveler@example.com"
+            user_phone = getattr(db_user, "phone", None) or "+919999999999"
+            
+            if hotel_id_raw.startswith("duffel_stay_"):
+                # Real Duffel Stays booking!
+                search_result_id = hotel_id_raw.replace("duffel_stay_", "")
+                guest_details = {
+                    "passenger_name": user_name,
+                    "passenger_email": user_email,
+                    "passenger_phone": user_phone
+                }
                 
-            booking = HotelBooking(
-                hotel_id=hotel_id,
-                user_id=user_id,
-                check_in_date=details["check_in_date"],
-                check_out_date=details["check_out_date"],
-                num_rooms=num_rooms,
-                num_guests=int(details["num_guests"]),
-                total_price_inr=float(details["total_price_inr"]),
-                status="confirmed"
-            )
-            hotel.rooms_booked += num_rooms
-            db.add(booking)
-            db.commit()
-            db.refresh(booking)
-            return {"success": True, "booking_id": booking.id}
+                try:
+                    duffel_booking = await duffel_client.book_hotel(
+                        search_result_id=search_result_id,
+                        guest_details=guest_details,
+                        amount=float(details["total_price_inr"])
+                    )
+                except Exception as e:
+                    raise HTTPException(status_code=400, detail=f"Duffel Stays Booking Failed: {str(e)}")
+                
+                # Retrieve accommodation properties to insert locally
+                accommodation = duffel_booking.get("accommodation", {})
+                acc_id = accommodation.get("id") or "acc_placeholder"
+                hotel_name = accommodation.get("name", "Luxury Stay")
+                hotel_city = accommodation.get("location", {}).get("city", {}).get("name", "City")
+                hotel_address = accommodation.get("location", {}).get("address", "Address")
+                hotel_rating = float(accommodation.get("rating", 4.0))
+                
+                # Deterministic integer hash of the accommodation ID
+                local_hotel_id = zlib.adler32(acc_id.encode()) & 0x7fffffff
+                
+                # Insert hotel locally if not exists
+                db_hotel = db.query(Hotel).filter(Hotel.id == local_hotel_id).first()
+                if not db_hotel:
+                    db_hotel = Hotel(
+                        id=local_hotel_id,
+                        name=hotel_name,
+                        city=hotel_city,
+                        address=hotel_address,
+                        star_rating=hotel_rating,
+                        price_per_night_inr=float(details["total_price_inr"]) / (max(int(details["num_rooms"]), 1)),
+                        total_rooms=10,
+                        rooms_booked=0,
+                        amenities="Wi-Fi, AC, Parking, Room Service"
+                    )
+                    db.add(db_hotel)
+                    db.commit()
+                
+                # Create local HotelBooking linked to local_hotel_id
+                booking = HotelBooking(
+                    hotel_id=local_hotel_id,
+                    user_id=user_id,
+                    check_in_date=details["check_in_date"],
+                    check_out_date=details["check_out_date"],
+                    num_rooms=num_rooms,
+                    num_guests=int(details["num_guests"]),
+                    total_price_inr=float(details["total_price_inr"]),
+                    status="confirmed",
+                    duffel_booking_id=duffel_booking.get("id")
+                )
+                db.add(booking)
+                db.commit()
+                db.refresh(booking)
+                return {"success": True, "booking_id": booking.id}
+            else:
+                # Local Mock Stay
+                hotel_id = int(details["hotel_id"])
+                hotel = db.query(Hotel).filter(Hotel.id == hotel_id).with_for_update().first()
+                if not hotel or hotel.rooms_available < num_rooms:
+                    raise HTTPException(400, "Hotel rooms unavailable")
+                    
+                booking = HotelBooking(
+                    hotel_id=hotel_id,
+                    user_id=user_id,
+                    check_in_date=details["check_in_date"],
+                    check_out_date=details["check_out_date"],
+                    num_rooms=num_rooms,
+                    num_guests=int(details["num_guests"]),
+                    total_price_inr=float(details["total_price_inr"]),
+                    status="confirmed"
+                )
+                hotel.rooms_booked += num_rooms
+                db.add(booking)
+                db.commit()
+                db.refresh(booking)
+                return {"success": True, "booking_id": booking.id}
             
         elif b_type == "transit":
-            from app.models.models import Booking
-            transport_option_id = details["transport_option_id"]
+            from app.models.models import Booking, User
+            transport_option_id = str(details["transport_option_id"])
             
-            # Seat lock verification
-            parts = transport_option_id.split("_")
-            mode = parts[0]
-            item_id = int(parts[1])
-            
-            if mode == "bus":
-                from app.models.models import Bus
-                bus = db.query(Bus).filter(Bus.id == item_id).with_for_update().first()
-                if not bus or bus.seats_available < 1: raise HTTPException(400, "Bus seats unavailable")
-                bus.seats_booked += 1
-            elif mode == "train":
-                from app.models.models import Train
-                train = db.query(Train).filter(Train.id == item_id).with_for_update().first()
-                if not train or train.seats_available < 1: raise HTTPException(400, "Train seats unavailable")
-                train.seats_booked += 1
-            elif mode == "flight":
-                from app.models.models import Flight
-                flight = db.query(Flight).filter(Flight.id == item_id).with_for_update().first()
-                if not flight or flight.seats_available < 1: raise HTTPException(400, "Flight seats unavailable")
-                flight.seats_booked += 1
+            if transport_option_id.startswith("flight_off_"):
+                # Real Duffel Flight booking!
+                offer_id = transport_option_id.replace("flight_", "")
                 
-            booking = Booking(
-                user_id=user_id,
-                transport_option_id=transport_option_id,
-                passenger_name=details["passenger_name"],
-                travel_date=details["travel_date"],
-                include_return=bool(details.get("include_return", False)),
-                return_date=details.get("return_date"),
-                going_fare_inr=float(details["going_fare_inr"]),
-                return_fare_inr=float(details.get("return_fare_inr", 0)),
-                total_fare_inr=float(details["total_fare_inr"]),
-                status="confirmed",
-                selected_seats=details.get("selected_seats"),
-                travel_class=details.get("travel_class")
-            )
-            db.add(booking)
-            db.commit()
-            db.refresh(booking)
-            return {"success": True, "booking_id": booking.id}
+                # Split seats to count travelers
+                seats = details.get("selected_seats", "").split(",")
+                num_seats = max(len([s for s in seats if s.strip()]), 1)
+                
+                # Fetch user details
+                db_user = db.query(User).filter(User.id == user_id).first()
+                user_name = db_user.name if db_user else "Traveler"
+                user_email = db_user.email if db_user else "traveler@example.com"
+                user_phone = getattr(db_user, "phone", None) or "+919999999999"
+                
+                passengers = []
+                lead_name = details.get("passenger_name") or user_name
+                for i in range(num_seats):
+                    name = lead_name if i == 0 else f"{lead_name} Traveler {i+1}"
+                    passengers.append({
+                        "name": name,
+                        "age": 30,
+                        "email": user_email,
+                        "phone": user_phone
+                    })
+                    
+                try:
+                    duffel_order = await duffel_client.create_flight_order(
+                        offer_id=offer_id,
+                        passenger_details=passengers,
+                        amount=float(details["total_fare_inr"])
+                    )
+                except Exception as e:
+                    raise HTTPException(status_code=400, detail=f"Duffel Flight Booking Failed: {str(e)}")
+                
+                booking = Booking(
+                    user_id=user_id,
+                    transport_option_id=transport_option_id,
+                    passenger_name=details["passenger_name"],
+                    travel_date=details["travel_date"],
+                    include_return=bool(details.get("include_return", False)),
+                    return_date=details.get("return_date"),
+                    going_fare_inr=float(details["going_fare_inr"]),
+                    return_fare_inr=float(details.get("return_fare_inr", 0)),
+                    total_fare_inr=float(details["total_fare_inr"]),
+                    status="confirmed",
+                    selected_seats=details.get("selected_seats"),
+                    travel_class=details.get("travel_class"),
+                    duffel_order_id=duffel_order.get("id")
+                )
+                db.add(booking)
+                db.commit()
+                db.refresh(booking)
+                return {"success": True, "booking_id": booking.id}
+            else:
+                # Seat lock verification
+                parts = transport_option_id.split("_")
+                mode = parts[0]
+                item_id = int(parts[1])
+                
+                if mode == "bus":
+                    from app.models.models import Bus
+                    bus = db.query(Bus).filter(Bus.id == item_id).with_for_update().first()
+                    if not bus or bus.seats_available < 1: raise HTTPException(400, "Bus seats unavailable")
+                    bus.seats_booked += 1
+                elif mode == "train":
+                    from app.models.models import Train
+                    train = db.query(Train).filter(Train.id == item_id).with_for_update().first()
+                    if not train or train.seats_available < 1: raise HTTPException(400, "Train seats unavailable")
+                    train.seats_booked += 1
+                elif mode == "flight":
+                    from app.models.models import Flight
+                    flight = db.query(Flight).filter(Flight.id == item_id).with_for_update().first()
+                    if not flight or flight.seats_available < 1: raise HTTPException(400, "Flight seats unavailable")
+                    flight.seats_booked += 1
+                    
+                booking = Booking(
+                    user_id=user_id,
+                    transport_option_id=transport_option_id,
+                    passenger_name=details["passenger_name"],
+                    travel_date=details["travel_date"],
+                    include_return=bool(details.get("include_return", False)),
+                    return_date=details.get("return_date"),
+                    going_fare_inr=float(details["going_fare_inr"]),
+                    return_fare_inr=float(details.get("return_fare_inr", 0)),
+                    total_fare_inr=float(details["total_fare_inr"]),
+                    status="confirmed",
+                    selected_seats=details.get("selected_seats"),
+                    travel_class=details.get("travel_class")
+                )
+                db.add(booking)
+                db.commit()
+                db.refresh(booking)
+                return {"success": True, "booking_id": booking.id}
             
         elif b_type == "cab":
             from app.models.models import ProviderBooking, ProviderVehicle

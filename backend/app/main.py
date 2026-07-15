@@ -94,9 +94,10 @@ async def run_migrations():
         "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS travel_class VARCHAR;",
         "ALTER TABLE trips ADD COLUMN IF NOT EXISTS status VARCHAR DEFAULT 'active';",
         "ALTER TABLE hotels ADD COLUMN IF NOT EXISTS avg_rating FLOAT DEFAULT 0.0;",
-        "ALTER TABLE hotels ADD COLUMN IF NOT EXISTS total_reviews INTEGER DEFAULT 0;",
         "ALTER TABLE provider_vehicles ADD COLUMN IF NOT EXISTS avg_rating FLOAT DEFAULT 0.0;",
-        "ALTER TABLE provider_vehicles ADD COLUMN IF NOT EXISTS total_reviews INTEGER DEFAULT 0;"
+        "ALTER TABLE provider_vehicles ADD COLUMN IF NOT EXISTS total_reviews INTEGER DEFAULT 0;",
+        "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS duffel_order_id VARCHAR;",
+        "ALTER TABLE hotel_bookings ADD COLUMN IF NOT EXISTS duffel_booking_id VARCHAR;"
     ]
     with engine.begin() as connection:
         dialect = connection.dialect.name

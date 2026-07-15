@@ -11,7 +11,7 @@ Register in main.py:
 
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
-from datetime import date
+from datetime import date, datetime, timedelta
 
 from app.core.database import get_db
 from app.core.auth import get_current_user
@@ -23,6 +23,7 @@ from app.schemas.booking_schemas import (
     BusSearchRequest, BusResult, BusBookingRequest, BusBookingOut,
     FlightSearchRequest, FlightResult, FlightBookingRequest, FlightBookingOut,
 )
+from app.services import duffel_client
 
 router = APIRouter()
 
@@ -34,23 +35,41 @@ def escape_like(text: str) -> str:
 # ── Hotels ─────────────────────────────────────────────────────────────────
 
 @router.post("/hotels/search", response_model=list[HotelResult])
-def search_hotels(
+async def search_hotels(
     data: HotelSearchRequest,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    escaped_city = escape_like(data.city)
-    hotels = db.query(Hotel).filter(Hotel.city.ilike(f"%{escaped_city}%", escape='/')).all()
-    return [
-        HotelResult(
-            id=h.id, name=h.name, city=h.city, address=h.address,
-            star_rating=h.star_rating, price_per_night_inr=h.price_per_night_inr,
-            rooms_available=h.rooms_available, amenities=h.amenities,
-            avg_rating=h.avg_rating if h.avg_rating is not None else 0.0,
-            total_reviews=h.total_reviews if h.total_reviews is not None else 0,
+    check_in = data.check_in_date
+    check_out = data.check_out_date
+    if not check_in:
+        check_in = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+    if not check_out:
+        check_out = (datetime.strptime(check_in, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+        
+    try:
+        results = await duffel_client.search_hotels(
+            city=data.city,
+            check_in=check_in,
+            check_out=check_out,
+            num_rooms=data.num_rooms,
+            num_guests=1
         )
-        for h in hotels if h.rooms_available >= data.num_rooms
-    ]
+        return results
+    except Exception as e:
+        print(f"Duffel Stays search encountered an error (e.g. 403 Forbidden, product not enabled, or connection issue). Falling back to local mock data. Error: {e}")
+        escaped_city = escape_like(data.city)
+        hotels = db.query(Hotel).filter(Hotel.city.ilike(f"%{escaped_city}%", escape='/')).all()
+        return [
+            HotelResult(
+                id=h.id, name=h.name, city=h.city, address=h.address,
+                star_rating=h.star_rating, price_per_night_inr=h.price_per_night_inr,
+                rooms_available=h.rooms_available, amenities=h.amenities,
+                avg_rating=h.avg_rating if h.avg_rating is not None else 0.0,
+                total_reviews=h.total_reviews if h.total_reviews is not None else 0,
+            )
+            for h in hotels if h.rooms_available >= data.num_rooms
+        ]
 
 
 @router.get("/hotels/{hotel_id}/reviews", response_model=list[HotelReviewOut])

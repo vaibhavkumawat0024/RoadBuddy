@@ -2,10 +2,12 @@ from fastapi import APIRouter, Request, Depends, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+import asyncio
 
 from app.core.database import get_db
 from app.models.models import User, Trip, Vehicle
 from app.core.auth import hash_password
+from app.services import duffel_client
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
 from app.core.config import settings
@@ -714,7 +716,7 @@ async def update_profile(
 # ---------------- MY BOOKINGS ----------------
 
 @router.get("/my-bookings", response_class=HTMLResponse)
-def my_bookings_page(request: Request, db: Session = Depends(get_db)):
+async def my_bookings_page(request: Request, db: Session = Depends(get_db)):
     user = get_user_from_cookie(request, db)
     if not user:
         return RedirectResponse("/login", status_code=303)
@@ -742,6 +744,24 @@ def my_bookings_page(request: Request, db: Session = Depends(get_db)):
         Booking.user_id == user.id
     ).all()
 
+    # Concurrent fetch of live Duffel flight order statuses & details
+    duffel_orders_map = {}
+    flight_bookings = [b for b in transit_bookings if getattr(b, "duffel_order_id", None)]
+    if flight_bookings:
+        tasks = [duffel_client.get_flight_order(b.duffel_order_id) for b in flight_bookings]
+        try:
+            orders_data = await asyncio.gather(*tasks, return_exceptions=True)
+            for b, order in zip(flight_bookings, orders_data):
+                if not isinstance(order, Exception):
+                    duffel_orders_map[b.duffel_order_id] = order
+                    is_cancelled = bool(order.get("cancelled_at"))
+                    new_status = "cancelled" if is_cancelled else "confirmed"
+                    if b.status != new_status:
+                        b.status = new_status
+                        db.commit()
+        except Exception as e:
+            print(f"Error fetching live Duffel order statuses in UI: {e}")
+
     for b in transit_bookings:
         opt = get_transport_option_by_id(b.transport_option_id, db)
         mode = None
@@ -751,14 +771,32 @@ def my_bookings_page(request: Request, db: Session = Depends(get_db)):
         if opt:
             mode = opt.mode
             operator = opt.operator
-            origin = opt.origin
-            destination = opt.destination
+            origin = opt.origin_station_name or opt.origin
+            destination = opt.destination_station_name or opt.destination
         else:
             try:
                 parts = b.transport_option_id.split("_")
                 mode = parts[0]
             except Exception:
                 pass
+                
+            # Duffel flights dynamic fields resolution
+            if mode == "flight" and getattr(b, "duffel_order_id", None):
+                order = duffel_orders_map.get(b.duffel_order_id)
+                if order and not isinstance(order, Exception):
+                    try:
+                        slices = order.get("slices", [])
+                        if slices:
+                            first_slice = slices[0]
+                            origin = first_slice.get("origin", {}).get("name", "Unknown")
+                            destination = first_slice.get("destination", {}).get("name", "Unknown")
+                        operator = order.get("owner", {}).get("name", "Airline")
+                    except Exception as ex:
+                        print(f"Error parsing Duffel order details: {ex}")
+                if not origin: origin = "Origin Airport"
+                if not destination: destination = "Destination Airport"
+                if not operator: operator = "Flight Carrier"
+                
         b.mode = mode
         b.transport_option_operator = operator
         b.origin = origin
@@ -772,9 +810,9 @@ def my_bookings_page(request: Request, db: Session = Depends(get_db)):
 
     for h in hotel_bookings:
         h.is_hotel = True
-        h.hotel_name = h.hotel.name
-        h.hotel_city = h.hotel.city
-        h.hotel_address = h.hotel.address
+        h.hotel_name = h.hotel.name if h.hotel else "Hotel"
+        h.hotel_city = h.hotel.city if h.hotel else "City"
+        h.hotel_address = h.hotel.address if h.hotel else "Address"
         h.total_fare_inr = h.total_price_inr
         h.travel_date = h.check_in_date
 
@@ -821,7 +859,7 @@ def cancel_booking(booking_id: int, request: Request, db: Session = Depends(get_
 
 
 @router.post("/cancel-transit-booking/{booking_id}")
-def cancel_transit_booking(booking_id: int, request: Request, db: Session = Depends(get_db)):
+async def cancel_transit_booking(booking_id: int, request: Request, db: Session = Depends(get_db)):
     user = get_user_from_cookie(request, db)
     if not user:
         return RedirectResponse("/login", status_code=303)
@@ -833,9 +871,22 @@ def cancel_transit_booking(booking_id: int, request: Request, db: Session = Depe
     ).first()
 
     if booking and booking.status != "cancelled":
+        # Check if Duffel flight cancellation is needed
+        if getattr(booking, "duffel_order_id", None):
+            try:
+                await duffel_client.cancel_flight_order(booking.duffel_order_id)
+            except Exception as e:
+                referer = request.headers.get("referer")
+                redirect_url = referer or "/my-bookings"
+                if "?" in redirect_url:
+                    redirect_url += f"&error=Flight cancellation failed: {str(e)}"
+                else:
+                    redirect_url += f"?error=Flight cancellation failed: {str(e)}"
+                return RedirectResponse(redirect_url, status_code=303)
+
         booking.status = "cancelled"
         
-        # Decrement seat count in the database
+        # Decrement seat count in the database for local mocks
         try:
             parts = booking.transport_option_id.split("_")
             mode = parts[0]
@@ -867,7 +918,7 @@ def cancel_transit_booking(booking_id: int, request: Request, db: Session = Depe
 
 
 @router.post("/cancel-hotel-booking/{booking_id}")
-def cancel_hotel_booking(booking_id: int, request: Request, db: Session = Depends(get_db)):
+async def cancel_hotel_booking(booking_id: int, request: Request, db: Session = Depends(get_db)):
     user = get_user_from_cookie(request, db)
     if not user:
         return RedirectResponse("/login", status_code=303)
@@ -879,6 +930,19 @@ def cancel_hotel_booking(booking_id: int, request: Request, db: Session = Depend
     ).first()
 
     if booking and booking.status != "cancelled":
+        # Check if Duffel stays cancellation is needed
+        if getattr(booking, "duffel_booking_id", None):
+            try:
+                await duffel_client.cancel_hotel_booking(booking.duffel_booking_id)
+            except Exception as e:
+                referer = request.headers.get("referer")
+                redirect_url = referer or "/my-bookings"
+                if "?" in redirect_url:
+                    redirect_url += f"&error=Hotel cancellation failed: {str(e)}"
+                else:
+                    redirect_url += f"?error=Hotel cancellation failed: {str(e)}"
+                return RedirectResponse(redirect_url, status_code=303)
+
         booking.status = "cancelled"
         
         # Decrement rooms booked in the hotel
