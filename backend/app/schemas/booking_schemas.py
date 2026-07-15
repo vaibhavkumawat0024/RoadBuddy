@@ -27,6 +27,25 @@ class HotelResult(BaseModel):
     price_per_night_inr: float
     rooms_available: int
     amenities: Optional[str]
+    avg_rating: Optional[float] = 0.0
+    total_reviews: Optional[int] = 0
+
+    class Config:
+        from_attributes = True
+
+
+class HotelReviewCreate(BaseModel):
+    rating: int
+    review_text: str
+
+
+class HotelReviewOut(BaseModel):
+    id: int
+    hotel_id: int
+    rating: int
+    review_text: str
+    user_name: str
+    created_at: str
 
     class Config:
         from_attributes = True
