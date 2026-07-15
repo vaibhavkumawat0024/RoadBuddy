@@ -15,9 +15,10 @@ from datetime import date
 
 from app.core.database import get_db
 from app.core.auth import get_current_user
-from app.models.models import Hotel, HotelBooking, Train, TrainBooking, Bus, BusBooking, Flight, FlightBooking
+from app.models.models import Hotel, HotelBooking, HotelReview, Train, TrainBooking, Bus, BusBooking, Flight, FlightBooking
 from app.schemas.booking_schemas import (
     HotelSearchRequest, HotelResult, HotelBookingRequest, HotelBookingOut,
+    HotelReviewCreate, HotelReviewOut,
     TrainSearchRequest, TrainResult, TrainBookingRequest, TrainBookingOut,
     BusSearchRequest, BusResult, BusBookingRequest, BusBookingOut,
     FlightSearchRequest, FlightResult, FlightBookingRequest, FlightBookingOut,
@@ -45,9 +46,63 @@ def search_hotels(
             id=h.id, name=h.name, city=h.city, address=h.address,
             star_rating=h.star_rating, price_per_night_inr=h.price_per_night_inr,
             rooms_available=h.rooms_available, amenities=h.amenities,
+            avg_rating=h.avg_rating if h.avg_rating is not None else 0.0,
+            total_reviews=h.total_reviews if h.total_reviews is not None else 0,
         )
         for h in hotels if h.rooms_available >= data.num_rooms
     ]
+
+
+@router.get("/hotels/{hotel_id}/reviews", response_model=list[HotelReviewOut])
+def get_hotel_reviews(hotel_id: int, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    reviews = db.query(HotelReview).filter(HotelReview.hotel_id == hotel_id).order_by(HotelReview.id.desc()).all()
+    return [
+        HotelReviewOut(
+            id=r.id,
+            hotel_id=r.hotel_id,
+            rating=r.rating,
+            review_text=r.review_text,
+            user_name=r.user.name if r.user else "Anonymous",
+            created_at=r.created_at.strftime("%Y-%m-%d %H:%M:%S")
+        )
+        for r in reviews
+    ]
+
+
+@router.post("/hotels/{hotel_id}/reviews", status_code=201)
+def post_hotel_review(
+    hotel_id: int,
+    review_data: HotelReviewCreate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    hotel = db.query(Hotel).filter(Hotel.id == hotel_id).first()
+    if not hotel:
+        raise HTTPException(status_code=404, detail="Hotel not found")
+        
+    user_id = int(current_user["user_id"])
+    
+    # Save the review
+    review = HotelReview(
+        hotel_id=hotel_id,
+        user_id=user_id,
+        rating=review_data.rating,
+        review_text=review_data.review_text
+    )
+    db.add(review)
+    db.commit()
+    db.refresh(review)
+    
+    # Recalculate average rating & total reviews
+    all_reviews = db.query(HotelReview).filter(HotelReview.hotel_id == hotel_id).all()
+    total = len(all_reviews)
+    avg = sum(r.rating for r in all_reviews) / total if total > 0 else 0.0
+    
+    hotel.avg_rating = round(avg, 1)
+    hotel.total_reviews = total
+    db.commit()
+    
+    return {"status": "success", "avg_rating": hotel.avg_rating, "total_reviews": hotel.total_reviews}
 
 
 @router.post("/hotels/book", response_model=HotelBookingOut, status_code=201)
