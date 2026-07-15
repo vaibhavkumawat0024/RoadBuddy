@@ -6,7 +6,7 @@ Save as: app/schemas/booking_schemas.py
 """
 
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Union, Any
 
 
 # ── Hotels ─────────────────────────────────────────────────────────────────
@@ -19,7 +19,7 @@ class HotelSearchRequest(BaseModel):
 
 
 class HotelResult(BaseModel):
-    id: int
+    id: Union[str, int]
     name: str
     city: str
     address: Optional[str]
@@ -52,7 +52,7 @@ class HotelReviewOut(BaseModel):
 
 
 class HotelBookingRequest(BaseModel):
-    hotel_id: int
+    hotel_id: Union[str, int]
     check_in_date: str
     check_out_date: str
     num_rooms: int = 1
@@ -60,8 +60,8 @@ class HotelBookingRequest(BaseModel):
 
 
 class HotelBookingOut(BaseModel):
-    id: int
-    hotel_id: int
+    id: Union[str, int]
+    hotel_id: Union[str, int]
     check_in_date: str
     check_out_date: str
     num_rooms: int
@@ -174,7 +174,7 @@ class FlightSearchRequest(BaseModel):
 
 
 class FlightResult(BaseModel):
-    id: int
+    id: Union[str, int]
     airline: str
     flight_number: str
     origin: str
@@ -191,15 +191,15 @@ class FlightResult(BaseModel):
 
 
 class FlightBookingRequest(BaseModel):
-    flight_id: int
+    flight_id: Union[str, int]
     passenger_name: str
     travel_date: str
     num_seats: int = 1
 
 
 class FlightBookingOut(BaseModel):
-    id: int
-    flight_id: int
+    id: Union[str, int]
+    flight_id: Union[str, int]
     passenger_name: str
     travel_date: str
     num_seats: int

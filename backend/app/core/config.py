@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     groq_api_key: str = ""
     gemini_api_key: str = ""
+    duffel_api_key: str = ""
 
     # Google Maps / Routing
     open_router_service_api_key: str = ""

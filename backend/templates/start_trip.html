@@ -1181,7 +1181,19 @@
   let routeLayerCounter = 0;  // unique layer ID counter
   let routeSourceIds = [];  // track added route sources
   let routeLayerIds = [];   // track added route layers
+  let activeLayers = [];    // track parameters of added layers to restore on style load
   let partnerRestaurantMarkers = [];
+
+  let isMapStyleLoaded = false;
+  let mapReadyQueue = [];
+
+  function runWhenMapReady(cb) {
+    if (map && isMapStyleLoaded && map.isStyleLoaded()) {
+      cb();
+    } else {
+      mapReadyQueue.push(cb);
+    }
+  }
 
   // ─── TRIP STOPS & GEOGRAPHIC DISTANCE HELPERS ──────────
   const tripStops = [];
@@ -1367,6 +1379,24 @@
 
     map.on('load', () => {
       map.resize();
+    });
+
+    map.on('style.load', () => {
+      isMapStyleLoaded = true;
+      if (activeLayers && activeLayers.length > 0) {
+        const savedLayers = [...activeLayers];
+        activeLayers = [];
+        routeLayerIds = [];
+        routeSourceIds = [];
+        routeLayerCounter = 0;
+        savedLayers.forEach(l => {
+          addRouteLayer(l.data, l.color, l.weight, l.opacity, l.dashArray);
+        });
+      }
+      while (mapReadyQueue.length > 0) {
+        const cb = mapReadyQueue.shift();
+        try { cb(); } catch(e) { console.error("Error in queued map callback:", e); }
+      }
     });
   }
 
@@ -2170,55 +2200,74 @@
   }
 
   // ─── MAPBOX ROUTE HELPERS ──────────────────────────────────
-  function addRouteLayer(coordinates, color, weight, opacity, dashArray) {
-    const srcId = 'route-src-' + routeLayerCounter;
-    const layId = 'route-layer-' + routeLayerCounter;
-    routeLayerCounter++;
+  function addRouteLayer(data, color, weight, opacity, dashArray) {
+    runWhenMapReady(() => {
+      const srcId = 'route-src-' + routeLayerCounter;
+      const layId = 'route-layer-' + routeLayerCounter;
+      routeLayerCounter++;
 
-    if (map.getSource(srcId)) { map.removeLayer(layId); map.removeSource(srcId); }
+      if (map.getSource(srcId)) { map.removeLayer(layId); map.removeSource(srcId); }
 
-    map.addSource(srcId, {
-      type: 'geojson',
-      data: {
+      const isGeoJson = data && typeof data === 'object' && !Array.isArray(data);
+      const geoJsonData = isGeoJson ? data : {
         type: 'Feature',
-        geometry: { type: 'LineString', coordinates: coordinates }
+        geometry: { type: 'LineString', coordinates: data }
+      };
+
+      map.addSource(srcId, {
+        type: 'geojson',
+        data: geoJsonData
+      });
+
+      const paint = {
+        'line-color': color === 'traffic' ? [
+          'match',
+          ['get', 'congestion'],
+          'low', '#10b981',      // Emerald Green
+          'moderate', '#f59e0b', // Yellow
+          'heavy', '#ef4444',    // Red
+          'severe', '#7f1d1d',   // Dark Red
+          '#3b82f6'              // Fallback Blue
+        ] : color,
+        'line-width': weight || 5,
+        'line-opacity': opacity || 0.8
+      };
+      if (dashArray) {
+        paint['line-dasharray'] = dashArray;
       }
+
+      map.addLayer({
+        id: layId,
+        type: 'line',
+        source: srcId,
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: paint
+      });
+
+      routeSourceIds.push(srcId);
+      routeLayerIds.push(layId);
+      activeLayers.push({ data, color, weight, opacity, dashArray });
     });
-
-    const paint = {
-      'line-color': color,
-      'line-width': weight || 5,
-      'line-opacity': opacity || 0.8
-    };
-    if (dashArray) {
-      paint['line-dasharray'] = dashArray;
-    }
-
-    map.addLayer({
-      id: layId,
-      type: 'line',
-      source: srcId,
-      layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: paint
-    });
-
-    routeSourceIds.push(srcId);
-    routeLayerIds.push(layId);
   }
 
   function removeRouteLayer() {
-    routeLayerIds.forEach(id => { try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){} });
-    routeSourceIds.forEach(id => { try { if (map.getSource(id)) map.removeSource(id); } catch(e){} });
-    routeLayerIds = [];
-    routeSourceIds = [];
-    transitRoutePolyline = null;
+    runWhenMapReady(() => {
+      routeLayerIds.forEach(id => { try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){} });
+      routeSourceIds.forEach(id => { try { if (map.getSource(id)) map.removeSource(id); } catch(e){} });
+      routeLayerIds = [];
+      routeSourceIds = [];
+      activeLayers = [];
+      transitRoutePolyline = null;
+    });
   }
 
   function fitBoundsToCoords(waypoints) {
-    if (!waypoints || waypoints.length === 0) return;
-    const bounds = new mapboxgl.LngLatBounds();
-    waypoints.forEach(w => bounds.extend([w.lon, w.lat]));
-    map.fitBounds(bounds, { padding: 50 });
+    runWhenMapReady(() => {
+      if (!waypoints || waypoints.length === 0) return;
+      const bounds = new mapboxgl.LngLatBounds();
+      waypoints.forEach(w => bounds.extend([w.lon, w.lat]));
+      map.fitBounds(bounds, { padding: 50 });
+    });
   }
 
   function drawFallbackLine(waypoints, opt, lineColor) {
@@ -3261,8 +3310,8 @@
     const destMarker = new mapboxgl.Marker({ element: destEl }).setLngLat([dest.lon, dest.lat]).addTo(map);
     stopMarkers.push(destMarker);
 
-    // Use Mapbox Directions API for car routing (free tier)
-    const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${origin.lon},${origin.lat};${dest.lon},${dest.lat}?alternatives=true&geometries=geojson&overview=full&steps=true&access_token=${mapboxgl.accessToken}`;
+    // Use Mapbox Directions API for traffic-aware routing (free tier)
+    const url = `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${origin.lon},${origin.lat};${dest.lon},${dest.lat}?alternatives=true&geometries=geojson&overview=full&steps=true&annotations=congestion&access_token=${mapboxgl.accessToken}`;
 
     fetch(url)
       .then(res => res.json())
@@ -3277,9 +3326,49 @@
           addRouteLayer(data.routes[i].geometry.coordinates, '#94a3b8', 5, 0.6);
         }
 
-        // Draw primary route (blue)
+        // Draw primary route (traffic-aware)
         const primary = data.routes[0];
-        addRouteLayer(primary.geometry.coordinates, '#2563eb', 6, 0.9);
+        let routeData = primary.geometry.coordinates;
+        let lineColor = '#2563eb'; // fallback blue
+
+        if (primary.legs && primary.legs[0] && primary.legs[0].annotation && primary.legs[0].annotation.congestion) {
+          const leg = primary.legs[0];
+          const coordinates = primary.geometry.coordinates;
+          const features = [];
+          let currentCoords = [coordinates[0]];
+          let currentCongestion = leg.annotation.congestion[0] || 'low';
+
+          for (let i = 0; i < leg.annotation.congestion.length; i++) {
+            const congestion = leg.annotation.congestion[i] || 'low';
+            const coord = coordinates[i+1];
+            if (congestion === currentCongestion) {
+              currentCoords.push(coord);
+            } else {
+              features.push({
+                type: 'Feature',
+                properties: { congestion: currentCongestion },
+                geometry: { type: 'LineString', coordinates: currentCoords }
+              });
+              currentCoords = [coordinates[i], coord];
+              currentCongestion = congestion;
+            }
+          }
+          if (currentCoords.length > 1) {
+            features.push({
+              type: 'Feature',
+              properties: { congestion: currentCongestion },
+              geometry: { type: 'LineString', coordinates: currentCoords }
+            });
+          }
+
+          routeData = {
+            type: 'FeatureCollection',
+            features: features
+          };
+          lineColor = 'traffic';
+        }
+
+        addRouteLayer(routeData, lineColor, 6, 0.9);
         currentPolyline = primary.geometry.coordinates.map(c => ({ lat: c[1], lng: c[0], lon: c[0] }));
 
         const distKm = (primary.distance / 1000).toFixed(1);
@@ -3655,7 +3744,7 @@
 
   function toggleNightMode() {
     isNightMode = !isNightMode;
-    map.setStyle(isNightMode ? 'mapbox://styles/mapbox/navigation-night-v1' : 'mapbox://styles/mapbox/streets-v12');
+    map.setStyle(isNightMode ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/streets-v12');
     document.getElementById('night-btn').textContent = isNightMode ? '☀️ Light Mode' : '🌙 Night Mode';
   }
 
