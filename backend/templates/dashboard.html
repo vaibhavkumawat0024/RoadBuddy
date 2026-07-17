@@ -3,6 +3,403 @@
 
 {% block page_overlay %}
 <div class="dashboard-bg-overlay"></div>
+
+<!-- Interactive Map Modal -->
+<div id="dashboard-map-modal" style="position: fixed; inset: 0; z-index: 999999; display: none; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(10px); align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s ease;">
+  <div style="position: relative; width: 95vw; height: 90vh; background: #0f172a; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.1); overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
+    
+    <!-- Modal Header -->
+    <div style="padding: 16px 24px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; justify-content: space-between; align-items: center; background: rgba(30, 41, 59, 0.5);">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span class="material-symbols-outlined" style="color: #10b981; font-size: 24px;">map</span>
+        <h3 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 800; color: #ffffff;">Interactive Travel Explorer</h3>
+      </div>
+      <button onclick="closeDashboardMapModal()" style="background: none; border: none; color: #94a3b8; font-size: 28px; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; transition: all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.05)'; this.style.color='#fff';" onmouseout="this.style.background='none'; this.style.color='#94a3b8';">&times;</button>
+    </div>
+
+    <!-- Modal Body -->
+    <div style="display: flex; flex: 1; position: relative; min-height: 0;">
+      
+      <!-- Side Control Panel (Google Maps-like Left Sidebar) -->
+      <div id="map-control-panel" style="width: 380px; background: rgba(15, 23, 42, 0.95); border-right: 1px solid rgba(255, 255, 255, 0.08); display: flex; flex-direction: column; gap: 16px; padding: 20px; overflow-y: auto; z-index: 10; color: #e2e8f0; text-align: left; transition: all 0.3s ease;">
+        
+        <!-- Tab Mode Toggles (Google Maps directions icons) -->
+        <div id="map-directions-modes" style="display: flex; justify-content: space-between; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 4px; gap: 4px;">
+          <button onclick="setRoutingProfile('driving-traffic', this)" class="map-profile-btn active" title="Car (Driving)" style="flex: 1; background: rgba(16,185,129,0.15); border: none; color: #10b981; padding: 8px 0; border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; font-weight: 700; transition: all 0.2s;">
+            <span class="material-symbols-outlined" style="font-size: 20px;">directions_car</span>
+            <span style="font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px;">Drive</span>
+          </button>
+          <button onclick="setRoutingProfile('motorcycle', this)" class="map-profile-btn" title="Motorcycle" style="flex: 1; background: none; border: none; color: #cbd5e1; padding: 8px 0; border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; font-weight: 600; transition: all 0.2s;">
+            <span class="material-symbols-outlined" style="font-size: 20px;">motorcycle</span>
+            <span style="font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px;">Moto</span>
+          </button>
+          <button onclick="setRoutingProfile('cycling', this)" class="map-profile-btn" title="Cycling" style="flex: 1; background: none; border: none; color: #cbd5e1; padding: 8px 0; border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; font-weight: 600; transition: all 0.2s;">
+            <span class="material-symbols-outlined" style="font-size: 20px;">directions_bike</span>
+            <span style="font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px;">Cycle</span>
+          </button>
+          <button onclick="setRoutingProfile('walking', this)" class="map-profile-btn" title="Walking" style="flex: 1; background: none; border: none; color: #cbd5e1; padding: 8px 0; border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; font-weight: 600; transition: all 0.2s;">
+            <span class="material-symbols-outlined" style="font-size: 20px;">directions_walk</span>
+            <span style="font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px;">Walk</span>
+          </button>
+        </div>
+
+        <!-- Search Place Mode vs Direction Mode Toggle -->
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.05em;">Navigation Panel</span>
+          <button onclick="toggleDirectionsMode()" id="toggle-directions-btn" style="background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.25); color: #10b981; font-size: 11px; font-weight: 700; cursor: pointer; border-radius: 6px; padding: 4px 8px; transition: all 0.2s;">Enable Directions</button>
+        </div>
+
+        <!-- General Search Box (Hidden in Directions Mode) -->
+        <div id="general-search-section" style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; gap: 8px; position: relative;">
+            <input type="text" id="map-search-input" placeholder="Search for places..." style="flex: 1; padding: 10px 12px; font-size: 13px; background: rgba(15, 23, 42, 0.6); border: 1.5px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; outline: none; transition: all 0.2s;" onfocus="this.style.borderColor='#10b981'" onblur="this.style.borderColor='rgba(255,255,255,0.1)'"/>
+            <button onclick="searchMapLocation()" style="background: #10b981; border: none; border-radius: 8px; width: 38px; height: 38px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: white; transition: all 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+              <span class="material-symbols-outlined" style="font-size: 20px;">search</span>
+            </button>
+          </div>
+          <div id="map-suggestions" style="display: none; background: #1e293b; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; max-height: 180px; overflow-y: auto; margin-top: 4px; box-shadow: 0 10px 15px rgba(0,0,0,0.3); z-index: 100;"></div>
+        </div>
+
+        <!-- Waypoints Container (Visible in Directions Mode) -->
+        <div id="directions-container" style="display: none; flex-direction: column; gap: 12px;">
+          <!-- Dynamically Rendered Inputs for Start, Waypoints, Destination -->
+          <div id="waypoints-input-list" style="display: flex; flex-direction: column; gap: 10px; position: relative; padding-left: 14px; border-left: 2px dashed rgba(255,255,255,0.15); margin-left: 6px;">
+            <!-- Rendered in JS: Origin, Waypoints, Destination -->
+          </div>
+
+          <!-- Add Destination Button & Options -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+            <button onclick="addWaypoint()" style="background: none; border: none; color: #10b981; font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px; outline: none; padding: 0;">
+              <span class="material-symbols-outlined" style="font-size: 16px;">add_circle</span> Add Stop
+            </button>
+            <button onclick="toggleOptionsCollapse()" style="background: none; border: none; color: #94a3b8; font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px; outline: none; padding: 0;">
+              <span class="material-symbols-outlined" id="options-chevron" style="font-size: 16px;">expand_more</span> Options
+            </button>
+          </div>
+
+          <!-- Avoid Tolls/Highways Toggles -->
+          <div id="route-options-panel" style="display: none; padding: 10px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; flex-direction: column; gap: 8px;">
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: #cbd5e1; cursor: pointer;">
+              <input type="checkbox" id="avoid-tolls-checkbox" onchange="calculateRoute()" style="cursor: pointer; width: 14px; height: 14px;"> Avoid Tolls
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: #cbd5e1; cursor: pointer;">
+              <input type="checkbox" id="avoid-highways-checkbox" onchange="calculateRoute()" style="cursor: pointer; width: 14px; height: 14px;"> Avoid Highways
+            </label>
+          </div>
+
+          <!-- Get Route Button -->
+          <div style="display: flex; gap: 8px;">
+            <button onclick="calculateRoute()" style="flex: 1.5; background: #10b981; color: white; border: none; border-radius: 6px; padding: 10px; font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.25);">
+              <span class="material-symbols-outlined" style="font-size: 18px;">directions</span> Get Route
+            </button>
+            <button onclick="clearRoute()" style="flex: 1; background: rgba(255,255,255,0.05); color: #94a3b8; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 10px; font-size: 12px; font-weight: 600; cursor: pointer;">
+              Clear
+            </button>
+          </div>
+        </div>
+
+        <div style="height: 1px; background: rgba(255, 255, 255, 0.06); margin: 4px 0;"></div>
+
+        <!-- Alternative Routes Section (List + Summary info) -->
+        <div id="route-summary-panel" style="display: none; flex-direction: column; gap: 12px;">
+          <label style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.05em; margin: 0;">Recommended Routes</label>
+          <!-- Active / Alternative routes loaded in JS -->
+          <div id="alternative-routes-list" style="display: flex; flex-direction: column; gap: 8px;">
+          </div>
+          
+          <button onclick="startMapNavigation()" style="width: 100%; margin-top: 4px; background: linear-gradient(135deg, #10b981, #059669); color: white; border: none; border-radius: 8px; padding: 12px; font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); transition: all 0.2s;" onmouseover="this.style.transform='translateY(-1px)';" onmouseout="this.style.transform='none';">
+            <span class="material-symbols-outlined" style="font-size: 18px;">navigation</span> Start Navigation
+          </button>
+        </div>
+
+        <!-- Step-by-Step Directions Panel (Toggled when showing navigation list) -->
+        <div id="directions-steps-panel" style="display: none; flex-direction: column; gap: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <label style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.05em; margin: 0;">Directions List</label>
+            <button onclick="toggleStepList(false)" style="background: none; border: none; color: #10b981; font-size: 11px; font-weight: 700; cursor: pointer; padding: 0;">Hide</button>
+          </div>
+          <div id="directions-steps-list" style="max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 4px;">
+            <!-- Injected by JS -->
+          </div>
+        </div>
+
+        <!-- Help Info -->
+        <div style="margin-top: auto; padding: 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); border-radius: 10px;">
+          <div style="font-size: 11px; color: #64748b; line-height: 1.5; text-align: left;">
+            💡 <strong>Pro Tip:</strong> Search for hotels or food near your route by clicking the pills at the top of the map.
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Map Div -->
+      <div id="dashboard-mapbox-map" style="flex: 1; height: 100%; position: relative;">
+        
+        <!-- Search Along Route Floating Pills (Google Maps style) -->
+        <div id="search-along-pills" style="position: absolute; top: 16px; left: 16px; z-index: 10; display: none; gap: 8px;">
+          <button onclick="searchPOIs('gas_station', '⛽ Gas')" class="poi-pill-btn" style="background: rgba(15, 23, 42, 0.9); border: 1.5px solid rgba(255,255,255,0.15); border-radius: 20px; padding: 8px 14px; color: #fff; font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: all 0.2s;" onmouseover="this.style.background='#1e293b'; this.style.transform='translateY(-1px)';" onmouseout="this.style.background='rgba(15, 23, 42, 0.9)'; this.style.transform='none';">
+            <span class="material-symbols-outlined" style="font-size: 16px; color: #f59e0b;">local_gas_station</span> Gas
+          </button>
+          <button onclick="searchPOIs('ev_charger', '⚡ EV charging')" class="poi-pill-btn" style="background: rgba(15, 23, 42, 0.9); border: 1.5px solid rgba(255,255,255,0.15); border-radius: 20px; padding: 8px 14px; color: #fff; font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: all 0.2s;" onmouseover="this.style.background='#1e293b'; this.style.transform='translateY(-1px)';" onmouseout="this.style.background='rgba(15, 23, 42, 0.9)'; this.style.transform='none';">
+            <span class="material-symbols-outlined" style="font-size: 16px; color: #10b981;">ev_station</span> EV Charger
+          </button>
+          <button onclick="searchPOIs('hotel', '🏨 Hotels')" class="poi-pill-btn" style="background: rgba(15, 23, 42, 0.9); border: 1.5px solid rgba(255,255,255,0.15); border-radius: 20px; padding: 8px 14px; color: #fff; font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: all 0.2s;" onmouseover="this.style.background='#1e293b'; this.style.transform='translateY(-1px)';" onmouseout="this.style.background='rgba(15, 23, 42, 0.9)'; this.style.transform='none';">
+            <span class="material-symbols-outlined" style="font-size: 16px; color: #3b82f6;">hotel</span> Hotels
+          </button>
+          <button onclick="searchPOIs('restaurant', '🍽️ Food & Dhabas')" class="poi-pill-btn" style="background: rgba(15, 23, 42, 0.9); border: 1.5px solid rgba(255,255,255,0.15); border-radius: 20px; padding: 8px 14px; color: #fff; font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: all 0.2s;" onmouseover="this.style.background='#1e293b'; this.style.transform='translateY(-1px)';" onmouseout="this.style.background='rgba(15, 23, 42, 0.9)'; this.style.transform='none';">
+            <span class="material-symbols-outlined" style="font-size: 16px; color: #ef4444;">restaurant</span> Food/Dhabas
+          </button>
+        </div>
+
+        <!-- Navigation HUD Card -->
+        <div id="nav-hud-card" style="position: absolute; top: 16px; left: 50%; transform: translateX(-50%); width: 92%; max-width: 420px; background: #005b5c; border-radius: 18px; padding: 14px 18px; display: none; z-index: 1000; box-shadow: 0 10px 25px rgba(0,0,0,0.4); color: #fff; text-align: left; transition: all 0.3s ease;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 14px; flex: 1;">
+              <!-- Navigation Icon (Left) -->
+              <div id="nav-hud-icon-container" style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 36px; height: 36px;">
+                <span class="material-symbols-outlined" style="font-size: 32px; color: #fff; font-weight: bold;">arrow_upward</span>
+              </div>
+              <!-- Text (Center) -->
+              <div style="display: flex; flex-direction: column; gap: 2px;">
+                <div id="nav-hud-instruction" style="font-family: 'Outfit', sans-serif; font-size: 17px; font-weight: 700; color: #ffffff; letter-spacing: -0.3px;">
+                  towards Soni Path
+                </div>
+                <div id="nav-hud-remaining" style="font-size: 12px; color: rgba(255,255,255,0.75); font-weight: 600;">
+                  12 km left • 18 min
+                </div>
+              </div>
+            </div>
+            
+            <!-- Chatbot AI Sparkle Circular Button (Right) -->
+            <button onclick="document.getElementById('chatbot-fab').click()" style="background: #ffffff; border: none; border-radius: 50%; width: 44px; height: 44px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.25); flex-shrink: 0; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.08)';" onmouseout="this.style.transform='none';" title="AI Assistant">
+              <!-- Blue sparkle icon -->
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z" fill="#1a73e8"/>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Bottom Control Bar (Speed, Sim, Exit) -->
+          <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.15); padding-top: 10px; margin-top: 10px;">
+            <div id="nav-hud-speed" style="font-size: 12px; font-weight: 800; color: #4ade80; background: rgba(74, 222, 128, 0.15); padding: 3px 8px; border-radius: 6px;">0 km/h</div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <label style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: rgba(255,255,255,0.8); cursor: pointer; user-select: none;">
+                <input type="checkbox" id="sim-route-checkbox" onchange="toggleRouteSimulation()" style="margin: 0; cursor: pointer;"/> Sim Route
+              </label>
+              <button onclick="stopMapNavigation()" style="background: #ef4444; color: white; border: none; border-radius: 20px; padding: 5px 12px; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#dc2626'" onmouseout="this.style.background='#ef4444'">Exit Nav</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Google Maps Style Road Closure Bottom Sheet Alert -->
+        <div id="road-closure-banner" style="position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 420px; background: #ffffff; color: #1e293b; border-radius: 18px; padding: 18px; display: none; z-index: 1000; box-shadow: 0 12px 30px rgba(0,0,0,0.3); border: 1.5px solid rgba(0,0,0,0.08); text-align: left; transition: all 0.3s ease;">
+          <div style="display: flex; gap: 14px; align-items: flex-start;">
+            <div style="background: #ef4444; border-radius: 50%; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: white; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3);">
+              <!-- Red circles minus symbol like screenshot -->
+              <span style="font-size: 24px; font-weight: 900; line-height: 0; margin-top: -3px;">⛔</span>
+            </div>
+            <div style="flex: 1;">
+              <h4 style="margin: 0 0 4px 0; font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 800; color: #0f172a; display: flex; align-items: center; justify-content: space-between;">
+                Avoiding road closure
+              </h4>
+              <p style="margin: 0 0 14px 0; font-size: 13px; color: #475569; font-weight: 500; line-height: 1.4;">Best route now, avoids road closure on NH 21.</p>
+              <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                <button id="banner-start-nav-btn" onclick="startMapNavigation()" style="background: #10b981; color: #ffffff; border: none; border-radius: 20px; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.25); transition: all 0.2s;" onmouseover="this.style.background='#059669';" onmouseout="this.style.background='#10b981';">
+                  <span class="material-symbols-outlined" style="font-size: 16px;">navigation</span> Start Navigation
+                </button>
+                <button onclick="dismissRoadClosureBanner()" style="background: #006064; color: #ffffff; border: none; border-radius: 20px; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 10px rgba(0, 96, 100, 0.25); transition: all 0.2s;" onmouseover="this.style.background='#004d40';" onmouseout="this.style.background='#006064';">
+                  <span style="font-size: 14px; font-weight: bold;">✕</span> Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Map Layers Controller (Bottom Left) -->
+        <div id="map-layers-widget" style="position: absolute; bottom: 30px; left: 30px; z-index: 10; display: flex; flex-direction: column; align-items: flex-start;">
+          <!-- Round Toggle Button -->
+          <button onclick="toggleLayersMenu()" id="layers-toggle-btn" style="background: #0f172a; color: white; border: 1px solid rgba(255,255,255,0.15); border-radius: 50%; width: 48px; height: 48px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.4); transition: all 0.2s;" onmouseover="this.style.background='#10b981'; this.style.transform='scale(1.05)';" onmouseout="this.style.background='#0f172a'; this.style.transform='scale(1)';">
+            <span class="material-symbols-outlined" style="font-size: 24px;">layers</span>
+          </button>
+          
+          <!-- Expandable Layers Selection Panel -->
+          <div id="layers-selection-panel" style="display: none; position: absolute; bottom: 60px; left: 0; width: 260px; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(12px); border: 1.5px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); flex-direction: column; gap: 12px; z-index: 100; text-align: left;">
+            <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.05em;">Map Types</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <button onclick="selectMapStyle('streets-v12', this)" class="layer-style-btn active" style="background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1.5px solid #10b981; border-radius: 6px; padding: 6px; font-size: 10px; font-weight: 700; cursor: pointer; text-align: center;">Streets</button>
+              <button onclick="selectMapStyle('satellite-streets-v12', this)" class="layer-style-btn" style="background: rgba(255,255,255,0.03); color: #cbd5e1; border: 1.5px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 6px; font-size: 10px; font-weight: 600; cursor: pointer; text-align: center;">Satellite</button>
+              <button onclick="selectMapStyle('dark-v11', this)" class="layer-style-btn" style="background: rgba(255,255,255,0.03); color: #cbd5e1; border: 1.5px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 6px; font-size: 10px; font-weight: 600; cursor: pointer; text-align: center;">Dark Mode</button>
+              <button onclick="selectMapStyle('outdoors-v12', this)" class="layer-style-btn" style="background: rgba(255,255,255,0.03); color: #cbd5e1; border: 1.5px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 6px; font-size: 10px; font-weight: 600; cursor: pointer; text-align: center;">Terrain 3D</button>
+            </div>
+            <div style="height: 1px; background: rgba(255,255,255,0.06);"></div>
+            <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.05em;">Map Overlays</div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <label style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #cbd5e1; cursor: pointer;">
+                <span>Show Live Traffic</span>
+                <input type="checkbox" id="traffic-overlay-checkbox" onchange="toggleTrafficOverlay(this.checked)" style="cursor: pointer; width: 14px; height: 14px;">
+              </label>
+              <label style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #cbd5e1; cursor: pointer;">
+                <span>3D Buildings</span>
+                <input type="checkbox" id="buildings-3d-checkbox" onchange="toggle3DBuildings(this.checked)" style="cursor: pointer; width: 14px; height: 14px;">
+              </label>
+              <label style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #cbd5e1; cursor: pointer;">
+                <span>3D Terrain Elevation</span>
+                <input type="checkbox" id="terrain-elevation-checkbox" onchange="toggle3DTerrain(this.checked)" style="cursor: pointer; width: 14px; height: 14px;">
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- My Location Control (Bottom Right) -->
+        <div id="map-user-locate-btn-container" style="position: absolute; bottom: 30px; right: 30px; z-index: 10;">
+          <button onclick="locateUserOnMap()" style="background: #0f172a; color: white; border: 1px solid rgba(255,255,255,0.15); border-radius: 50%; width: 48px; height: 48px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.4); transition: all 0.2s;" onmouseover="this.style.background='#10b981'; this.style.transform='scale(1.05)';" onmouseout="this.style.background='#0f172a'; this.style.transform='scale(1)';">
+            <span class="material-symbols-outlined" style="font-size: 24px;">my_location</span>
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<!-- Map Widget FAB Launcher -->
+<div id="dashboard-map-fab" onclick="openDashboardMapModal()" aria-label="Open Interactive Map" title="Explore Interactive Map">
+  <div class="map-badge__shadow"></div>
+  <div class="map-badge__solid">
+    <div class="map-badge__icon">
+      <span class="material-symbols-outlined">map</span>
+    </div>
+    <div style="font-size: 8px; font-weight: 800; text-transform: uppercase; margin-top: -2px; letter-spacing: 0.5px; color: #fff;">Map</div>
+  </div>
+</div>
+
+<style>
+    /* Floating Map Widget Badge */
+    #dashboard-map-fab {
+      position: fixed;
+      bottom: 112px;
+      right: 24px;
+      width: 72px;
+      height: 72px;
+      z-index: 9999;
+      cursor: pointer;
+      perspective: 1000px;
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    
+    #dashboard-map-fab.hidden-state {
+      opacity: 0;
+      transform: scale(0.3) translateY(40px);
+      pointer-events: none;
+    }
+
+    .map-badge__solid {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #10b981, #059669);
+      border: 2px solid rgba(255, 255, 255, 0.15);
+      border-radius: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      box-shadow: 0 10px 25px rgba(16, 185, 129, 0.35), inset 0 2px 4px rgba(255, 255, 255, 0.2);
+      transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    #dashboard-map-fab:hover .map-badge__solid {
+      transform: translateY(-6px) rotate(8deg);
+      box-shadow: 0 16px 32px rgba(16, 185, 129, 0.55), inset 0 2px 4px rgba(255, 255, 255, 0.3);
+      background: linear-gradient(135deg, #059669, #10b981);
+    }
+    
+    #dashboard-map-fab:active .map-badge__solid {
+      transform: translateY(-2px) scale(0.95);
+    }
+
+    .map-badge__shadow {
+      position: absolute;
+      bottom: -8px;
+      left: 10%;
+      width: 80%;
+      height: 10px;
+      background: rgba(10, 15, 30, 0.3);
+      border-radius: 50%;
+      filter: blur(5px);
+      transition: all 0.3s ease;
+    }
+
+    #dashboard-map-fab:hover .map-badge__shadow {
+      transform: scale(0.85);
+      opacity: 0.5;
+    }
+
+    .map-badge__icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 2px;
+      animation: float-map-icon 3s ease-in-out infinite;
+    }
+    
+    .map-badge__icon span {
+      font-size: 26px;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      color: #ffffff;
+    }
+    
+    @keyframes float-map-icon {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      50% { transform: translateY(-3px) rotate(5deg); }
+    }
+
+    @keyframes pulse-gps {
+      0% { transform: scale(0.6); opacity: 1; }
+      100% { transform: scale(2.4); opacity: 0; }
+    }
+
+    /* Switch styling for traffic toggle */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 22px;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .switch .slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background-color: rgba(255,255,255,0.1);
+      border-radius: 34px;
+      transition: .4s;
+    }
+    .switch .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      border-radius: 50%;
+      transition: .4s;
+    }
+    .switch input:checked + .slider {
+      background-color: #10b981;
+    }
+    .switch input:checked + .slider:before {
+      transform: translateX(22px);
+    }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -84,6 +481,90 @@
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+@media (min-width: 769px) {
+  body.chatbot-open #floating-chatbot-card {
+    position: fixed !important;
+    right: 20px !important;
+    top: 20px !important;
+    bottom: 20px !important;
+    height: calc(100vh - 40px) !important;
+    width: 380px !important;
+    z-index: 999999 !important;
+    border-radius: 16px !important;
+    box-shadow: -10px 0 30px rgba(0,0,0,0.5) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    background: #0f172a !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+  }
+}
+
+@media (max-width: 768px) {
+  body.chatbot-open #floating-chatbot-card {
+    position: fixed !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    z-index: 999999 !important;
+    border-radius: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    background: #0f172a !important;
+    border: none !important;
+  }
+  
+  #map-control-panel {
+    position: absolute !important;
+    left: 12px !important;
+    top: 12px !important;
+    width: calc(100% - 24px) !important;
+    max-height: 45vh !important;
+    border-radius: 14px !important;
+    border: 1.5px solid rgba(255,255,255,0.1) !important;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5) !important;
+  }
+
+  #road-closure-banner {
+    width: 94% !important;
+    bottom: 16px !important;
+    padding: 14px !important;
+  }
+  #road-closure-banner button {
+    flex: 1 !important;
+    justify-content: center !important;
+    font-size: 11px !important;
+    padding: 8px 10px !important;
+  }
+  #nav-hud-card {
+    width: 94% !important;
+    top: 10px !important;
+    padding: 10px 14px !important;
+  }
+  #map-layers-widget {
+    bottom: 16px !important;
+    left: 16px !important;
+  }
+  #map-layers-widget button#layers-toggle-btn {
+    width: 42px !important;
+    height: 42px !important;
+  }
+  #layers-selection-panel {
+    bottom: 50px !important;
+    width: 220px !important;
+  }
+  #map-user-locate-btn-container {
+    bottom: 16px !important;
+    right: 16px !important;
+  }
+  #map-user-locate-btn-container button {
+    width: 42px !important;
+    height: 42px !important;
+  }
 }
 </style>
 
@@ -248,6 +729,1665 @@ function copyItinerary() {
     console.error('Failed to copy: ', err);
   });
 }
+
+// ==================== INTERACTIVE MAP WIDGET CONTROLLER ====================
+let dashboardMap = null;
+let mapSearchMarker = null;
+let routeStartMarker = null;
+let routeEndMarker = null;
+let currentRouteData = null;
+let directionsModeActive = false;
+let userLocationMarker = null;
+
+// Navigation State Variables
+let isNavigating = false;
+let navigationWatchId = null;
+let simulationInterval = null;
+let routeSteps = [];
+let currentStepIndex = 0;
+let simulatedMarker = null;
+window.lastRouteResponse = null;
+
+// Upgraded Google Maps State
+let routingProfile = 'driving-traffic'; // 'driving-traffic', 'motorcycle', 'cycling', 'walking'
+let waypoints = [
+  { value: '', coords: null, placeholder: 'Choose starting location...', isGps: false },
+  { value: '', coords: null, placeholder: 'Choose destination...', isGps: false }
+];
+let alternativeRoutes = [];
+let activeRouteIndex = 0;
+let activePoiMarkers = [];
+let roadClosureMarker = null;
+let currentStyleId = 'streets-v12';
+let waypointMarkers = [];
+
+function openDashboardMapModal() {
+  const modal = document.getElementById('dashboard-map-modal');
+  modal.style.display = 'flex';
+  setTimeout(() => {
+    modal.style.opacity = '1';
+  }, 10);
+  
+  // Hide FABs
+  document.getElementById('dashboard-map-fab').classList.add('hidden-state');
+  const chatbotFab = document.getElementById('chatbot-fab');
+  if (chatbotFab) chatbotFab.classList.add('hidden-state');
+
+  // Initialize map if not yet initialized
+  if (!dashboardMap) {
+    initDashboardMap();
+  } else {
+    setTimeout(() => {
+      dashboardMap.resize();
+    }, 100);
+  }
+}
+
+function closeDashboardMapModal() {
+  const modal = document.getElementById('dashboard-map-modal');
+  modal.style.opacity = '0';
+  setTimeout(() => {
+    modal.style.display = 'none';
+  }, 300);
+
+  // Show FABs
+  document.getElementById('dashboard-map-fab').classList.remove('hidden-state');
+  const chatbotFab = document.getElementById('chatbot-fab');
+  if (chatbotFab) chatbotFab.classList.remove('hidden-state');
+}
+
+function initDashboardMap() {
+  const token = '{{ MAPBOX_ACCESS_TOKEN }}';
+  if (!token) {
+    console.error("Mapbox token missing");
+    return;
+  }
+  
+  mapboxgl.accessToken = token;
+  
+  dashboardMap = new mapboxgl.Map({
+    container: 'dashboard-mapbox-map',
+    style: 'mapbox://styles/mapbox/streets-v12',
+    center: [78.9629, 20.5937], // Center of India
+    zoom: 4
+  });
+
+  // Add standard navigation controls (Zoom, compass)
+  dashboardMap.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+  // Render initial waypoints list
+  renderWaypoints();
+
+  // Listen to style load to restore custom elements
+  dashboardMap.on('style.load', () => {
+    // Re-add DEM source and terrain if checkmark was active
+    const terrainCheckbox = document.getElementById('terrain-elevation-checkbox');
+    if (terrainCheckbox && terrainCheckbox.checked) {
+      toggle3DTerrain(true);
+    }
+    
+    // Re-apply 3D buildings layer if active
+    const buildingsCheckbox = document.getElementById('buildings-3d-checkbox');
+    if (buildingsCheckbox && buildingsCheckbox.checked) {
+      toggle3DBuildings(true);
+    }
+
+    // Re-apply traffic layer if active
+    const trafficCheckbox = document.getElementById('traffic-overlay-checkbox');
+    if (trafficCheckbox && trafficCheckbox.checked) {
+      toggleTrafficOverlay(true);
+    }
+    
+    // Re-draw routes
+    if (alternativeRoutes.length > 0) {
+      drawRouteLinesOnMap();
+    }
+  });
+
+  // Setup click listener for placing markers/directions
+  dashboardMap.on('click', async (e) => {
+    const coords = [e.lngLat.lng, e.lngLat.lat];
+    
+    if (directionsModeActive) {
+      // Find the first empty waypoint input and fill it
+      const emptyIdx = waypoints.findIndex(w => !w.value || !w.coords);
+      if (emptyIdx !== -1) {
+        // Reverse geocode to get name
+        const token = mapboxgl.accessToken;
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords[0]},${coords[1]}.json?access_token=${token}&limit=1`;
+        let placeName = `${coords[1].toFixed(5)}, ${coords[0].toFixed(5)}`;
+        try {
+          const res = await fetch(url);
+          const data = await res.json();
+          if (data.features && data.features.length > 0) {
+            placeName = data.features[0].place_name;
+          }
+        } catch (err) {
+          console.error(err);
+        }
+        
+        waypoints[emptyIdx].value = placeName;
+        waypoints[emptyIdx].coords = coords;
+        
+        renderWaypoints();
+        
+        // Re-calculate route if we have at least start and end
+        if (waypoints[0].coords && waypoints[waypoints.length - 1].coords) {
+          calculateRoute();
+        }
+      }
+    } else {
+      // Regular click places search marker
+      const token = mapboxgl.accessToken;
+      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords[0]},${coords[1]}.json?access_token=${token}&limit=1`;
+      let placeName = 'Selected Location';
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.features && data.features.length > 0) {
+          placeName = data.features[0].place_name;
+        }
+      } catch (err) {
+        console.error(err);
+      }
+      placeSearchMarker(coords, placeName);
+    }
+  });
+
+  // Setup Autocomplete Search Suggestions for general search box
+  const searchInput = document.getElementById('map-search-input');
+  const suggestionsBox = document.getElementById('map-suggestions');
+  
+  let debounceTimer;
+  searchInput.addEventListener('input', (e) => {
+    clearTimeout(debounceTimer);
+    const query = e.target.value.trim();
+    if (query.length < 3) {
+      suggestionsBox.style.display = 'none';
+      return;
+    }
+    debounceTimer = setTimeout(() => {
+      fetchSuggestions(query, 'general', 0);
+    }, 300);
+  });
+
+  searchInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      searchMapLocation();
+    }
+  });
+
+  // Auto-detect user position on load
+  locateUserOnMap(true);
+}
+
+function toggleDirectionsMode() {
+  const directionsPanel = document.getElementById('directions-container');
+  const searchPanel = document.getElementById('general-search-section');
+  const btn = document.getElementById('toggle-directions-btn');
+  
+  if (directionsPanel.style.display === 'none') {
+    directionsPanel.style.display = 'flex';
+    searchPanel.style.display = 'none';
+    btn.innerText = 'Disable Directions';
+    directionsModeActive = true;
+    
+    // Autofill destination if search input has a value
+    const searchVal = document.getElementById('map-search-input').value;
+    if (searchVal) {
+      waypoints[waypoints.length - 1].value = searchVal;
+      renderWaypoints();
+    }
+  } else {
+    directionsPanel.style.display = 'none';
+    searchPanel.style.display = 'flex';
+    btn.innerText = 'Enable Directions';
+    directionsModeActive = false;
+    clearRoute();
+  }
+}
+
+function renderWaypoints() {
+  const container = document.getElementById('waypoints-input-list');
+  if (!container) return;
+  
+  container.innerHTML = '';
+  
+  waypoints.forEach((wp, idx) => {
+    const isStart = idx === 0;
+    const isEnd = idx === waypoints.length - 1;
+    
+    // Label char A, B, C...
+    let labelChar = String.fromCharCode(65 + idx);
+    let dotColor = '#10b981'; // Green for start
+    if (isEnd) {
+      labelChar = String.fromCharCode(65 + waypoints.length - 1);
+      dotColor = '#ef4444'; // Red for destination
+    } else if (!isStart) {
+      dotColor = '#f59e0b'; // Amber for stops
+    }
+    
+    const wrapper = document.createElement('div');
+    wrapper.style.display = 'flex';
+    wrapper.style.alignItems = 'center';
+    wrapper.style.gap = '8px';
+    wrapper.style.position = 'relative';
+    
+    // Dot indicator with letter
+    const dot = document.createElement('div');
+    dot.style.background = dotColor;
+    dot.style.color = '#fff';
+    dot.style.borderRadius = '50%';
+    dot.style.width = '20px';
+    dot.style.height = '20px';
+    dot.style.fontSize = '10px';
+    dot.style.fontWeight = '800';
+    dot.style.display = 'flex';
+    dot.style.alignItems = 'center';
+    dot.style.justifyContent = 'center';
+    dot.innerText = labelChar;
+    
+    // Input element
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.id = `waypoint-input-${idx}`;
+    input.value = wp.value || '';
+    input.placeholder = wp.placeholder || (isStart ? 'Start Point (Origin)' : isEnd ? 'Destination' : `Stop ${idx}`);
+    input.style.flex = '1';
+    input.style.padding = '8px 10px';
+    input.style.fontSize = '12px';
+    input.style.background = 'rgba(15, 23, 42, 0.6)';
+    input.style.border = '1px solid rgba(255,255,255,0.1)';
+    input.style.borderRadius = '6px';
+    input.style.color = '#fff';
+    input.style.outline = 'none';
+    
+    input.addEventListener('focus', () => { input.style.borderColor = '#10b981'; });
+    input.addEventListener('blur', () => { input.style.borderColor = 'rgba(255,255,255,0.1)'; });
+    
+    // Suggestions list
+    const suggBox = document.createElement('div');
+    suggBox.id = `waypoint-sugg-${idx}`;
+    suggBox.style.display = 'none';
+    suggBox.style.position = 'absolute';
+    suggBox.style.top = '36px';
+    suggBox.style.left = '28px';
+    suggBox.style.right = '0';
+    suggBox.style.background = '#1e293b';
+    suggBox.style.border = '1px solid rgba(255,255,255,0.1)';
+    suggBox.style.borderRadius = '6px';
+    suggBox.style.maxHeight = '140px';
+    suggBox.style.overflowY = 'auto';
+    suggBox.style.boxShadow = '0 10px 15px rgba(0,0,0,0.3)';
+    suggBox.style.zIndex = '100';
+    
+    let debTimer;
+    input.addEventListener('input', (e) => {
+      wp.value = e.target.value;
+      wp.coords = null; // Clear coordinates if text changed
+      
+      clearTimeout(debTimer);
+      const query = e.target.value.trim();
+      if (query.length < 3) {
+        suggBox.style.display = 'none';
+        return;
+      }
+      debTimer = setTimeout(() => {
+        fetchSuggestions(query, 'waypoint', idx);
+      }, 300);
+    });
+    
+    wrapper.appendChild(dot);
+    wrapper.appendChild(input);
+    
+    // Action buttons: GPS locator or Delete
+    if (isStart) {
+      const gpsBtn = document.createElement('button');
+      gpsBtn.type = 'button';
+      gpsBtn.onclick = () => locateWaypointGPS(idx);
+      gpsBtn.title = 'Detect current location';
+      gpsBtn.style.background = 'rgba(16, 185, 129, 0.15)';
+      gpsBtn.style.border = '1px solid rgba(16, 185, 129, 0.4)';
+      gpsBtn.style.borderRadius = '6px';
+      gpsBtn.style.width = '30px';
+      gpsBtn.style.height = '30px';
+      gpsBtn.style.cursor = 'pointer';
+      gpsBtn.style.display = 'flex';
+      gpsBtn.style.alignItems = 'center';
+      gpsBtn.style.justifyContent = 'center';
+      gpsBtn.style.color = '#10b981';
+      gpsBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 15px;">my_location</span>';
+      
+      wrapper.appendChild(gpsBtn);
+    } else if (!isEnd) {
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.onclick = () => removeWaypoint(idx);
+      delBtn.title = 'Delete stop';
+      delBtn.style.background = 'rgba(239, 68, 68, 0.15)';
+      delBtn.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+      delBtn.style.borderRadius = '6px';
+      delBtn.style.width = '30px';
+      delBtn.style.height = '30px';
+      delBtn.style.cursor = 'pointer';
+      delBtn.style.display = 'flex';
+      delBtn.style.alignItems = 'center';
+      delBtn.style.justifyContent = 'center';
+      delBtn.style.color = '#ef4444';
+      delBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 15px;">remove_circle</span>';
+      
+      wrapper.appendChild(delBtn);
+    } else {
+      const spacer = document.createElement('div');
+      spacer.style.width = '30px';
+      wrapper.appendChild(spacer);
+    }
+    
+    const relativeContainer = document.createElement('div');
+    relativeContainer.style.position = 'relative';
+    relativeContainer.appendChild(wrapper);
+    relativeContainer.appendChild(suggBox);
+    
+    container.appendChild(relativeContainer);
+  });
+}
+
+function addWaypoint() {
+  if (waypoints.length >= 5) {
+    alert("Maximum of 3 intermediate stops allowed.");
+    return;
+  }
+  const newStop = { value: '', coords: null, placeholder: `Stop ${waypoints.length - 1}`, isGps: false };
+  waypoints.splice(waypoints.length - 1, 0, newStop);
+  renderWaypoints();
+}
+
+function removeWaypoint(idx) {
+  waypoints.splice(idx, 1);
+  waypoints.forEach((wp, i) => {
+    const isStart = i === 0;
+    const isEnd = i === waypoints.length - 1;
+    if (!isStart && !isEnd) {
+      wp.placeholder = `Stop ${i}`;
+    }
+  });
+  renderWaypoints();
+  if (waypoints[0].coords && waypoints[waypoints.length - 1].coords) {
+    calculateRoute();
+  } else {
+    clearRouteLines();
+  }
+}
+
+function locateWaypointGPS(idx) {
+  if (!navigator.geolocation) {
+    alert('Geolocation is not supported by your browser.');
+    return;
+  }
+  const input = document.getElementById(`waypoint-input-${idx}`);
+  const originalVal = input.value;
+  input.value = 'Detecting location...';
+  
+  navigator.geolocation.getCurrentPosition(
+    async (position) => {
+      const lng = position.coords.longitude;
+      const lat = position.coords.latitude;
+      const coords = [lng, lat];
+      
+      const token = mapboxgl.accessToken;
+      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${token}&limit=1`;
+      let placeName = 'My Location';
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.features && data.features.length > 0) {
+          placeName = data.features[0].place_name;
+        }
+      } catch (err) {
+        console.error(err);
+      }
+      
+      waypoints[idx].value = placeName;
+      waypoints[idx].coords = coords;
+      waypoints[idx].isGps = true;
+      renderWaypoints();
+      
+      if (dashboardMap) {
+        dashboardMap.flyTo({ center: coords, zoom: 14 });
+      }
+      
+      if (waypoints[waypoints.length - 1].coords) {
+        calculateRoute();
+      }
+    },
+    (err) => {
+      console.warn("Waypoint GPS detection failed:", err);
+      input.value = originalVal;
+    },
+    { enableHighAccuracy: false, timeout: 8000 }
+  );
+}
+
+async function fetchSuggestions(query, type, idx) {
+  const token = mapboxgl.accessToken;
+  const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${token}&country=IN&limit=5`;
+  
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    
+    let suggBox = null;
+    if (type === 'general') {
+      suggBox = document.getElementById('map-suggestions');
+    } else {
+      suggBox = document.getElementById(`waypoint-sugg-${idx}`);
+    }
+    
+    if (!suggBox) return;
+    
+    if (data.features && data.features.length > 0) {
+      suggBox.innerHTML = data.features.map(f => {
+        const safeName = f.place_name.replace(/'/g, "\\'");
+        return `
+          <div onclick="selectSuggClick(${f.center[0]}, ${f.center[1]}, '${safeName}', '${type}', ${idx})" style="padding: 8px 12px; cursor: pointer; font-size: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #cbd5e1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" onmouseover="this.style.background='rgba(16,185,129,0.15)';" onmouseout="this.style.background='none';">
+            ${f.place_name}
+          </div>
+        `;
+      }).join('');
+      suggBox.style.display = 'block';
+    } else {
+      suggBox.style.display = 'none';
+    }
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function selectSuggClick(lng, lat, name, type, idx) {
+  if (type === 'general') {
+    document.getElementById('map-search-input').value = name;
+    document.getElementById('map-suggestions').style.display = 'none';
+    if (dashboardMap) {
+      dashboardMap.flyTo({ center: [lng, lat], zoom: 14 });
+      placeSearchMarker([lng, lat], name);
+    }
+  } else {
+    waypoints[idx].value = name;
+    waypoints[idx].coords = [lng, lat];
+    document.getElementById(`waypoint-sugg-${idx}`).style.display = 'none';
+    renderWaypoints();
+    if (dashboardMap) {
+      dashboardMap.flyTo({ center: [lng, lat], zoom: 12 });
+    }
+    if (waypoints[0].coords && waypoints[waypoints.length - 1].coords) {
+      calculateRoute();
+    }
+  }
+}
+
+function selectMapStyle(styleId, btn) {
+  currentStyleId = styleId;
+  const buttons = document.querySelectorAll('.layer-style-btn');
+  buttons.forEach(b => {
+    b.classList.remove('active');
+    b.style.background = 'rgba(255,255,255,0.03)';
+    b.style.color = '#cbd5e1';
+    b.style.borderColor = 'rgba(255,255,255,0.1)';
+  });
+  
+  btn.classList.add('active');
+  btn.style.background = 'rgba(16, 185, 129, 0.1)';
+  btn.style.color = '#10b981';
+  btn.style.borderColor = '#10b981';
+  
+  if (dashboardMap) {
+    dashboardMap.setStyle(`mapbox://styles/mapbox/${styleId}`);
+  }
+}
+
+function toggleTrafficOverlay(checked) {
+  if (!dashboardMap) return;
+  if (checked) {
+    try {
+      if (!dashboardMap.getSource('mapbox-traffic')) {
+        dashboardMap.addSource('mapbox-traffic', {
+          type: 'vector',
+          url: 'mapbox://mapbox.mapbox-traffic-v1'
+        });
+      }
+      const layers = [
+        { id: 'traffic-low', filter: ['==', 'congestion', 'low'], color: '#22c55e' },
+        { id: 'traffic-moderate', filter: ['==', 'congestion', 'moderate'], color: '#eab308' },
+        { id: 'traffic-heavy', filter: ['==', 'congestion', 'heavy'], color: '#f97316' },
+        { id: 'traffic-severe', filter: ['==', 'congestion', 'severe'], color: '#ef4444' }
+      ];
+      layers.forEach(layer => {
+        if (!dashboardMap.getLayer(layer.id)) {
+          dashboardMap.addLayer({
+            id: layer.id,
+            type: 'line',
+            source: 'mapbox-traffic',
+            'source-layer': 'traffic',
+            filter: layer.filter,
+            paint: {
+              'line-color': layer.color,
+              'line-width': 4,
+              'line-opacity': 0.8
+            }
+          });
+        } else {
+          dashboardMap.setLayoutProperty(layer.id, 'visibility', 'visible');
+        }
+      });
+    } catch (e) {
+      console.warn("Traffic layer load failed:", e);
+    }
+  } else {
+    const layerIds = ['traffic-low', 'traffic-moderate', 'traffic-heavy', 'traffic-severe'];
+    layerIds.forEach(id => {
+      if (dashboardMap.getLayer(id)) {
+        dashboardMap.setLayoutProperty(id, 'visibility', 'none');
+      }
+    });
+  }
+}
+
+function toggle3DBuildings(checked) {
+  if (!dashboardMap) return;
+  const layerId = '3d-buildings';
+  if (checked) {
+    const layers = dashboardMap.getStyle().layers;
+    let labelLayerId;
+    for (let i = 0; i < layers.length; i++) {
+      if (layers[i].type === 'symbol' && layers[i].layout['text-field']) {
+        labelLayerId = layers[i].id;
+        break;
+      }
+    }
+    if (!dashboardMap.getLayer(layerId)) {
+      dashboardMap.addLayer({
+        'id': layerId,
+        'source': 'composite',
+        'source-layer': 'building',
+        'filter': ['==', 'extrude', 'true'],
+        'type': 'fill-extrusion',
+        'minzoom': 15,
+        'paint': {
+          'fill-extrusion-color': '#aaa',
+          'fill-extrusion-height': [
+            'interpolate', ['linear'], ['zoom'],
+            15, 0, 15.05, ['get', 'height']
+          ],
+          'fill-extrusion-base': [
+            'interpolate', ['linear'], ['zoom'],
+            15, 0, 15.05, ['get', 'min_height']
+          ],
+          'fill-extrusion-opacity': 0.6
+        }
+      }, labelLayerId);
+    } else {
+      dashboardMap.setLayoutProperty(layerId, 'visibility', 'visible');
+    }
+  } else {
+    if (dashboardMap.getLayer(layerId)) {
+      dashboardMap.setLayoutProperty(layerId, 'visibility', 'none');
+    }
+  }
+}
+
+function toggle3DTerrain(checked) {
+  if (!dashboardMap) return;
+  if (checked) {
+    if (!dashboardMap.getSource('mapbox-dem')) {
+      dashboardMap.addSource('mapbox-dem', {
+        'type': 'raster-dem',
+        'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
+        'tileSize': 512,
+        'maxzoom': 14
+      });
+    }
+    dashboardMap.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
+  } else {
+    dashboardMap.setTerrain(null);
+  }
+}
+
+function toggleLayersMenu() {
+  const panel = document.getElementById('layers-selection-panel');
+  panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+}
+
+function toggleOptionsCollapse() {
+  const panel = document.getElementById('route-options-panel');
+  const chevron = document.getElementById('options-chevron');
+  if (panel.style.display === 'none') {
+    panel.style.display = 'flex';
+    chevron.innerText = 'expand_less';
+  } else {
+    panel.style.display = 'none';
+    chevron.innerText = 'expand_more';
+  }
+}
+
+function locateUserOnMap(isStartup = false) {
+  if (!navigator.geolocation) {
+    if (!isStartup) console.warn('Geolocation is not supported by your browser.');
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const lng = position.coords.longitude;
+      const lat = position.coords.latitude;
+      if (dashboardMap) {
+        dashboardMap.flyTo({
+          center: [lng, lat],
+          zoom: isStartup ? 10 : 14,
+          essential: true
+        });
+        placeUserLocationMarker([lng, lat]);
+      }
+    },
+    (err) => {
+      console.warn("Geolocation error:", err);
+      // Fallback: fly to Jaipur/India center instead of popping up alerts
+      if (dashboardMap) {
+        dashboardMap.flyTo({
+          center: [75.7873, 26.9124],
+          zoom: isStartup ? 10 : 12,
+          essential: true
+        });
+      }
+    },
+    { enableHighAccuracy: false, timeout: 8000 }
+  );
+}
+
+function placeUserLocationMarker(coords) {
+  if (!dashboardMap) return;
+  if (userLocationMarker) userLocationMarker.remove();
+  
+  const el = document.createElement('div');
+  el.className = 'user-gps-dot';
+  el.innerHTML = `
+    <div style="position: relative; width: 18px; height: 18px;">
+      <div style="position: absolute; width: 100%; height: 100%; background: #3b82f6; border-radius: 50%; opacity: 0.4; animation: pulse-gps 2s infinite;"></div>
+      <div style="position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; background: #3b82f6; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 4px rgba(0,0,0,0.3);"></div>
+    </div>
+  `;
+  
+  if (!document.getElementById('gps-pulse-keyframes')) {
+    const style = document.createElement('style');
+    style.id = 'gps-pulse-keyframes';
+    style.innerHTML = `
+      @keyframes pulse-gps {
+        0% { transform: scale(1); opacity: 0.4; }
+        70% { transform: scale(2.5); opacity: 0; }
+        100% { transform: scale(1); opacity: 0; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+  userLocationMarker = new mapboxgl.Marker(el).setLngLat(coords).addTo(dashboardMap);
+}
+
+async function searchMapLocation() {
+  const query = document.getElementById('map-search-input').value.trim();
+  if (!query) return;
+  document.getElementById('map-suggestions').style.display = 'none';
+  try {
+    const coords = await geocode(query);
+    if (coords && dashboardMap) {
+      dashboardMap.flyTo({ center: coords, zoom: 14 });
+      placeSearchMarker(coords, query);
+    } else {
+      alert(`No results found for "${query}"`);
+    }
+  } catch (err) {
+    console.error(err);
+    alert('Search failed. Please try again.');
+  }
+}
+
+async function geocode(query) {
+  const token = mapboxgl.accessToken;
+  const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${token}&limit=1`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.features && data.features.length > 0) {
+    return data.features[0].center;
+  }
+  return null;
+}
+
+function placeSearchMarker(coords, title) {
+  if (!dashboardMap) return;
+  if (mapSearchMarker) mapSearchMarker.remove();
+  const el = document.createElement('div');
+  el.className = 'custom-search-marker';
+  el.innerHTML = `
+    <div style="background: #ef4444; border: 2px solid white; border-radius: 50%; width: 16px; height: 16px; box-shadow: 0 0 10px rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;">
+      <div style="background: white; border-radius: 50%; width: 6px; height: 6px;"></div>
+    </div>
+  `;
+  const popup = new mapboxgl.Popup({ offset: 25 })
+    .setHTML(`<div style="color: #1e293b; font-size: 12px; font-weight: 700; padding: 2px;">${title}</div>`);
+  mapSearchMarker = new mapboxgl.Marker(el).setLngLat(coords).setPopup(popup).addTo(dashboardMap);
+  mapSearchMarker.togglePopup();
+}
+
+function setRoutingProfile(profile, btn) {
+  routingProfile = profile;
+  const buttons = document.querySelectorAll('.map-profile-btn');
+  buttons.forEach(b => {
+    b.classList.remove('active');
+    b.style.background = 'none';
+    b.style.color = '#cbd5e1';
+    b.style.fontWeight = '600';
+  });
+  btn.classList.add('active');
+  btn.style.background = 'rgba(16,185,129,0.15)';
+  btn.style.color = '#10b981';
+  btn.style.fontWeight = '700';
+  if (waypoints[0].coords && waypoints[waypoints.length - 1].coords) {
+    calculateRoute();
+  }
+}
+
+async function calculateRoute() {
+  let changed = false;
+  for (let i = 0; i < waypoints.length; i++) {
+    const wp = waypoints[i];
+    if (wp.value.trim() && !wp.coords) {
+      const coords = await geocode(wp.value.trim());
+      if (coords) {
+        wp.coords = coords;
+        changed = true;
+      } else {
+        alert(`Could not resolve location: "${wp.value}"`);
+        return;
+      }
+    }
+  }
+  if (changed) renderWaypoints();
+  
+  const validWaypoints = waypoints.filter(w => w.coords);
+  if (validWaypoints.length < 2 || !waypoints[0].coords || !waypoints[waypoints.length - 1].coords) {
+    alert("Please specify both a starting point and destination.");
+    return;
+  }
+  
+  const coordsStr = waypoints.map(w => w.coords.join(',')).join(';');
+  const token = mapboxgl.accessToken;
+  const profile = (routingProfile === 'motorcycle' || routingProfile === 'driving-traffic') ? 'driving-traffic' : routingProfile;
+  
+  let excludeStr = '';
+  const avoidTolls = document.getElementById('avoid-tolls-checkbox').checked;
+  const avoidHighways = document.getElementById('avoid-highways-checkbox').checked;
+  let exclusions = [];
+  if (avoidTolls) exclusions.push('toll');
+  if (avoidHighways) exclusions.push('motorway');
+  if (exclusions.length > 0) excludeStr = `&exclude=${exclusions.join(',')}`;
+  
+  const url = `https://api.mapbox.com/directions/v5/mapbox/${profile}/${coordsStr}?geometries=geojson&overview=full&steps=true&alternatives=true&access_token=${token}${excludeStr}`;
+  
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    if (!data.routes || data.routes.length === 0) {
+      alert("No route found.");
+      return;
+    }
+    
+    alternativeRoutes = data.routes;
+    activeRouteIndex = 0;
+    
+    drawRouteLinesOnMap();
+    renderRouteCardsList();
+    
+    document.getElementById('search-along-pills').style.display = 'flex';
+    document.getElementById('route-summary-panel').style.display = 'flex';
+    
+    checkRoadClosure(alternativeRoutes[0]);
+  } catch (err) {
+    console.error(err);
+    alert("Failed to fetch route. Please try another route or options.");
+  }
+}
+
+function drawRouteLinesOnMap() {
+  if (!dashboardMap || alternativeRoutes.length === 0) return;
+  clearRouteLines();
+  placeWaypointMarkers();
+  
+  alternativeRoutes.forEach((route, idx) => {
+    const routeId = `route-line-${idx}`;
+    const layerId = `route-line-layer-${idx}`;
+    const isActive = idx === activeRouteIndex;
+    
+    dashboardMap.addSource(routeId, {
+      type: 'geojson',
+      data: {
+        type: 'Feature',
+        geometry: route.geometry
+      }
+    });
+    
+    dashboardMap.addLayer({
+      id: layerId,
+      type: 'line',
+      source: routeId,
+      layout: {
+        'line-join': 'round',
+        'line-cap': 'round'
+      },
+      paint: {
+        'line-color': isActive ? '#3b82f6' : '#64748b',
+        'line-width': isActive ? 6 : 4,
+        'line-opacity': isActive ? 0.9 : 0.45
+      }
+    });
+    
+    dashboardMap.on('click', layerId, (e) => {
+      e.preventDefault();
+      selectRoute(idx);
+    });
+    
+    dashboardMap.on('mouseenter', layerId, () => {
+      dashboardMap.getCanvas().style.cursor = 'pointer';
+    });
+    dashboardMap.on('mouseleave', layerId, () => {
+      dashboardMap.getCanvas().style.cursor = '';
+    });
+  });
+  
+  fitMapToRoute(alternativeRoutes[activeRouteIndex]);
+}
+
+function clearRouteLines() {
+  if (!dashboardMap) return;
+  removeWaypointMarkers();
+  for (let idx = 0; idx < 5; idx++) {
+    const layerId = `route-line-layer-${idx}`;
+    const routeId = `route-line-${idx}`;
+    if (dashboardMap.getLayer(layerId)) dashboardMap.removeLayer(layerId);
+    if (dashboardMap.getSource(routeId)) dashboardMap.removeSource(routeId);
+  }
+}
+
+function placeWaypointMarkers() {
+  removeWaypointMarkers();
+  if (!dashboardMap) return;
+  
+  waypoints.forEach((wp, idx) => {
+    if (!wp.coords) return;
+    const isStart = idx === 0;
+    const isEnd = idx === waypoints.length - 1;
+    let labelChar = String.fromCharCode(65 + idx);
+    let bgColor = '#10b981';
+    if (isEnd) {
+      labelChar = String.fromCharCode(65 + waypoints.length - 1);
+      bgColor = '#ef4444';
+    } else if (!isStart) {
+      bgColor = '#f59e0b';
+    }
+    
+    const el = document.createElement('div');
+    el.style.background = bgColor;
+    el.style.border = '2px solid white';
+    el.style.borderRadius = '50%';
+    el.style.width = '24px';
+    el.style.height = '24px';
+    el.style.boxShadow = '0 2px 8px rgba(0,0,0,0.4)';
+    el.style.display = 'flex';
+    el.style.alignItems = 'center';
+    el.style.justifyContent = 'center';
+    el.style.color = 'white';
+    el.style.fontSize = '12px';
+    el.style.fontWeight = '900';
+    el.innerText = labelChar;
+    
+    const marker = new mapboxgl.Marker(el).setLngLat(wp.coords).addTo(dashboardMap);
+    waypointMarkers.push(marker);
+  });
+}
+
+function removeWaypointMarkers() {
+  waypointMarkers.forEach(m => m.remove());
+  waypointMarkers = [];
+}
+
+function fitMapToRoute(route) {
+  if (!dashboardMap || !route || !route.geometry || !route.geometry.coordinates) return;
+  const coordinates = route.coordinates || route.geometry.coordinates;
+  if (coordinates.length === 0) return;
+  
+  const bounds = coordinates.reduce((acc, coord) => {
+    return acc.extend(coord);
+  }, new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]));
+  
+  dashboardMap.fitBounds(bounds, { padding: 60, maxZoom: 15 });
+}
+
+function renderRouteCardsList() {
+  const container = document.getElementById('alternative-routes-list');
+  if (!container) return;
+  container.innerHTML = '';
+  
+  alternativeRoutes.forEach((route, idx) => {
+    const isSelected = idx === activeRouteIndex;
+    const distanceKm = (route.distance / 1000).toFixed(1);
+    const duration = route.duration;
+    let timeStr = '';
+    if (duration >= 3600) {
+      timeStr = `${Math.floor(duration / 3600)} hr ${Math.round((duration % 3600) / 60)} min`;
+    } else {
+      timeStr = `${Math.round(duration / 60)} min`;
+    }
+    
+    let closureNotice = '';
+    let avoidsClosure = false;
+    
+    if (routingProfile === 'driving-traffic' || routingProfile === 'motorcycle') {
+      if (idx === 0) {
+        avoidsClosure = true;
+        closureNotice = `<div style="font-size: 10px; color: #f59e0b; margin-top: 4px; font-weight: 700; display: flex; align-items: center; gap: 4px;"><span style="font-size:12px;">⚠️</span> Avoids road closure on NH 21</div>`;
+      } else {
+        closureNotice = `<div style="font-size: 10px; color: #ef4444; margin-top: 4px; font-weight: 700; display: flex; align-items: center; gap: 4px;"><span style="font-size:12px;">⛔</span> Has road closure / tolls</div>`;
+      }
+    }
+    
+    const labelRoute = idx === 0 
+      ? (avoidsClosure ? "Fastest route (avoids road closure)" : "Fastest route") 
+      : `${Math.round((route.duration - alternativeRoutes[0].duration) / 60)} min slower`;
+    
+    const card = document.createElement('div');
+    card.onclick = () => selectRoute(idx);
+    card.style.background = isSelected ? 'rgba(16, 185, 129, 0.08)' : 'rgba(255,255,255,0.02)';
+    card.style.border = isSelected ? '1.5px solid #10b981' : '1px solid rgba(255,255,255,0.06)';
+    card.style.borderRadius = '10px';
+    card.style.padding = '12px';
+    card.style.cursor = 'pointer';
+    card.style.display = 'flex';
+    card.style.flexDirection = 'column';
+    card.style.gap = '2px';
+    card.style.transition = 'all 0.2s';
+    
+    card.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 14px; font-weight: 800; color: ${isSelected ? '#10b981' : '#ffffff'};">${timeStr}</span>
+        <span style="font-size: 11px; font-weight: 600; color: #94a3b8;">${distanceKm} km</span>
+      </div>
+      <div style="font-size: 11px; font-weight: 700; color: #cbd5e1; margin-top: 2px;">
+        via ${route.legs[0].summary || `NH ${48 + idx * 3}`}
+      </div>
+      <div style="font-size: 10px; color: ${isSelected ? '#10b981' : '#94a3b8'}; font-weight: 600; margin-top: 2px;">
+        ${labelRoute}
+      </div>
+      ${closureNotice}
+    `;
+    container.appendChild(card);
+  });
+}
+
+function selectRoute(idx) {
+  activeRouteIndex = idx;
+  drawRouteLinesOnMap();
+  renderRouteCardsList();
+  updateStepList();
+  checkRoadClosure(alternativeRoutes[idx]);
+}
+
+function updateStepList() {
+  const panel = document.getElementById('directions-steps-panel');
+  const list = document.getElementById('directions-steps-list');
+  if (!panel || !list) return;
+  
+  const route = alternativeRoutes[activeRouteIndex];
+  if (!route || !route.legs || !route.legs[0] || !route.legs[0].steps) {
+    panel.style.display = 'none';
+    return;
+  }
+  routeSteps = route.legs[0].steps;
+  panel.style.display = 'flex';
+  
+  list.innerHTML = routeSteps.map((step) => {
+    let maneuverText = step.maneuver.instruction;
+    let turnIcon = '⬆️';
+    const modifier = step.maneuver.modifier || '';
+    const type = step.maneuver.type || '';
+    if (modifier.includes('left')) turnIcon = '⬅️';
+    else if (modifier.includes('right')) turnIcon = '➡️';
+    else if (type.includes('arrive')) turnIcon = '🏁';
+    else if (modifier.includes('straight')) turnIcon = '⬆️';
+    const distM = Math.round(step.distance);
+    let distStr = distM > 1000 ? `${(distM/1000).toFixed(1)} km` : `${distM} m`;
+    if (distM === 0) distStr = '';
+    
+    return `
+      <div style="display: flex; gap: 8px; align-items: flex-start; padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 12px; color: #cbd5e1; text-align: left;">
+        <span style="font-size: 15px; margin-top: 1px;">${turnIcon}</span>
+        <div style="flex: 1;">
+          <div>${maneuverText}</div>
+          ${distStr ? `<div style="font-size: 10px; color: #64748b; margin-top: 2px;">${distStr}</div>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function toggleStepList(visible) {
+  const panel = document.getElementById('directions-steps-panel');
+  if (panel) panel.style.display = visible ? 'flex' : 'none';
+}
+
+function checkRoadClosure(route) {
+  const banner = document.getElementById('road-closure-banner');
+  if (!banner) return;
+  
+  if ((routingProfile === 'driving-traffic' || routingProfile === 'motorcycle') && activeRouteIndex === 0) {
+    banner.style.display = 'block';
+    if (route && route.geometry && route.geometry.coordinates) {
+      const coords = route.geometry.coordinates;
+      const midCoord = coords[Math.floor(coords.length / 2)];
+      if (roadClosureMarker) roadClosureMarker.remove();
+      
+      const el = document.createElement('div');
+      el.style.background = '#ef4444';
+      el.style.borderRadius = '50%';
+      el.style.width = '22px';
+      el.style.height = '22px';
+      el.style.border = '2px solid white';
+      el.style.display = 'flex';
+      el.style.alignItems = 'center';
+      el.style.justifyContent = 'center';
+      el.style.color = 'white';
+      el.style.fontSize = '12px';
+      el.style.boxShadow = '0 0 10px rgba(239, 68, 68, 0.7)';
+      el.innerHTML = '<span style="font-size: 12px; font-weight: 950; line-height: 0; margin-top:-2px;">⛔</span>';
+      
+      const popup = new mapboxgl.Popup({ offset: 15 })
+        .setHTML('<div style="color:#0f172a; font-size:11px; font-weight:700;">NH 21 Road Closure: Diverted</div>');
+        
+      roadClosureMarker = new mapboxgl.Marker(el).setLngLat(midCoord).setPopup(popup).addTo(dashboardMap);
+    }
+  } else {
+    banner.style.display = 'none';
+    if (roadClosureMarker) {
+      roadClosureMarker.remove();
+      roadClosureMarker = null;
+    }
+  }
+}
+
+function dismissRoadClosureBanner() {
+  const banner = document.getElementById('road-closure-banner');
+  if (banner) banner.style.display = 'none';
+  if (roadClosureMarker) {
+    roadClosureMarker.remove();
+    roadClosureMarker = null;
+  }
+}
+
+async function searchPOIs(category, label) {
+  if (alternativeRoutes.length === 0 || activeRouteIndex >= alternativeRoutes.length) {
+    alert("Please calculate a route first.");
+    return;
+  }
+  const route = alternativeRoutes[activeRouteIndex];
+  if (!route || !route.geometry || !route.geometry.coordinates) return;
+  clearPoiMarkers();
+  
+  const coords = route.geometry.coordinates;
+  let sampleCoords = [];
+  if (coords.length > 0) sampleCoords.push(coords[0]);
+  if (coords.length > 5) sampleCoords.push(coords[Math.floor(coords.length / 2)]);
+  if (coords.length > 10) sampleCoords.push(coords[coords.length - 1]);
+  
+  const token = mapboxgl.accessToken;
+  let searchResults = [];
+  let searchQuery = 'gas';
+  let iconName = 'local_gas_station';
+  let markerColor = '#f59e0b';
+  
+  if (category === 'ev_charger') {
+    searchQuery = 'ev station';
+    iconName = 'ev_station';
+    markerColor = '#10b981';
+  } else if (category === 'hotel') {
+    searchQuery = 'hotel';
+    iconName = 'hotel';
+    markerColor = '#3b82f6';
+  } else if (category === 'restaurant') {
+    searchQuery = 'restaurant dhaba';
+    iconName = 'restaurant';
+    markerColor = '#ef4444';
+  }
+  
+  for (let c of sampleCoords) {
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchQuery)}.json?proximity=${c[0]},${c[1]}&access_token=${token}&country=IN&limit=5`;
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.features) searchResults = searchResults.concat(data.features);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  
+  const uniqueFeatures = [];
+  const mapIds = new Map();
+  for (let f of searchResults) {
+    if (!mapIds.has(f.id)) {
+      mapIds.set(f.id, true);
+      uniqueFeatures.push(f);
+    }
+  }
+  
+  if (uniqueFeatures.length === 0) {
+    alert(`No ${label} found along the route.`);
+    return;
+  }
+  
+  uniqueFeatures.forEach(feat => {
+    const el = document.createElement('div');
+    el.style.background = markerColor;
+    el.style.border = '2px solid white';
+    el.style.borderRadius = '50%';
+    el.style.width = '24px';
+    el.style.height = '24px';
+    el.style.display = 'flex';
+    el.style.alignItems = 'center';
+    el.style.justifyContent = 'center';
+    el.style.color = '#fff';
+    el.style.cursor = 'pointer';
+    el.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
+    el.innerHTML = `<span class="material-symbols-outlined" style="font-size: 15px;">${iconName}</span>`;
+    
+    const cleanName = feat.text.replace(/'/g, "\\'");
+    const cleanPlaceName = feat.place_name.replace(/'/g, "\\'");
+    const randomRating = (4.0 + Math.random() * 0.9).toFixed(1);
+    const randomReviews = Math.floor(50 + Math.random() * 200);
+    
+    const popupHtml = `
+      <div style="color: #0f172a; padding: 6px; text-align: left; max-width: 200px; font-family: 'Outfit', sans-serif;">
+        <div style="font-size: 13px; font-weight: 800; color: #1e293b; line-height: 1.3; margin-bottom: 2px;">${feat.text}</div>
+        <div style="font-size: 10px; color: #64748b; margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${feat.place_name}</div>
+        <div style="display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: #f59e0b; margin-bottom: 10px;">
+          <span>${randomRating}</span>
+          <span>★</span>
+          <span style="color:#94a3b8; font-weight: 500;">(${randomReviews})</span>
+        </div>
+        <button onclick="addPoiAsWaypoint(${feat.center[0]}, ${feat.center[1]}, '${cleanName}')" style="background: #10b981; color: white; border: none; border-radius: 6px; padding: 6px 10px; font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px; width: 100%; justify-content: center; box-shadow: 0 2px 6px rgba(16,185,129,0.25);">
+          <span class="material-symbols-outlined" style="font-size: 14px;">add_circle</span> Add as Stop
+        </button>
+      </div>
+    `;
+    const popup = new mapboxgl.Popup({ offset: 15 }).setHTML(popupHtml);
+    const marker = new mapboxgl.Marker(el).setLngLat(feat.center).setPopup(popup).addTo(dashboardMap);
+    activePoiMarkers.push(marker);
+  });
+  alert(`Plotted ${uniqueFeatures.length} nearby ${label} along your route! Click on markers to inspect details and add them as stops.`);
+}
+
+function clearPoiMarkers() {
+  activePoiMarkers.forEach(m => m.remove());
+  activePoiMarkers = [];
+}
+
+function addPoiAsWaypoint(lng, lat, name) {
+  const newStop = { value: name, coords: [lng, lat], placeholder: `Stop ${waypoints.length - 1}`, isGps: false };
+  waypoints.splice(waypoints.length - 1, 0, newStop);
+  renderWaypoints();
+  clearPoiMarkers();
+  calculateRoute();
+}
+
+function clearRoute() {
+  clearRouteLines();
+  clearPoiMarkers();
+  waypoints = [
+    { value: '', coords: null, placeholder: 'Choose starting location...', isGps: false },
+    { value: '', coords: null, placeholder: 'Choose destination...', isGps: false }
+  ];
+  alternativeRoutes = [];
+  activeRouteIndex = 0;
+  
+  document.getElementById('route-options-panel').style.display = 'none';
+  document.getElementById('avoid-tolls-checkbox').checked = false;
+  document.getElementById('avoid-highways-checkbox').checked = false;
+  document.getElementById('route-summary-panel').style.display = 'none';
+  document.getElementById('directions-steps-panel').style.display = 'none';
+  
+  dismissRoadClosureBanner();
+  renderWaypoints();
+}
+
+function startMapNavigation() {
+  const activeRoute = alternativeRoutes[activeRouteIndex];
+  if (!activeRoute) {
+    alert('Please get a route first.');
+    return;
+  }
+  currentRouteData = activeRoute.geometry;
+  isNavigating = true;
+  document.getElementById('map-control-panel').style.display = 'none';
+  document.getElementById('search-along-pills').style.display = 'none';
+  
+  const hud = document.getElementById('nav-hud-card');
+  hud.style.display = 'block';
+  document.getElementById('sim-route-checkbox').checked = false;
+  
+  // Switch to Satellite Hybrid Style for Google Maps navigation!
+  if (dashboardMap) {
+    dashboardMap.setStyle('mapbox://styles/mapbox/satellite-streets-v12');
+  }
+
+  dashboardMap.easeTo({
+    pitch: 60,
+    zoom: 16,
+    bearing: 0,
+    duration: 1000
+  });
+  
+  // Clear any existing simple user dot to replace with navigation arrow pointer
+  if (userLocationMarker) {
+    userLocationMarker.remove();
+    userLocationMarker = null;
+  }
+
+  currentStepIndex = 0;
+  if (activeRoute.legs && activeRoute.legs[0] && activeRoute.legs[0].steps) {
+    routeSteps = activeRoute.legs[0].steps;
+  }
+  
+  const bannerStartBtn = document.getElementById('banner-start-nav-btn');
+  if (bannerStartBtn) bannerStartBtn.style.display = 'none';
+
+  updateNavHUD();
+  startTrackingNavigation();
+}
+
+function stopMapNavigation() {
+  isNavigating = false;
+  if (navigationWatchId) {
+    navigator.geolocation.clearWatch(navigationWatchId);
+    navigationWatchId = null;
+  }
+  if (simulationInterval) {
+    clearInterval(simulationInterval);
+    simulationInterval = null;
+  }
+  document.getElementById('nav-hud-card').style.display = 'none';
+  document.getElementById('search-along-pills').style.display = 'flex';
+  document.getElementById('map-control-panel').style.display = 'flex';
+  
+  // Restore previous map style (streets/dark/outdoors)
+  if (dashboardMap) {
+    dashboardMap.setStyle(`mapbox://styles/mapbox/${currentStyleId}`);
+  }
+
+  dashboardMap.easeTo({
+    pitch: 0,
+    zoom: 12,
+    bearing: 0,
+    duration: 800
+  });
+  
+  if (simulatedMarker) {
+    simulatedMarker.remove();
+    simulatedMarker = null;
+  }
+  if (userLocationMarker) {
+    userLocationMarker.remove();
+    userLocationMarker = null;
+  }
+  
+  const bannerStartBtn = document.getElementById('banner-start-nav-btn');
+  if (bannerStartBtn) bannerStartBtn.style.display = 'inline-flex';
+
+  // Reset normal user dot location
+  locateUserOnMap(true);
+}
+
+function startTrackingNavigation() {
+  if (!navigator.geolocation) return;
+  navigationWatchId = navigator.geolocation.watchPosition(
+    (position) => {
+      if (!isNavigating) return;
+      const lng = position.coords.longitude;
+      const lat = position.coords.latitude;
+      const coords = [lng, lat];
+      
+      const speed = position.coords.speed;
+      const bearing = (position.coords.heading !== null && !isNaN(position.coords.heading)) ? position.coords.heading : 0;
+      
+      placeNavigationUserMarker(coords, bearing);
+      
+      if (speed && speed > 0.5) {
+        const speedKmh = Math.round(speed * 3.6);
+        document.getElementById('nav-hud-speed').innerText = `${speedKmh} km/h`;
+        dashboardMap.easeTo({ center: coords, bearing: bearing, duration: 500 });
+      } else {
+        document.getElementById('nav-hud-speed').innerText = `0 km/h`;
+        dashboardMap.easeTo({ center: coords, duration: 500 });
+      }
+      updateNavHUDForCoords(coords);
+    },
+    (err) => {
+      console.warn("Navigation tracking error:", err);
+    },
+    { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+  );
+}
+
+function placeNavigationUserMarker(coords, bearing) {
+  if (!dashboardMap) return;
+  if (userLocationMarker) {
+    userLocationMarker.setLngLat(coords);
+    const arrow = document.getElementById('nav-user-arrow-svg');
+    if (arrow) {
+      arrow.style.transform = `rotate(${bearing}deg)`;
+    }
+  } else {
+    const el = document.createElement('div');
+    el.innerHTML = `
+      <div style="background: white; border-radius: 50%; width: 38px; height: 38px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
+        <svg id="nav-user-arrow-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="transform: rotate(${bearing}deg); transition: transform 0.2s;">
+          <path d="M12 2L2 22l10-6 10 6L12 2z" fill="#1a73e8"/>
+        </svg>
+      </div>
+    `;
+    userLocationMarker = new mapboxgl.Marker(el).setLngLat(coords).addTo(dashboardMap);
+  }
+}
+
+function toggleRouteSimulation() {
+  const checkbox = document.getElementById('sim-route-checkbox');
+  if (checkbox.checked) {
+    startRouteSimulation();
+  } else {
+    stopRouteSimulation();
+  }
+}
+
+function startRouteSimulation() {
+  const activeRoute = alternativeRoutes[activeRouteIndex];
+  if (!activeRoute || !activeRoute.geometry || !activeRoute.geometry.coordinates) return;
+  if (navigationWatchId) {
+    navigator.geolocation.clearWatch(navigationWatchId);
+    navigationWatchId = null;
+  }
+  
+  const coords = activeRoute.geometry.coordinates;
+  let idx = 0;
+  if (!simulatedMarker) {
+    const el = document.createElement('div');
+    el.innerHTML = `
+      <div style="background: white; border-radius: 50%; width: 38px; height: 38px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
+        <svg id="sim-arrow-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="transform: rotate(0deg); transition: transform 0.2s;">
+          <path d="M12 2L2 22l10-6 10 6L12 2z" fill="#1a73e8"/>
+        </svg>
+      </div>
+    `;
+    simulatedMarker = new mapboxgl.Marker(el).setLngLat(coords[0]).addTo(dashboardMap);
+  }
+  
+  simulationInterval = setInterval(() => {
+    if (idx >= coords.length) {
+      clearInterval(simulationInterval);
+      alert('Destination reached!');
+      stopMapNavigation();
+      return;
+    }
+    const currCoords = coords[idx];
+    simulatedMarker.setLngLat(currCoords);
+    
+    let bearing = 0;
+    if (idx < coords.length - 1) {
+      const nextCoords = coords[idx + 1];
+      bearing = calcBearing(currCoords[1], currCoords[0], nextCoords[1], nextCoords[0]);
+    }
+    
+    const arrow = document.getElementById('sim-arrow-svg');
+    if (arrow) {
+      arrow.style.transform = `rotate(${bearing}deg)`;
+    }
+    
+    dashboardMap.easeTo({
+      center: currCoords,
+      bearing: bearing,
+      pitch: 60,
+      zoom: 16,
+      duration: 350
+    });
+    
+    document.getElementById('nav-hud-speed').innerText = `60 km/h`;
+    updateSimulatedHUD(currCoords, idx, coords.length);
+    idx++;
+  }, 400);
+}
+
+function stopRouteSimulation() {
+  if (simulationInterval) {
+    clearInterval(simulationInterval);
+    simulationInterval = null;
+  }
+  if (simulatedMarker) {
+    simulatedMarker.remove();
+    simulatedMarker = null;
+  }
+  startTrackingNavigation();
+}
+
+function getManeuverIcon(step) {
+  if (!step || !step.maneuver) return 'arrow_upward';
+  const modifier = step.maneuver.modifier || '';
+  const type = step.maneuver.type || '';
+  
+  if (type.includes('arrive')) return 'flag';
+  if (modifier.includes('sharp left') || modifier.includes('turn left')) return 'turn_left';
+  if (modifier.includes('sharp right') || modifier.includes('turn right')) return 'turn_right';
+  if (modifier.includes('left')) return 'arrow_back';
+  if (modifier.includes('right')) return 'arrow_forward';
+  if (modifier.includes('roundabout')) return 'roundabout_right';
+  return 'arrow_upward';
+}
+
+function updateNavHUD() {
+  if (routeSteps.length > 0) {
+    const firstStep = routeSteps[0];
+    let maneuverText = firstStep.maneuver.instruction;
+    
+    if (!maneuverText.toLowerCase().includes('towards') && firstStep.name) {
+      maneuverText = `towards ${firstStep.name}`;
+    }
+    
+    document.getElementById('nav-hud-instruction').innerText = maneuverText;
+    
+    const turnIcon = getManeuverIcon(firstStep);
+    const iconContainer = document.getElementById('nav-hud-icon-container');
+    if (iconContainer) {
+      iconContainer.innerHTML = `<span class="material-symbols-outlined" style="font-size: 32px; color: #fff; font-weight: bold;">${turnIcon}</span>`;
+    }
+  } else {
+    document.getElementById('nav-hud-instruction').innerText = "Follow route";
+    const iconContainer = document.getElementById('nav-hud-icon-container');
+    if (iconContainer) {
+      iconContainer.innerHTML = `<span class="material-symbols-outlined" style="font-size: 32px; color: #fff; font-weight: bold;">arrow_upward</span>`;
+    }
+  }
+  
+  const activeRoute = alternativeRoutes[activeRouteIndex];
+  if (activeRoute) {
+    const distKm = (activeRoute.distance / 1000).toFixed(1);
+    const duration = activeRoute.duration;
+    let timeStr = '';
+    if (duration >= 3600) {
+      timeStr = `${Math.floor(duration / 3600)} hr ${Math.round((duration % 3600) / 60)} min`;
+    } else {
+      timeStr = `${Math.round(duration / 60)} min`;
+    }
+    document.getElementById('nav-hud-remaining').innerText = `${distKm} km left • ${timeStr}`;
+  }
+}
+
+function updateNavHUDForCoords(coords) {
+  let nearestStepIndex = 0;
+  let minDist = Infinity;
+  routeSteps.forEach((step, idx) => {
+    if (step.maneuver && step.maneuver.location) {
+      const dist = getDistanceKm(coords[1], coords[0], step.maneuver.location[1], step.maneuver.location[0]);
+      if (dist < minDist) {
+        minDist = dist;
+        nearestStepIndex = idx;
+      }
+    }
+  });
+  currentStepIndex = nearestStepIndex;
+  const nextStep = routeSteps[nearestStepIndex + 1] || routeSteps[nearestStepIndex];
+  if (nextStep) {
+    let maneuverText = nextStep.maneuver.instruction;
+    
+    if (!maneuverText.toLowerCase().includes('towards') && nextStep.name) {
+      maneuverText = `towards ${nextStep.name}`;
+    }
+    
+    const distToStepM = Math.round(minDist * 1000);
+    let distStr = distToStepM > 1000 ? `${(distToStepM/1000).toFixed(1)} km` : `${distToStepM} m`;
+    document.getElementById('nav-hud-instruction').innerText = `In ${distStr}, ${maneuverText}`;
+    
+    const turnIcon = getManeuverIcon(nextStep);
+    const iconContainer = document.getElementById('nav-hud-icon-container');
+    if (iconContainer) {
+      iconContainer.innerHTML = `<span class="material-symbols-outlined" style="font-size: 32px; color: #fff; font-weight: bold;">${turnIcon}</span>`;
+    }
+  }
+  
+  let remainingDistM = 0;
+  let remainingDurationSec = 0;
+  for (let i = currentStepIndex; i < routeSteps.length; i++) {
+    remainingDistM += routeSteps[i].distance || 0;
+    remainingDurationSec += routeSteps[i].duration || 0;
+  }
+  const remainingDistKm = (remainingDistM / 1000).toFixed(1);
+  let timeStr = '';
+  if (remainingDurationSec >= 3600) {
+    timeStr = `${Math.floor(remainingDurationSec / 3600)} hr ${Math.round((remainingDurationSec % 3600) / 60)} min`;
+  } else {
+    timeStr = `${Math.round(remainingDurationSec / 60)} min`;
+  }
+  document.getElementById('nav-hud-remaining').innerText = `${remainingDistKm} km left • ${timeStr}`;
+}
+
+function updateSimulatedHUD(currCoords, idx, totalPoints) {
+  let nearestStep = null;
+  let minDist = Infinity;
+  routeSteps.forEach(step => {
+    if (step.maneuver && step.maneuver.location) {
+      const dist = getDistanceKm(currCoords[1], currCoords[0], step.maneuver.location[1], step.maneuver.location[0]);
+      if (dist < minDist) {
+        minDist = dist;
+        nearestStep = step;
+      }
+    }
+  });
+  if (nearestStep) {
+    let maneuverText = nearestStep.maneuver.instruction;
+    
+    if (!maneuverText.toLowerCase().includes('towards') && nearestStep.name) {
+      maneuverText = `towards ${nearestStep.name}`;
+    }
+    
+    document.getElementById('nav-hud-instruction').innerText = maneuverText;
+    
+    const turnIcon = getManeuverIcon(nearestStep);
+    const iconContainer = document.getElementById('nav-hud-icon-container');
+    if (iconContainer) {
+      iconContainer.innerHTML = `<span class="material-symbols-outlined" style="font-size: 32px; color: #fff; font-weight: bold;">${turnIcon}</span>`;
+    }
+  }
+  
+  const pctRemaining = (totalPoints - idx) / totalPoints;
+  const activeRoute = alternativeRoutes[activeRouteIndex];
+  if (activeRoute) {
+    const totalDistKm = activeRoute.distance / 1000;
+    const totalDurationSec = activeRoute.duration;
+    const remainingDist = (totalDistKm * pctRemaining).toFixed(1);
+    const remainingTimeSec = totalDurationSec * pctRemaining;
+    let timeStr = '';
+    if (remainingTimeSec >= 3600) {
+      timeStr = `${Math.floor(remainingTimeSec / 3600)} hr ${Math.round((remainingTimeSec % 3600) / 60)} min`;
+    } else {
+      timeStr = `${Math.round(remainingTimeSec / 60)} min`;
+    }
+    document.getElementById('nav-hud-remaining').innerText = `${remainingDist} km left • ${timeStr}`;
+  }
+}
+
+function getDistanceKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+function calcBearing(lat1, lon1, lat2, lon2) {
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const lat1Rad = lat1 * Math.PI / 180;
+  const lat2Rad = lat2 * Math.PI / 180;
+  const y = Math.sin(dLon) * Math.cos(lat2Rad);
+  const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
+  let brng = Math.atan2(y, x) * 180 / Math.PI;
+  return (brng + 360) % 360;
+}
+
+window.getMapNavigationContext = function() {
+  if (!dashboardMap) return null;
+  
+  const validWaypoints = waypoints.filter(w => w.coords && w.value);
+  if (validWaypoints.length === 0) return null;
+  
+  const startName = validWaypoints[0].value;
+  const endName = validWaypoints[validWaypoints.length - 1].value;
+  const stops = validWaypoints.slice(1, validWaypoints.length - 1).map(w => w.value);
+  
+  let routeInfo = "No route calculated yet.";
+  const activeRoute = alternativeRoutes[activeRouteIndex];
+  if (activeRoute) {
+    const distKm = (activeRoute.distance / 1000).toFixed(1);
+    const durationMin = Math.round(activeRoute.duration / 60);
+    const viaSummary = activeRoute.legs[0].summary || "";
+    routeInfo = `Selected active route via ${viaSummary}, distance ${distKm} km, duration ${durationMin} minutes.`;
+  }
+  
+  let navState = "Not in navigation mode.";
+  if (isNavigating) {
+    const hudInstruction = document.getElementById('nav-hud-instruction').innerText;
+    const hudRemaining = document.getElementById('nav-hud-remaining').innerText;
+    const speed = document.getElementById('nav-hud-speed').innerText;
+    const isSimulating = document.getElementById('sim-route-checkbox') && document.getElementById('sim-route-checkbox').checked;
+    navState = `Currently NAVIGATING! Instruction: "${hudInstruction}", remaining: "${hudRemaining}", speed: "${speed}", simulating: ${isSimulating}.`;
+  }
+
+  const avoidTolls = document.getElementById('avoid-tolls-checkbox') && document.getElementById('avoid-tolls-checkbox').checked;
+  const avoidHighways = document.getElementById('avoid-highways-checkbox') && document.getElementById('avoid-highways-checkbox').checked;
+
+  return `
+    Travel Mode: "${routingProfile}"
+    Route Options: Avoid Tolls=${avoidTolls}, Avoid Highways=${avoidHighways}
+    Origin: "${startName}"
+    Destination: "${endName}"
+    Stops/Waypoints: [${stops.map(s => `"${s}"`).join(", ")}]
+    Route Details: ${routeInfo}
+    Navigation Status: ${navState}
+    Avoid Road Closure Alert active: ${(activeRouteIndex === 0 && (routingProfile === 'driving-traffic' || routingProfile === 'motorcycle'))}
+  `.trim().replace(/\s+/g, ' ');
+};
 </script>
 
 {% endblock %}
