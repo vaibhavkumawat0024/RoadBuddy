@@ -113,22 +113,14 @@
     </div>
   </div>
 
-  <!-- 3D Compass Badge Launcher for Chatbot -->
+  <!-- 3D Chatbot Badge Launcher -->
   <div class="chat-badge" id="chatbot-fab" aria-label="Open AI Chatbot">
     <div class="chat-badge__shadow"></div>
-    <div class="chat-badge__solid">
-      <!-- Faceted 3D Diamond faces -->
-      <div class="chat-badge__face chat-badge__face--top"></div>
-      <div class="chat-badge__face chat-badge__face--right"></div>
-      <div class="chat-badge__face chat-badge__face--left"></div>
-      <!-- Inner lit seam ridge highlight -->
-      <div class="chat-badge__ridge"></div>
-      <!-- Compass icon indicator -->
-      <div class="chat-badge__icon">
-        <span class="material-symbols-outlined">explore</span>
-      </div>
+    <div class="chat-badge__solid" style="background: none !important; border: none !important; box-shadow: none !important; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;">
+      <!-- Renders the 3D robot widget image -->
+      <img src="/static/images/chatbot_icon.png" alt="RoadBuddy AI" style="width: 72px; height: 72px; object-fit: contain;" />
       <!-- 3D Spherical notification dot -->
-      <div class="chat-badge__nub" id="chat-badge-nub" style="display: none;"></div>
+      <div class="chat-badge__nub" id="chat-badge-nub" style="display: none; background: #ef4444; border: 2px solid #0f172a; box-shadow: 0 0 8px rgba(239, 68, 68, 0.6); width: 14px; height: 14px; top: -2px; right: -2px; border-radius: 50%;"></div>
     </div>
   </div>
 
@@ -447,6 +439,14 @@
       appendMsg('Thinking...', 'ai', 'thinking');
       setButtonState('chat-send-btn', true, 'Sending...');
 
+      let finalMsg = msg;
+      if (window.getMapNavigationContext) {
+        const mapContext = window.getMapNavigationContext();
+        if (mapContext) {
+          finalMsg = `[SYSTEM MAP CONTEXT: ${mapContext}]\nUser: ${msg}`;
+        }
+      }
+
       try {
         const token = getCookie('access_token');
         const headers = { 'Content-Type': 'application/json' };
@@ -457,7 +457,7 @@
           method: 'POST',
           headers: headers,
           credentials: 'same-origin',
-          body: JSON.stringify({ message: msg, history: chatHistory })
+          body: JSON.stringify({ message: finalMsg, history: chatHistory })
         });
         if (!res.ok) {
           throw new Error('Chat API returned error status');
