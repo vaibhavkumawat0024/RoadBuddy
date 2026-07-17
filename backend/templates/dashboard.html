@@ -1617,7 +1617,7 @@ function clearRouteLines() {
 
 function placeWaypointMarkers() {
   removeWaypointMarkers();
-  if (!dashboardMap) return;
+  if (!dashboardMap || isNavigating) return;
   
   waypoints.forEach((wp, idx) => {
     if (!wp.coords) return;
@@ -1971,6 +1971,13 @@ function startMapNavigation() {
   }
   currentRouteData = activeRoute.geometry;
   isNavigating = true;
+  
+  // Clear search and waypoint markers to prevent overlapping navigation arrow
+  if (mapSearchMarker) {
+    mapSearchMarker.remove();
+    mapSearchMarker = null;
+  }
+  removeWaypointMarkers();
   document.getElementById('map-control-panel').style.display = 'none';
   document.getElementById('search-along-pills').style.display = 'none';
   
