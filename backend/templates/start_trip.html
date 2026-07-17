@@ -563,8 +563,10 @@
   /* ─── MOBILE MEDIA RESPONSIVENESS OVERRIDES ─── */
   @media (max-width: 768px) {
     .topbar {
-      height: 56px !important;
-      padding: 0 12px !important;
+      height: calc(54px + env(safe-area-inset-top, 0px)) !important;
+      padding-top: env(safe-area-inset-top, 0px) !important;
+      padding-left: 10px !important;
+      padding-right: 10px !important;
       display: flex !important;
       justify-content: space-between !important;
       align-items: center !important;
@@ -577,21 +579,25 @@
     }
     .topbar > div:last-child {
       display: flex !important;
-      gap: 6px !important;
+      gap: 4px !important;
       align-items: center !important;
       margin-left: auto !important;
     }
     
+    .logo {
+      font-size: 16px !important;
+    }
+    
     /* Modern circular buttons for mobile topbar */
     .topbar button, .topbar a.back-to-itinerary, .topbar a[href="/dashboard"] {
-      width: 36px !important;
-      height: 36px !important;
+      width: 32px !important;
+      height: 32px !important;
       padding: 0 !important;
       display: inline-flex !important;
       align-items: center !important;
       justify-content: center !important;
       border-radius: 50% !important;
-      font-size: 16px !important;
+      font-size: 15px !important;
       border: 1.5px solid var(--border-color) !important;
       background: var(--surface) !important;
       box-shadow: 0 2px 8px rgba(0,0,0,0.05) !important;
@@ -631,7 +637,7 @@
     
     .main-layout {
       flex-direction: column !important;
-      height: calc(100vh - 104px) !important;
+      height: calc(100vh - 102px - env(safe-area-inset-top, 0px)) !important;
     }
     
     .left-panel {
@@ -641,6 +647,12 @@
       border-right: none !important;
       border-bottom: 1px solid var(--border-color) !important;
       overflow-y: auto !important;
+      transition: max-height 0.3s ease !important;
+    }
+    
+    /* Expand sidebar panel height when typing/focusing details inside form */
+    .left-panel:focus-within {
+      max-height: 70% !important;
     }
     
     .panel-section { padding: 12px 16px !important; }

@@ -500,7 +500,7 @@
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 991px) {
   #map-modal-card {
     width: 100vw !important;
     height: 100vh !important;
@@ -537,10 +537,20 @@
     z-index: 1000 !important;
     padding: 14px !important;
     gap: 12px !important;
+    transition: max-height 0.3s ease, border-radius 0.3s ease !important;
+  }
+
+  /* Expand waypoint editor height when keyboard opens and user is typing */
+  #map-control-panel:focus-within {
+    max-height: 80vh !important;
+    border-color: #10b981 !important;
   }
 
   #dashboard-map-modal > div > div:first-child {
-    padding: 10px 16px !important;
+    padding-top: calc(12px + env(safe-area-inset-top, 0px)) !important;
+    padding-bottom: 12px !important;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
   }
 
   #dashboard-map-modal h3 {
