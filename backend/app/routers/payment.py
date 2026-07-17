@@ -375,3 +375,82 @@ async def verify_payment_signature(
     except Exception as e:
         db.rollback()
         raise HTTPException(500, f"Database transaction failed: {str(e)}")
+
+
+class OTPVerifyRequest(BaseModel):
+    otp: str
+
+
+@router.post("/send-otp")
+async def send_payment_otp(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    from app.models.models import User
+    from app.core.email_otp import generate_and_send_otp, _otp_store
+    
+    user_id = int(current_user["user_id"])
+    db_user = db.query(User).filter(User.id == user_id).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    email = db_user.email
+    name = db_user.name or "User"
+    phone = getattr(db_user, "phone", None) or "Not Registered"
+    
+    if not email:
+        raise HTTPException(status_code=400, detail="User email not found")
+        
+    try:
+        sent = generate_and_send_otp(email, name, otp_type="payment")
+        stored = _otp_store.get(email, {})
+        otp = stored.get("otp", "")
+        
+        # Format registered info for display
+        masked_email = email
+        if "@" in email:
+            parts = email.split("@")
+            masked_email = f"{parts[0][:3]}***@{parts[1]}"
+            
+        masked_phone = phone
+        if len(phone) >= 10:
+            masked_phone = f"+91 ******{phone[-4:]}"
+            
+        print(f"\n[Payment OTP] Sent OTP '{otp}' to registered email: {email} (Phone: {phone})\n")
+        
+        return {
+            "success": True,
+            "email": masked_email,
+            "phone": masked_phone,
+            "sent_via_email": sent,
+            "otp_preview": otp if not sent else None
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/verify-otp")
+async def verify_payment_otp(
+    req: OTPVerifyRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    from app.models.models import User
+    from app.core.email_otp import verify_otp, clear_otp
+    
+    user_id = int(current_user["user_id"])
+    db_user = db.query(User).filter(User.id == user_id).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    email = db_user.email
+    if not email:
+        raise HTTPException(status_code=400, detail="User email not found")
+        
+    is_valid = verify_otp(email, req.otp)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP")
+        
+    clear_otp(email)
+    return {"success": True}
+

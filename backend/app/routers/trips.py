@@ -237,6 +237,57 @@ async def update_trip(
         vehicle_info = {}
 
     try:
+        # Check if any planning detail has changed
+        detail_changed = (
+            trip.start_date != data.start_date or
+            trip.end_date != data.end_date or
+            trip.origin.lower() != data.origin.lower() or
+            trip.destination.lower() != data.destination.lower() or
+            trip.travel_mode != data.travel_mode or
+            trip.budget_inr != data.budget_inr or
+            trip.num_people != data.num_people or
+            trip.group_type != data.group_type or
+            trip.vehicle_id != (int(data.vehicle_id) if data.vehicle_id else None)
+        )
+
+        if detail_changed:
+            from app.models.models import HotelBooking, Booking, TrainBooking, BusBooking, FlightBooking, ProviderBooking, FoodOrder
+            
+            # 1. Clear Hotel Bookings
+            db.query(HotelBooking).filter(
+                HotelBooking.user_id == trip.user_id,
+                HotelBooking.check_in_date == trip.start_date
+            ).delete()
+            
+            # 2. Clear Transit Bookings
+            db.query(Booking).filter(
+                Booking.user_id == trip.user_id,
+                Booking.travel_date == trip.start_date
+            ).delete()
+            db.query(TrainBooking).filter(
+                TrainBooking.user_id == trip.user_id,
+                TrainBooking.travel_date == trip.start_date
+            ).delete()
+            db.query(BusBooking).filter(
+                BusBooking.user_id == trip.user_id,
+                BusBooking.travel_date == trip.start_date
+            ).delete()
+            db.query(FlightBooking).filter(
+                FlightBooking.user_id == trip.user_id,
+                FlightBooking.travel_date == trip.start_date
+            ).delete()
+            
+            # 3. Clear Cab Bookings
+            db.query(ProviderBooking).filter(
+                ProviderBooking.user_id == trip.user_id,
+                ProviderBooking.travel_date == trip.start_date
+            ).delete()
+            
+            # 4. Clear Food Orders
+            db.query(FoodOrder).filter(
+                FoodOrder.user_id == trip.user_id
+            ).delete()
+
         trip_out = await generate_itinerary(data, vehicle_info)
 
         # Update trip fields

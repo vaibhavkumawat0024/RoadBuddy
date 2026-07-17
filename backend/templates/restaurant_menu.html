@@ -211,52 +211,670 @@
         return res.json();
       })
       .then(orderData => {
-        const options = {
-          "key": orderData.key_id,
-          "amount": orderData.amount,
-          "currency": orderData.currency,
-          "name": "RoadBuddy AI",
-          "description": `${bookingType.toUpperCase()} Booking Payment`,
-          "order_id": orderData.order_id,
-          "handler": function (response) {
-            fetch("/api/payment/verify", {
+        // Custom Payment Gateway Injection
+        if (!document.getElementById('rb-pay-styles')) {
+          const style = document.createElement('style');
+          style.id = 'rb-pay-styles';
+          style.innerHTML = `
+            .rb-pay-overlay {
+              position: fixed;
+              top: 0;
+              left: 0;
+              width: 100%;
+              height: 100%;
+              background: rgba(15, 23, 42, 0.75);
+              backdrop-filter: blur(8px);
+              z-index: 10000;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-family: 'Inter', system-ui, -apple-system, sans-serif;
+              opacity: 0;
+              transition: opacity 0.3s ease;
+            }
+            .rb-pay-overlay.active {
+              opacity: 1;
+            }
+            .rb-pay-content {
+              background: #ffffff;
+              border-radius: 24px;
+              width: 90%;
+              max-width: 440px;
+              box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+              transform: translateY(20px);
+              transition: transform 0.3s ease;
+              overflow: hidden;
+              border: 1px solid rgba(226, 232, 240, 0.8);
+            }
+            .rb-pay-overlay.active .rb-pay-content {
+              transform: translateY(0);
+            }
+            .rb-pay-header {
+              background: #10b981;
+              color: white;
+              padding: 20px 24px;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+            }
+            .rb-pay-title-row {
+              display: flex;
+              align-items: center;
+              gap: 12px;
+            }
+            .rb-pay-logo {
+              width: 32px;
+              height: 32px;
+            }
+            .rb-pay-header h3 {
+              margin: 0;
+              font-size: 1.15rem;
+              font-weight: 700;
+              letter-spacing: -0.01em;
+            }
+            .rb-pay-subtitle {
+              font-size: 0.75rem;
+              opacity: 0.9;
+              display: block;
+            }
+            .rb-pay-close {
+              background: transparent;
+              border: none;
+              color: white;
+              font-size: 1.75rem;
+              cursor: pointer;
+              opacity: 0.8;
+              transition: opacity 0.2s;
+              padding: 0;
+              line-height: 1;
+            }
+            .rb-pay-close:hover {
+              opacity: 1;
+            }
+            .rb-pay-body {
+              padding: 24px;
+            }
+            .rb-pay-amount-box {
+              background: #f0fdf4;
+              border: 1px dashed #10b981;
+              padding: 14px 20px;
+              border-radius: 16px;
+              margin-bottom: 20px;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+            }
+            .rb-pay-amount-lbl {
+              font-size: 0.85rem;
+              color: #065f46;
+              font-weight: 600;
+              text-transform: uppercase;
+              letter-spacing: 0.03em;
+            }
+            .rb-pay-amount-val {
+              font-size: 1.6rem;
+              font-weight: 800;
+              color: #047857;
+            }
+            .rb-pay-step {
+              display: none;
+              flex-direction: column;
+              gap: 16px;
+            }
+            .rb-pay-step.active {
+              display: flex;
+            }
+            .rb-pay-tabs {
+              display: flex;
+              background: #f1f5f9;
+              padding: 4px;
+              border-radius: 12px;
+              margin-bottom: 8px;
+            }
+            .rb-pay-tab {
+              flex: 1;
+              border: none;
+              background: transparent;
+              padding: 10px;
+              border-radius: 8px;
+              font-size: 0.9rem;
+              font-weight: 600;
+              color: #64748b;
+              cursor: pointer;
+              transition: all 0.2s ease;
+            }
+            .rb-pay-tab.active {
+              background: #ffffff;
+              color: #0f172a;
+              box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            }
+            .rb-payment-form {
+              display: none;
+              flex-direction: column;
+              gap: 14px;
+            }
+            .rb-payment-form.active {
+              display: flex;
+            }
+            .rb-input-group {
+              display: flex;
+              flex-direction: column;
+              gap: 6px;
+              text-align: left;
+            }
+            .rb-input-group label {
+              font-size: 0.8rem;
+              font-weight: 600;
+              color: #475569;
+            }
+            .rb-input-group input {
+              padding: 11px 14px;
+              border: 1px solid #cbd5e1;
+              border-radius: 10px;
+              font-size: 0.95rem;
+              outline: none;
+              transition: all 0.2s;
+              color: #0f172a;
+            }
+            .rb-input-group input:focus {
+              border-color: #10b981;
+              box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+            }
+            .rb-phone-input-wrap {
+              display: flex;
+              border: 1px solid #cbd5e1;
+              border-radius: 10px;
+              overflow: hidden;
+              transition: all 0.2s;
+            }
+            .rb-phone-input-wrap:focus-within {
+              border-color: #10b981;
+              box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+            }
+            .rb-phone-prefix {
+              background: #f1f5f9;
+              padding: 11px 14px;
+              color: #475569;
+              font-weight: 600;
+              font-size: 0.95rem;
+              border-right: 1px solid #cbd5e1;
+            }
+            .rb-phone-input-wrap input {
+              border: none;
+              flex: 1;
+              padding: 11px 14px;
+            }
+            .rb-phone-input-wrap input:focus {
+              box-shadow: none;
+            }
+            .rb-row {
+              display: flex;
+              gap: 12px;
+            }
+            .rb-error-msg {
+              font-size: 0.75rem;
+              color: #ef4444;
+              font-weight: 500;
+              display: none;
+              margin-top: -2px;
+            }
+            .rb-upi-suggest {
+              display: flex;
+              flex-wrap: wrap;
+              gap: 6px;
+              align-items: center;
+              margin-top: 4px;
+            }
+            .rb-upi-suggest span {
+              font-size: 0.75rem;
+              color: #64748b;
+              font-weight: 500;
+            }
+            .rb-suggest-chip {
+              background: #f8fafc;
+              border: 1px solid #e2e8f0;
+              padding: 4px 10px;
+              border-radius: 20px;
+              font-size: 0.75rem;
+              color: #475569;
+              font-weight: 500;
+              cursor: pointer;
+              transition: all 0.15s;
+            }
+            .rb-suggest-chip:hover {
+              background: #f1f5f9;
+              border-color: #cbd5e1;
+            }
+            .rb-btn {
+              padding: 12px 24px;
+              border-radius: 12px;
+              font-size: 0.95rem;
+              font-weight: 700;
+              cursor: pointer;
+              transition: all 0.2s;
+              border: none;
+              outline: none;
+              text-align: center;
+            }
+            .rb-btn-primary {
+              background: #10b981;
+              color: white;
+            }
+            .rb-btn-primary:hover {
+              background: #059669;
+            }
+            .rb-btn-success {
+              background: #10b981;
+              color: white;
+            }
+            .rb-btn-success:hover {
+              background: #059669;
+            }
+            .rb-btn-outline {
+              background: transparent;
+              border: 1.5px solid #cbd5e1;
+              color: #475569;
+              margin-top: -4px;
+            }
+            .rb-btn-outline:hover {
+              background: #f8fafc;
+            }
+            .rb-otp-icon-wrap {
+              width: 56px;
+              height: 56px;
+              background: #e0f2fe;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              margin: 0 auto 8px;
+            }
+            .rb-otp-icon-wrap span {
+              font-size: 32px;
+              color: #0284c7;
+            }
+            .rb-otp-desc {
+              font-size: 0.85rem;
+              color: #64748b;
+              line-height: 1.5;
+              margin: 0 0 8px;
+            }
+            .rb-otp-info {
+              background: #f0fdf4;
+              padding: 10px 16px;
+              border-radius: 10px;
+              border: 1px dashed #10b981;
+              font-size: 0.85rem;
+              color: #047857;
+              text-align: center;
+              margin: 4px 0 12px;
+            }
+            .rb-spinner {
+              width: 44px;
+              height: 44px;
+              border: 4px solid #f1f5f9;
+              border-top-color: #10b981;
+              border-radius: 50%;
+              animation: rb-spin 1s linear infinite;
+              margin: 20px auto;
+            }
+            @keyframes rb-spin {
+              to { transform: rotate(360deg); }
+            }
+          `;
+          document.head.appendChild(style);
+        }
+
+        // Create modal overlay
+        const modalOverlay = document.createElement('div');
+        modalOverlay.className = 'rb-pay-overlay';
+        modalOverlay.innerHTML = `
+          <div class="rb-pay-content">
+            <div class="rb-pay-header">
+              <div class="rb-pay-title-row">
+                <svg class="rb-pay-logo" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:24px; height:24px;">
+                  <rect width="24" height="24" rx="6" fill="white" fill-opacity="0.2"/>
+                  <path d="M12 2L2 22H22L12 2Z" fill="white"/>
+                </svg>
+                <div>
+                  <h3>RoadBuddy Pay</h3>
+                  <span class="rb-pay-subtitle">Mock Payment Gateway</span>
+                </div>
+              </div>
+              <button class="rb-pay-close">&times;</button>
+            </div>
+            
+            <div class="rb-pay-body">
+              <!-- Amount Header -->
+              <div class="rb-pay-amount-box">
+                <span class="rb-pay-amount-lbl">Amount to Pay</span>
+                <span class="rb-pay-amount-val">₹${Number(amountInr).toLocaleString('en-IN')}</span>
+              </div>
+              
+              <!-- STEP 1: PAYMENT METHOD SELECTION & DETAILS -->
+              <div id="rb-step-details" class="rb-pay-step active">
+                <!-- Tabs to toggle UPI vs Card -->
+                <div class="rb-pay-tabs">
+                  <button type="button" id="rb-tab-card" class="rb-pay-tab active">Card</button>
+                  <button type="button" id="rb-tab-upi" class="rb-pay-tab">UPI</button>
+                </div>
+                
+                <!-- Common Phone input -->
+                <div class="rb-input-group">
+                  <label>Phone Number</label>
+                  <div class="rb-phone-input-wrap">
+                    <span class="rb-phone-prefix">+91</span>
+                    <input type="tel" id="rb-pay-phone" placeholder="Enter 10-digit number" maxlength="10" value="${'{{ user.phone if user and user.phone else "" }}'}">
+                  </div>
+                  <span class="rb-error-msg" id="rb-err-phone">Please enter a valid 10-digit phone number</span>
+                </div>
+                
+                <!-- CARD DETAILS FORM -->
+                <div id="rb-form-card" class="rb-payment-form active">
+                  <div class="rb-input-group">
+                    <label>Cardholder Name</label>
+                    <input type="text" id="rb-card-name" placeholder="John Doe" value="${'{{ user.name if user else "" }}'}">
+                    <span class="rb-error-msg" id="rb-err-name">Please enter the name on your card</span>
+                  </div>
+                  <div class="rb-input-group">
+                    <label>Card Number</label>
+                    <input type="text" id="rb-card-number" placeholder="4111 1111 1111 1111" maxlength="19">
+                    <span class="rb-error-msg" id="rb-err-number">Please enter a valid card number</span>
+                  </div>
+                  <div class="rb-row">
+                    <div class="rb-input-group flex-1">
+                      <label>Expiry Date</label>
+                      <input type="text" id="rb-card-expiry" placeholder="MM/YY" maxlength="5">
+                      <span class="rb-error-msg" id="rb-err-expiry">Enter valid MM/YY</span>
+                    </div>
+                    <div class="rb-input-group flex-1">
+                      <label>CVV</label>
+                      <input type="password" id="rb-card-cvv" placeholder="•••" maxlength="3">
+                      <span class="rb-error-msg" id="rb-err-cvv">Enter CVV</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- UPI DETAILS FORM -->
+                <div id="rb-form-upi" class="rb-payment-form">
+                  <div class="rb-input-group">
+                    <label>UPI ID (VPA)</label>
+                    <input type="text" id="rb-upi-id" placeholder="username@upi">
+                    <span class="rb-error-msg" id="rb-err-upi">Please enter a valid UPI ID (e.g. name@upi)</span>
+                  </div>
+                  <div class="rb-upi-suggest">
+                    <span>Suggestions:</span>
+                    <button type="button" class="rb-suggest-chip" onclick="document.getElementById('rb-upi-id').value='success@upi'">success@upi</button>
+                    <button type="button" class="rb-suggest-chip" onclick="document.getElementById('rb-upi-id').value='pay@okaxis'">pay@okaxis</button>
+                  </div>
+                </div>
+                
+                <button type="button" id="rb-btn-proceed" class="rb-btn rb-btn-primary" style="margin-top: 8px;">Proceed to Pay</button>
+              </div>
+              
+              <!-- STEP 2: OTP VERIFICATION -->
+              <div id="rb-step-otp" class="rb-pay-step">
+                <div class="rb-otp-icon-wrap">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:24px; height:24px;">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                  </svg>
+                </div>
+                <h4 style="margin: 0; font-size: 1.1rem; color: #1e293b;">OTP Verification</h4>
+                <p class="rb-otp-desc">We have sent a verification code to <span id="rb-otp-target-phone" style="font-weight: 700; color: #334155;">+91 XXXXX XXXXX</span></p>
+                
+                <div class="rb-input-group">
+                  <input type="text" id="rb-otp-input" placeholder="Enter 6-digit OTP" maxlength="6" style="text-align: center; font-size: 1.3rem; letter-spacing: 0.2em; font-weight: 700;">
+                  <span class="rb-error-msg" id="rb-err-otp" style="text-align: center;">Please enter the correct 6-digit OTP</span>
+                </div>
+                
+                <div class="rb-otp-info">
+                  Your verification OTP is: <strong id="rb-otp-code-display" style="font-size: 1.05rem;">------</strong>
+                </div>
+                
+                <button type="button" id="rb-btn-verify" class="rb-btn rb-btn-success">Verify & Pay</button>
+                <button type="button" id="rb-btn-back" class="rb-btn rb-btn-outline">Back</button>
+              </div>
+              
+              <!-- STEP 3: LOADING / PROCESSING -->
+              <div id="rb-step-loading" class="rb-pay-step">
+                <div class="rb-spinner"></div>
+                <h4 style="margin: 0; font-size: 1.1rem; color: #1e293b;">Processing Payment</h4>
+                <p style="font-size: 0.85rem; color: #64748b; margin: 4px 0 0;">Please do not refresh this page or click back.</p>
+              </div>
+              
+            </div>
+          </div>
+        `;
+        document.body.appendChild(modalOverlay);
+
+        // Tab switching state
+        let activeTab = 'card';
+        let generatedOtp = '';
+
+        const tabCardBtn = modalOverlay.querySelector('#rb-tab-card');
+        const tabUpiBtn = modalOverlay.querySelector('#rb-tab-upi');
+        const formCard = modalOverlay.querySelector('#rb-form-card');
+        const formUpi = modalOverlay.querySelector('#rb-form-upi');
+
+        tabCardBtn.addEventListener('click', () => {
+          activeTab = 'card';
+          tabCardBtn.classList.add('active');
+          tabUpiBtn.classList.remove('active');
+          formCard.classList.add('active');
+          formUpi.classList.remove('active');
+        });
+
+        tabUpiBtn.addEventListener('click', () => {
+          activeTab = 'upi';
+          tabUpiBtn.classList.add('active');
+          tabCardBtn.classList.remove('active');
+          formUpi.classList.add('active');
+          formCard.classList.remove('active');
+        });
+
+        // Card formatters
+        const cardInput = modalOverlay.querySelector('#rb-card-number');
+        cardInput.addEventListener('input', (e) => {
+          let value = e.target.value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
+          let formatted = '';
+          for (let i = 0; i < value.length; i++) {
+            if (i > 0 && i % 4 === 0) formatted += ' ';
+            formatted += value[i];
+          }
+          e.target.value = formatted;
+        });
+
+        const expiryInput = modalOverlay.querySelector('#rb-card-expiry');
+        expiryInput.addEventListener('input', (e) => {
+          let value = e.target.value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
+          if (value.length > 2) {
+            e.target.value = value.substr(0, 2) + '/' + value.substr(2, 2);
+          } else {
+            e.target.value = value;
+          }
+        });
+
+        // Open transition
+        setTimeout(() => modalOverlay.classList.add('active'), 50);
+
+        // Close events
+        const closeModal = () => {
+          modalOverlay.classList.remove('active');
+          setTimeout(() => modalOverlay.remove(), 300);
+        };
+
+        modalOverlay.querySelector('.rb-pay-close').addEventListener('click', closeModal);
+
+        // Validate and Proceed
+        modalOverlay.querySelector('#rb-btn-proceed').addEventListener('click', () => {
+          // Reset error visibility
+          modalOverlay.querySelectorAll('.rb-error-msg').forEach(el => el.style.display = 'none');
+          
+          const phone = modalOverlay.querySelector('#rb-pay-phone').value.trim();
+          let isValid = true;
+
+          if (phone.length !== 10 || !/^\d+$/.test(phone)) {
+            modalOverlay.querySelector('#rb-err-phone').style.display = 'block';
+            isValid = false;
+          }
+
+          if (activeTab === 'card') {
+            const cardName = modalOverlay.querySelector('#rb-card-name').value.trim();
+            const cardNum = modalOverlay.querySelector('#rb-card-number').value.replace(/\s+/g, '');
+            const cardExp = modalOverlay.querySelector('#rb-card-expiry').value;
+            const cardCvv = modalOverlay.querySelector('#rb-card-cvv').value;
+
+            if (!cardName) {
+              modalOverlay.querySelector('#rb-err-name').style.display = 'block';
+              isValid = false;
+            }
+            if (cardNum.length < 15 || cardNum.length > 16 || !/^\d+$/.test(cardNum)) {
+              modalOverlay.querySelector('#rb-err-number').style.display = 'block';
+              isValid = false;
+            }
+            if (!/^\d{2}\/\d{2}$/.test(cardExp)) {
+              modalOverlay.querySelector('#rb-err-expiry').style.display = 'block';
+              isValid = false;
+            }
+            if (cardCvv.length !== 3 || !/^\d+$/.test(cardCvv)) {
+              modalOverlay.querySelector('#rb-err-cvv').style.display = 'block';
+              isValid = false;
+            }
+          } else {
+            const upiVal = modalOverlay.querySelector('#rb-upi-id').value.trim();
+            if (!/^[\w.-]+@[\w.-]+$/.test(upiVal)) {
+              modalOverlay.querySelector('#rb-err-upi').style.display = 'block';
+              isValid = false;
+            }
+          }
+
+          if (isValid) {
+            const proceedBtn = modalOverlay.querySelector('#rb-btn-proceed');
+            proceedBtn.disabled = true;
+            proceedBtn.innerText = "Sending OTP...";
+
+            fetch("/api/payment/send-otp", {
               method: "POST",
-              headers: headers,
-              body: JSON.stringify({
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-                booking_type: bookingType,
-                details: details
-              })
+              headers: headers
             })
-            .then(async verifyRes => {
-              if (!verifyRes.ok) {
-                const err = await verifyRes.json().catch(() => ({}));
-                throw new Error(err.detail || "Payment verification failed");
+            .then(async response => {
+              if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.detail || "Failed to send OTP");
               }
-              return verifyRes.json();
+              return response.json();
             })
-            .then(verifyData => {
-              successCallback(verifyData);
+            .then(data => {
+              proceedBtn.disabled = false;
+              proceedBtn.innerText = "Proceed to Pay";
+
+              // Update registered details in the UI
+              modalOverlay.querySelector('#rb-otp-target-phone').innerText = `${data.phone} / ${data.email}`;
+              
+              // Set up OTP preview text
+              const codeDisplay = modalOverlay.querySelector('#rb-otp-code-display');
+              const codeDisplayParent = codeDisplay.parentElement;
+              if (data.sent_via_email) {
+                codeDisplayParent.innerHTML = `OTP sent to your registered email / phone. Please check your inbox.`;
+              } else {
+                codeDisplayParent.innerHTML = `Your verification OTP is: <strong id="rb-otp-code-display" style="font-size: 1.05rem;">${data.otp_preview}</strong>`;
+              }
+
+              modalOverlay.querySelector('#rb-otp-input').value = '';
+              modalOverlay.querySelector('#rb-step-details').classList.remove('active');
+              modalOverlay.querySelector('#rb-step-otp').classList.add('active');
             })
             .catch(err => {
-              alert("Payment Verification Failed: " + err.message);
-              window.location.reload();
+              proceedBtn.disabled = false;
+              proceedBtn.innerText = "Proceed to Pay";
+              alert("Error sending OTP: " + err.message);
             });
-          },
-          "prefill": {
-            "name": "{{ user.name if user else '' }}",
-            "email": "{{ user.email if user else '' }}",
-            "contact": "{{ user.phone if user else '' }}"
-          },
-          "theme": {
-            "color": "#10b981"
           }
-        };
-        
-        const rzp = new Razorpay(options);
-        rzp.open();
+        });
+
+        // Back Button
+        modalOverlay.querySelector('#rb-btn-back').addEventListener('click', () => {
+          modalOverlay.querySelector('#rb-step-otp').classList.remove('active');
+          modalOverlay.querySelector('#rb-step-details').classList.add('active');
+        });
+
+        // Verify OTP and Complete
+        modalOverlay.querySelector('#rb-btn-verify').addEventListener('click', () => {
+          const enteredOtp = modalOverlay.querySelector('#rb-otp-input').value.trim();
+          const errOtp = modalOverlay.querySelector('#rb-err-otp');
+          errOtp.style.display = 'none';
+
+          if (enteredOtp.length !== 6 || !/^\d+$/.test(enteredOtp)) {
+            errOtp.style.display = 'block';
+            errOtp.innerText = "Please enter a valid 6-digit OTP";
+            return;
+          }
+
+          const verifyBtn = modalOverlay.querySelector('#rb-btn-verify');
+          verifyBtn.disabled = true;
+          verifyBtn.innerText = "Verifying...";
+
+          // Verify OTP with backend
+          fetch("/api/payment/verify-otp", {
+            method: "POST",
+            headers: headers,
+            body: JSON.stringify({ otp: enteredOtp })
+          })
+          .then(async response => {
+            if (!response.ok) {
+              const err = await response.json().catch(() => ({}));
+              throw new Error(err.detail || "Invalid or expired OTP");
+            }
+            return response.json();
+          })
+          .then(() => {
+            // OTP Success! Move to loading
+            modalOverlay.querySelector('#rb-step-otp').classList.remove('active');
+            modalOverlay.querySelector('#rb-step-loading').classList.add('active');
+
+            // Verify request to FastAPI
+            const mockOrderId = "order_mock_" + orderData.order_id;
+            const mockPaymentId = "pay_mock_" + Math.random().toString(36).substr(2, 9);
+            const mockSignature = "sig_mock_" + Math.random().toString(36).substr(2, 12);
+
+            // Delay 1.5s for realistic loading spinner
+            setTimeout(() => {
+              fetch("/api/payment/verify", {
+                method: "POST",
+                headers: headers,
+                body: JSON.stringify({
+                  razorpay_order_id: mockOrderId,
+                  razorpay_payment_id: mockPaymentId,
+                  razorpay_signature: mockSignature,
+                  booking_type: bookingType,
+                  details: details
+                })
+              })
+              .then(async verifyRes => {
+                if (!verifyRes.ok) {
+                  const err = await verifyRes.json().catch(() => ({}));
+                  throw new Error(err.detail || "Payment verification failed");
+                }
+                return verifyRes.json();
+              })
+              .then(verifyData => {
+                closeModal();
+                successCallback(verifyData);
+              })
+              .catch(err => {
+                alert("Payment Verification Failed: " + err.message);
+                modalOverlay.querySelector('#rb-step-loading').classList.remove('active');
+                modalOverlay.querySelector('#rb-step-details').classList.add('active');
+              });
+            }, 1500);
+          })
+          .catch(err => {
+            errOtp.style.display = 'block';
+            errOtp.innerText = err.message;
+            verifyBtn.disabled = false;
+            verifyBtn.innerText = "Verify & Pay";
+          });
+        });
       })
       .catch(err => {
         alert("Payment Error: " + err.message);

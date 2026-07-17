@@ -308,7 +308,7 @@ def list_cab_services(
         from sqlalchemy import func
         query = query.filter(
             (ProviderVehicle.origin.ilike(f"%{origin}%")) |
-            (func.lower(origin).like(func.concat("%", func.lower(ProviderVehicle.origin), "%")))
+            (func.lower(origin).like("%" + func.lower(ProviderVehicle.origin) + "%"))
         )
     if destination:
         # "Private" vehicles have no real destination (they're priced per-km,
@@ -317,7 +317,7 @@ def list_cab_services(
         from sqlalchemy import func
         query = query.filter(
             (ProviderVehicle.destination.ilike(f"%{destination}%")) |
-            (func.lower(destination).like(func.concat("%", func.lower(ProviderVehicle.destination), "%"))) |
+            (func.lower(destination).like("%" + func.lower(ProviderVehicle.destination) + "%")) |
             (ProviderVehicle.destination == "Private")
         )
 
@@ -388,12 +388,11 @@ def list_cab_services(
 def search_vehicles(data: VehicleSearchRequest, db: Session = Depends(get_db)):
     """Search available provider vehicles for a route. Public — no auth needed."""
     _auto_cleanup_expired_routes(db)
-    from sqlalchemy import func
     vehicles = db.query(ProviderVehicle).filter(
         ((ProviderVehicle.origin.ilike(f"%{data.origin}%")) |
-         (func.lower(data.origin).like(func.concat("%", func.lower(ProviderVehicle.origin), "%")))),
+         (func.lower(data.origin).like("%" + func.lower(ProviderVehicle.origin) + "%"))),
         ((ProviderVehicle.destination.ilike(f"%{data.destination}%")) |
-         (func.lower(data.destination).like(func.concat("%", func.lower(ProviderVehicle.destination), "%")))),
+         (func.lower(data.destination).like("%" + func.lower(ProviderVehicle.destination) + "%"))),
         ProviderVehicle.is_active == True,
     ).all()
 

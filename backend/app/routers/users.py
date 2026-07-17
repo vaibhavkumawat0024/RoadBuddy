@@ -71,6 +71,43 @@ def login(
     return TokenOut(access_token=token)
 
 
+from pydantic import BaseModel, EmailStr, Field
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ForgotPasswordResetRequest(BaseModel):
+    email: EmailStr
+    otp: str = Field(..., min_length=6, max_length=6)
+    new_password: str = Field(..., min_length=8)
+
+@router.post("/forgot-password")
+def forgot_password(data: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """Initiate password reset: send OTP to verified email."""
+    user = db.query(User).filter(User.email == data.email).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="No account registered with this email address.")
+    try:
+        generate_and_send_otp(data.email, user.name)
+    except ValueError as e:
+        raise HTTPException(status_code=429, detail=str(e))
+    return {"message": "OTP sent", "email": data.email}
+
+@router.post("/forgot-password/reset")
+def forgot_password_reset(data: ForgotPasswordResetRequest, db: Session = Depends(get_db)):
+    """Verify OTP and update user's password."""
+    user = db.query(User).filter(User.email == data.email).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="No account registered with this email address.")
+    
+    if not verify_otp(data.email, data.otp):
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP code.")
+        
+    user.password_hash = hash_password(data.new_password)
+    db.commit()
+    return {"message": "Password reset successful"}
+
+
 # ── Profile ───────────────────────────────────────────────────────────────────
 @router.get("/me", response_model=UserOut)
 def get_profile(

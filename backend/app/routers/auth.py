@@ -69,7 +69,9 @@ def signup(payload: SignupRequest, response: Response, db: Session = Depends(get
         return {
             "role": "traveler",
             "name": user.name,
-            "email": user.email
+            "email": user.email,
+            "access_token": token,
+            "token_type": "bearer"
         }
         
     elif payload.role == "provider":
@@ -98,7 +100,9 @@ def signup(payload: SignupRequest, response: Response, db: Session = Depends(get
         return {
             "role": "provider",
             "name": provider.contact_person,
-            "email": provider.email
+            "email": provider.email,
+            "access_token": token,
+            "token_type": "bearer"
         }
         
     elif payload.role == "food_provider":
@@ -139,7 +143,9 @@ def signup(payload: SignupRequest, response: Response, db: Session = Depends(get
         return {
             "role": "food_provider",
             "name": provider.contact_person,
-            "email": provider.email
+            "email": provider.email,
+            "access_token": token,
+            "token_type": "bearer"
         }
         
     else:
@@ -161,7 +167,9 @@ def login(payload: LoginRequest, response: Response, db: Session = Depends(get_d
         return {
             "role": "traveler",
             "name": user.name,
-            "email": user.email
+            "email": user.email,
+            "access_token": token,
+            "token_type": "bearer"
         }
         
     elif payload.role == "provider":
@@ -180,7 +188,9 @@ def login(payload: LoginRequest, response: Response, db: Session = Depends(get_d
         return {
             "role": "provider",
             "name": provider.contact_person,
-            "email": provider.email
+            "email": provider.email,
+            "access_token": token,
+            "token_type": "bearer"
         }
         
     elif payload.role == "food_provider":
@@ -199,7 +209,9 @@ def login(payload: LoginRequest, response: Response, db: Session = Depends(get_d
         return {
             "role": "food_provider",
             "name": provider.contact_person,
-            "email": provider.email
+            "email": provider.email,
+            "access_token": token,
+            "token_type": "bearer"
         }
         
     else:
