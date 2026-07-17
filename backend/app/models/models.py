@@ -604,3 +604,144 @@ class VehicleReview(Base):
 
     vehicle = relationship("ProviderVehicle", back_populates="reviews")
     user    = relationship("User")
+
+
+# ── Fuel Station Availability Feature ─────────────────────────────────────────
+# NOTE: These models are new and separate from the Provider/Vehicle models above.
+# FuelStationOperator is a pump-owner concept; Provider is a cab/vehicle-service concept.
+
+class FuelStation(Base):
+    """
+    A petrol/diesel/CNG/EV station along a highway route.
+    is_demo=True marks synthetic/test stations used for demo purposes — never mix
+    with real production data that has is_demo=False.
+    """
+    __tablename__ = "fuel_stations"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    name        = Column(String, nullable=False)
+    brand       = Column(String, nullable=True)          # e.g. IOCL, BPCL, HPCL, private
+    latitude    = Column(Float, nullable=False)
+    longitude   = Column(Float, nullable=False)
+    address     = Column(String, nullable=True)
+    route_tag   = Column(String, nullable=True, index=True)  # e.g. "NH48-Jaipur-Delhi"
+    is_demo     = Column(Boolean, default=False, nullable=False)
+    gstin       = Column(String, nullable=True)
+    location_verified = Column(Boolean, default=False)
+    created_at  = Column(DateTime, server_default=func.now())
+
+    fuel_types        = relationship("StationFuelType",    back_populates="station", cascade="all, delete-orphan")
+    availability_log  = relationship("AvailabilityUpdate", back_populates="station", cascade="all, delete-orphan")
+    operator          = relationship("FuelStationOperator", back_populates="station", uselist=False, cascade="all, delete-orphan")
+    service_road_info = relationship("ServiceRoadInfo",    back_populates="station", uselist=False, cascade="all, delete-orphan")
+    ev_charger_status = relationship("EVChargerStatus",    back_populates="station", uselist=False, cascade="all, delete-orphan")
+
+
+class StationFuelType(Base):
+    """
+    Which fuel types a station offers.
+    fuel_type: one of petrol | diesel | cng | ev
+    """
+    __tablename__ = "station_fuel_types"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    station_id  = Column(Integer, ForeignKey("fuel_stations.id"), nullable=False)
+    fuel_type   = Column(String, nullable=False)    # petrol | diesel | cng | ev
+    is_offered  = Column(Boolean, default=True)
+
+    station = relationship("FuelStation", back_populates="fuel_types")
+
+
+class AvailabilityUpdate(Base):
+    """
+    Append-only log of availability reports per station+fuel_type.
+    Always INSERT new rows; never UPDATE existing rows.
+    This lets us recompute confidence from history at any point in time.
+
+    source: operator | crowdsource
+    reported_status: available | unavailable
+    """
+    __tablename__ = "availability_updates"
+
+    id              = Column(Integer, primary_key=True, index=True)
+    station_id      = Column(Integer, ForeignKey("fuel_stations.id"), nullable=False)
+    fuel_type       = Column(String, nullable=False)     # petrol | diesel | cng | ev
+    source          = Column(String, nullable=False)     # operator | crowdsource
+    reported_status = Column(String, nullable=False)     # available | unavailable
+    reported_at     = Column(DateTime, nullable=False, server_default=func.now())
+    reported_by     = Column(Integer, nullable=True)     # operator_id or user_id; nullable for anonymous
+
+    station = relationship("FuelStation", back_populates="availability_log")
+
+
+class FuelStationOperator(Base):
+    """
+    Owner/operator of a fuel station — completely separate from the Provider model
+    which handles cab/vehicle services.
+
+    verification_status:
+        pending  — submitted but not yet verified (real future flow)
+        verified — KYC confirmed (real future flow)
+        demo     — synthetic/test operator for mentor demo; clearly distinguishable from real data
+
+    kyc_document_reference is nullable/stub for now.
+    # TODO (real implementation): integrate a KYC document verification service here.
+    """
+    __tablename__ = "fuel_station_operators"
+
+    id                      = Column(Integer, primary_key=True, index=True)
+    station_id              = Column(Integer, ForeignKey("fuel_stations.id"), nullable=True, unique=True)
+    name                    = Column(String, nullable=True)
+    phone_number            = Column(String, nullable=True)
+    email                   = Column(String, nullable=True, unique=True)
+    license_number          = Column(String, nullable=True)
+    relationship_to_pump    = Column(String, nullable=True)  # owner | authorized_manager | dealer
+    gov_id                  = Column(String, nullable=True)  # Aadhaar or PAN
+    dealership_agreement_number = Column(String, nullable=True)
+    kyc_document_reference  = Column(String, nullable=True)   # stub field; no real document stored yet
+    verification_status     = Column(String, default="pending", nullable=False)  # pending | verified | demo
+    api_key                 = Column(String, nullable=True, unique=True)  # stub operator auth token
+    created_at              = Column(DateTime, server_default=func.now())
+
+    station = relationship("FuelStation", back_populates="operator")
+
+
+class ServiceRoadInfo(Base):
+    """
+    Service-road metadata for highway stations.
+    Drivers often miss pump entries on service roads — this data lets a frontend
+    trigger advance distance-based alerts (e.g. at 2km / 1km / 500m from entry).
+
+    highway_side: left | right (relative to travel direction)
+    entry_position: before_pump | after_pump
+    """
+    __tablename__ = "service_road_info"
+
+    id                   = Column(Integer, primary_key=True, index=True)
+    station_id           = Column(Integer, ForeignKey("fuel_stations.id"), nullable=False, unique=True)
+    highway_side         = Column(String, nullable=True)    # left | right
+    entry_position       = Column(String, nullable=True)    # before_pump | after_pump
+    requires_u_turn      = Column(Boolean, default=False)
+    entry_point_latitude  = Column(Float, nullable=True)
+    entry_point_longitude = Column(Float, nullable=True)
+    notes                = Column(Text, nullable=True)      # free text, e.g. "Entry visible from Delhi-bound side only"
+
+    station = relationship("FuelStation", back_populates="service_road_info")
+
+
+class EVChargerStatus(Base):
+    """
+    EV charger availability snapshot — separate from the confidence/decay model
+    used for liquid fuels, because EV availability is about charger occupancy,
+    not fuel stock confidence.
+    """
+    __tablename__ = "ev_charger_status"
+
+    id                  = Column(Integer, primary_key=True, index=True)
+    station_id          = Column(Integer, ForeignKey("fuel_stations.id"), nullable=False, unique=True)
+    total_chargers      = Column(Integer, default=0)
+    chargers_available  = Column(Integer, default=0)
+    chargers_working    = Column(Integer, default=0)
+    last_updated_at     = Column(DateTime, nullable=True)
+
+    station = relationship("FuelStation", back_populates="ev_charger_status")

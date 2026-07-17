@@ -45,6 +45,11 @@ class Settings(BaseSettings):
         "http://127.0.0.1:8081"
     ]
 
+    # Fuel station availability feature
+    demo_mode: bool = False               # Set DEMO_MODE=true in .env to enable debug/simulate-time endpoint
+    operator_decay_hours: float = 4.0     # Hours for operator-confirmed confidence to decay to 0%
+    crowdsource_decay_hours: float = 1.5  # Hours for crowdsourced confidence to decay to 0%
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 

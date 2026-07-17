@@ -8,7 +8,8 @@ from app.provider.pages import router as provider_pages_router
 from app.provider.food_pages import router as food_provider_pages_router
 from app.routers import booking, payment
 
-from app.routers import trips, fuel, users, community, journal, transport, food, auth
+from app.routers import trips, fuel, users, community, journal, transport, food, auth, stations
+from app.routers import fuel_operator_pages
 from app.pages import auth_pages, dashboard_pages
 from app.core.database import engine
 from sqlalchemy import text
@@ -97,7 +98,15 @@ async def run_migrations():
         "ALTER TABLE provider_vehicles ADD COLUMN IF NOT EXISTS avg_rating FLOAT DEFAULT 0.0;",
         "ALTER TABLE provider_vehicles ADD COLUMN IF NOT EXISTS total_reviews INTEGER DEFAULT 0;",
         "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS duffel_order_id VARCHAR;",
-        "ALTER TABLE hotel_bookings ADD COLUMN IF NOT EXISTS duffel_booking_id VARCHAR;"
+        "ALTER TABLE hotel_bookings ADD COLUMN IF NOT EXISTS duffel_booking_id VARCHAR;",
+        "ALTER TABLE fuel_station_operators ADD COLUMN IF NOT EXISTS email VARCHAR;",
+        "ALTER TABLE fuel_station_operators ALTER COLUMN station_id DROP NOT NULL;",
+        "ALTER TABLE fuel_station_operators ALTER COLUMN phone_number DROP NOT NULL;",
+        "ALTER TABLE fuel_station_operators ADD COLUMN IF NOT EXISTS relationship_to_pump VARCHAR;",
+        "ALTER TABLE fuel_station_operators ADD COLUMN IF NOT EXISTS gov_id VARCHAR;",
+        "ALTER TABLE fuel_station_operators ADD COLUMN IF NOT EXISTS dealership_agreement_number VARCHAR;",
+        "ALTER TABLE fuel_stations ADD COLUMN IF NOT EXISTS gstin VARCHAR;",
+        "ALTER TABLE fuel_stations ADD COLUMN IF NOT EXISTS location_verified BOOLEAN DEFAULT FALSE;"
     ]
     with engine.begin() as connection:
         dialect = connection.dialect.name
@@ -188,6 +197,9 @@ app.include_router(food_provider_pages_router)
 app.include_router(booking.router, prefix="/api/booking", tags=["Booking"])
 app.include_router(payment.router, prefix="/api/payment", tags=["Payment Gateway"])
 app.include_router(food.router, prefix="/api/food", tags=["Food & Restaurant"])
+app.include_router(stations.router, prefix="/api/stations", tags=["Fuel Station Availability"])
+app.include_router(stations.debug_router, prefix="/api", tags=["Debug (DEMO only)"])
+app.include_router(fuel_operator_pages.router)   # /fuel-operator/* pages
 
 # UI page routes
 app.include_router(auth_pages.router)

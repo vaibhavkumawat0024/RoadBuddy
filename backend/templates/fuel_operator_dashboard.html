@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fuel Operator Dashboard — RoadBuddy</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.css" rel="stylesheet" />
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #070d1a 0%, #0a1526 60%, #0d1e35 100%);
+      min-height: 100vh;
+      color: #fff;
+    }
+
+    /* ── Topbar ── */
+    .topbar {
+      background: rgba(255,255,255,0.04);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      padding: 0 24px;
+      height: 62px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .topbar-brand { display: flex; align-items: center; gap: 10px; }
+    .topbar-brand .icon { font-size: 26px; }
+    .topbar-brand .name { font-weight: 800; font-size: 16px; color: #fff; }
+    .topbar-brand .sub { font-size: 11px; color: #22c55e; font-weight: 600; letter-spacing: 0.4px; }
+    .topbar-right { display: flex; align-items: center; gap: 14px; }
+    .topbar-op { font-size: 13px; color: rgba(255,255,255,0.55); }
+    .topbar-op strong { color: #fff; }
+    .btn-logout {
+      padding: 7px 16px;
+      background: rgba(239,68,68,0.12);
+      border: 1px solid rgba(239,68,68,0.25);
+      border-radius: 8px;
+      color: #fca5a5;
+      font-size: 12px;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-logout:hover { background: rgba(239,68,68,0.22); }
+
+    /* ── Layout ── */
+    .main { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+    .page-header { margin-bottom: 28px; }
+    .page-header h1 { font-size: 26px; font-weight: 900; }
+    .page-header p { color: rgba(255,255,255,0.45); font-size: 14px; margin-top: 4px; }
+
+    /* Station info pill */
+    .station-pill {
+      display: inline-flex; align-items: center; gap: 10px;
+      background: rgba(34,197,94,0.10);
+      border: 1px solid rgba(34,197,94,0.20);
+      border-radius: 12px;
+      padding: 10px 18px;
+      margin-bottom: 28px;
+    }
+    .station-pill .label { font-size: 11px; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 0.4px; }
+    .station-pill .value { font-size: 14px; font-weight: 700; color: #fff; }
+    .station-pill .dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 8px #22c55e; flex-shrink: 0; }
+    .station-meta { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
+    .station-meta-item { display: flex; flex-direction: column; }
+
+    /* ── Grid layout ── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media(max-width: 700px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    /* ── Cards ── */
+    .card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 22px;
+    }
+    .card-title {
+      font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.55);
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px;
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    /* ── Fuel status cards ── */
+    .fuel-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin-bottom: 28px; }
+    .fuel-card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      padding: 18px;
+      position: relative;
+      overflow: hidden;
+    }
+    .fuel-card::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      border-radius: 14px 14px 0 0;
+    }
+    .fuel-card.petrol::before { background: linear-gradient(90deg, #ef4444, #dc2626); }
+    .fuel-card.diesel::before { background: linear-gradient(90deg, #b45309, #92400e); }
+    .fuel-card.cng::before   { background: linear-gradient(90deg, #3b82f6, #2563eb); }
+    .fuel-card.ev::before    { background: linear-gradient(90deg, #22c55e, #16a34a); }
+
+    .fuel-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .fuel-type-label { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+    .fuel-icon { font-size: 22px; }
+    .fuel-card .status-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;
+      margin-bottom: 10px;
+    }
+    .status-pill.available { background: rgba(34,197,94,0.15); color: #86efac; border: 1px solid rgba(34,197,94,0.25); }
+    .status-pill.unavailable { background: rgba(239,68,68,0.15); color: #fca5a5; border: 1px solid rgba(239,68,68,0.25); }
+    .status-pill.nodata { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.4); border: 1px solid rgba(255,255,255,0.10); }
+
+    /* Confidence bar */
+    .conf-bar-wrap { margin-top: 8px; }
+    .conf-label { display: flex; justify-content: space-between; font-size: 11px; color: rgba(255,255,255,0.4); margin-bottom: 5px; }
+    .conf-label .score { font-weight: 700; color: #fff; }
+    .conf-bar {
+      height: 5px; border-radius: 4px;
+      background: rgba(255,255,255,0.08);
+      overflow: hidden;
+    }
+    .conf-bar-fill {
+      height: 100%; border-radius: 4px;
+      transition: width 0.6s ease;
+    }
+    .conf-bar-fill.high   { background: linear-gradient(90deg, #22c55e, #16a34a); }
+    .conf-bar-fill.mid    { background: linear-gradient(90deg, #f59e0b, #d97706); }
+    .conf-bar-fill.low    { background: linear-gradient(90deg, #ef4444, #dc2626); }
+    .conf-bar-fill.zero   { background: rgba(255,255,255,0.15); }
+    .conf-freshness { font-size: 11px; color: rgba(255,255,255,0.35); margin-top: 5px; }
+
+    /* ── Update Form ── */
+    .update-card {
+      background: rgba(34,197,94,0.04);
+      border: 1px solid rgba(34,197,94,0.15);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 28px;
+    }
+    .update-card .card-title { color: #86efac; }
+    .update-form-grid { display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; align-items: end; }
+    @media(max-width: 600px) { .update-form-grid { grid-template-columns: 1fr; } }
+
+    .form-group label { display: block; font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 7px; }
+    .fuel-btn-group { display: flex; flex-wrap: wrap; gap: 8px; }
+    .fuel-radio { display: none; }
+    .fuel-radio-btn {
+      padding: 9px 16px;
+      background: rgba(255,255,255,0.05);
+      border: 1.5px solid rgba(255,255,255,0.10);
+      border-radius: 9px;
+      color: rgba(255,255,255,0.5);
+      font-size: 13px; font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      user-select: none;
+    }
+    .fuel-radio:checked + .fuel-radio-btn {
+      background: rgba(34,197,94,0.15);
+      border-color: #22c55e;
+      color: #86efac;
+    }
+    .status-btn-group { display: flex; gap: 8px; }
+    .status-radio { display: none; }
+    .status-radio-btn {
+      padding: 9px 20px;
+      border-radius: 9px;
+      font-size: 13px; font-weight: 700;
+      cursor: pointer;
+      border: 1.5px solid rgba(255,255,255,0.10);
+      background: rgba(255,255,255,0.05);
+      color: rgba(255,255,255,0.5);
+      transition: all 0.15s;
+      user-select: none;
+    }
+    .status-radio.avail:checked + .status-radio-btn {
+      background: rgba(34,197,94,0.18);
+      border-color: #22c55e;
+      color: #86efac;
+    }
+    .status-radio.unavail:checked + .status-radio-btn {
+      background: rgba(239,68,68,0.18);
+      border-color: #ef4444;
+      color: #fca5a5;
+    }
+    .btn-update {
+      padding: 11px 28px;
+      background: linear-gradient(135deg, #16a34a, #15803d);
+      color: #fff; font-size: 14px; font-weight: 700;
+      border: none; border-radius: 10px; cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s; white-space: nowrap;
+    }
+    .btn-update:hover { opacity: 0.88; transform: translateY(-1px); }
+    .btn-update:active { transform: scale(0.97); }
+
+    /* ── Activity log ── */
+    .log-table { width: 100%; border-collapse: collapse; }
+    .log-table th { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.35); text-transform: uppercase; letter-spacing: 0.4px; padding: 8px 10px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.07); }
+    .log-table td { font-size: 13px; color: rgba(255,255,255,0.7); padding: 10px 10px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .log-table tr:last-child td { border-bottom: none; }
+    .tag {
+      display: inline-block; padding: 2px 8px; border-radius: 5px; font-size: 11px; font-weight: 700;
+    }
+    .tag.available   { background: rgba(34,197,94,0.15); color: #86efac; }
+    .tag.unavailable { background: rgba(239,68,68,0.15); color: #fca5a5; }
+    .tag.petrol  { background: rgba(239,68,68,0.12);  color: #fca5a5; }
+    .tag.diesel  { background: rgba(180,83,9,0.18);   color: #fbbf24; }
+    .tag.cng     { background: rgba(59,130,246,0.15); color: #93c5fd; }
+    .tag.ev      { background: rgba(34,197,94,0.12);  color: #86efac; }
+
+    /* ── Station info ── */
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .info-item { }
+    .info-item .ilabel { font-size: 11px; color: rgba(255,255,255,0.35); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; }
+    .info-item .ival { font-size: 14px; font-weight: 600; color: #fff; }
+    .api-key-box {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      color: #22c55e;
+      word-break: break-all;
+      margin-top: 12px;
+    }
+
+    /* ── Success toast ── */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px; z-index: 999;
+      background: rgba(34,197,94,0.18);
+      border: 1px solid rgba(34,197,94,0.35);
+      border-radius: 12px;
+      padding: 14px 20px;
+      color: #86efac;
+      font-size: 13px; font-weight: 600;
+      display: flex; align-items: center; gap: 10px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+      animation: slideUp 0.3s ease;
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .empty-log { color: rgba(255,255,255,0.25); font-size: 13px; padding: 18px 0; text-align: center; }
+    .badge-demo {
+      display: inline-block;
+      background: rgba(251,191,36,0.15); color: #fde68a;
+      font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 5px;
+      border: 1px solid rgba(251,191,36,0.25); margin-left: 8px; vertical-align: middle;
+    }
+
+    /* ── Fuel type checkboxes for setup ── */
+    .setup-fuel-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
+    .setup-fuel-chk { display: none; }
+    .setup-fuel-btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 9px 16px;
+      background: rgba(255,255,255,0.05);
+      border: 2px solid rgba(255,255,255,0.10);
+      border-radius: 10px;
+      color: rgba(255,255,255,0.55);
+      font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: all 0.18s;
+      user-select: none;
+    }
+    .setup-fuel-chk:checked + .setup-fuel-btn {
+      background: rgba(34,197,94,0.15);
+      border-color: #22c55e;
+      color: #86efac;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Topbar -->
+<div class="topbar">
+  <div class="topbar-brand">
+    <span class="icon">⛽</span>
+    <div>
+      <div class="name">RoadBuddy Fuel <span class="badge-demo">DEMO</span></div>
+      <div class="sub">Station Operator Dashboard</div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <span class="topbar-op">Logged in as <strong>{{ operator.name }}</strong></span>
+    <a href="/fuel-operator/logout" class="btn-logout">Logout</a>
+  </div>
+</div>
+
+<!-- Main Content -->
+<div class="main">
+
+  <!-- Header -->
+  <div class="page-header">
+    <h1>⛽ Fuel Availability Dashboard</h1>
+    <p>Update live fuel availability — drivers on RoadBuddy see your status in real time with a confidence score</p>
+  </div>
+
+  {% if show_setup %}
+  <!-- Setup warning banner -->
+  <div class="setup-warning-banner" style="background: rgba(239, 68, 68, 0.12); border: 1.5px dashed #ef4444; border-radius: 16px; padding: 22px; margin-bottom: 28px; display: flex; align-items: center; justify-content: space-between; gap: 20px; box-shadow: 0 8px 32px rgba(239, 68, 68, 0.1);">
+    <div style="display: flex; align-items: center; gap: 14px;">
+      <span style="font-size: 32px;">⚠️</span>
+      <div>
+        <h3 style="color: #fca5a5; font-size: 15px; font-weight: 700; margin-bottom: 4px;">Quick Setup Incomplete</h3>
+        <p style="color: rgba(255, 255, 255, 0.60); font-size: 13px;">Your operator account is active, but you must register your fuel pump station to start updating fuel availability.</p>
+      </div>
+    </div>
+    <button onclick="openSetupPopup()" style="padding: 10px 20px; background: #22c55e; border: none; border-radius: 10px; color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; transition: opacity 0.2s; white-space: nowrap;">Complete Setup Now</button>
+  </div>
+
+  <!-- Quick Setup Popup Overlay -->
+  <div class="popup-overlay" id="setup-overlay" style="position: fixed; inset: 0; background: rgba(10, 15, 30, 0.85); backdrop-filter: blur(10px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px;">
+    <div class="popup-card" style="background: rgba(20, 30, 50, 0.96); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 24px; padding: 32px; width: 100%; max-width: 650px; max-height: 92vh; overflow-y: auto; box-shadow: 0 24px 64px rgba(0,0,0,0.6); position: relative; animation: popupSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
+      
+      <div class="popup-header" style="text-align: center; margin-bottom: 20px;">
+        <span style="font-size: 36px; display: inline-block; margin-bottom: 6px;">⚡</span>
+        <h2 style="font-size: 21px; font-weight: 800; color: #fff; margin-bottom: 4px;">Quick Register the Petrol Pump</h2>
+        <p style="color: rgba(255,255,255,0.45); font-size: 12.5px;">Complete onboarding steps to link your fuel pump and activate updates</p>
+      </div>
+
+      <!-- Tab header indicators -->
+      <div style="display: flex; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 24px;">
+        <button type="button" id="tab-btn-1" onclick="showTab(1)" style="flex: 1; padding: 12px; background: none; border: none; border-bottom: 2px solid #22c55e; color: #fff; font-size: 12.5px; font-weight: 700; cursor: pointer; transition: all 0.2s;">1. Personal ID</button>
+        <button type="button" id="tab-btn-2" onclick="showTab(2)" style="flex: 1; padding: 12px; background: none; border: none; border-bottom: 2px solid transparent; color: rgba(255,255,255,0.4); font-size: 12.5px; font-weight: 700; cursor: pointer; transition: all 0.2s;">2. Operations</button>
+        <button type="button" id="tab-btn-3" onclick="showTab(3)" style="flex: 1; padding: 12px; background: none; border: none; border-bottom: 2px solid transparent; color: rgba(255,255,255,0.4); font-size: 12.5px; font-weight: 700; cursor: pointer; transition: all 0.2s;">3. Pump Proof & Map</button>
+      </div>
+
+      <form id="setup-form" method="POST" action="/fuel-operator/setup" style="display: flex; flex-direction: column; gap: 18px;">
+        
+        <!-- ==================== TAB 1: PERSONAL ID ==================== -->
+        <div id="tab-content-1" style="display: block;">
+          <div style="display: flex; flex-direction: column; gap: 16px;">
+            <div>
+              <label style="display: block; color: rgba(255,255,255,0.6); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Full Name *</label>
+              <input type="text" id="operator_name" name="operator_name" placeholder="Full name of registering person" required style="width: 100%; padding: 11px 13px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 9px; color: #fff; font-size: 13.5px; outline: none;" />
+            </div>
+
+            <div>
+              <label style="display: block; color: rgba(255,255,255,0.6); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Relationship to the Pump *</label>
+              <select name="relationship_to_pump" required style="width: 100%; padding: 11px 13px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 9px; color: #fff; font-size: 13.5px; outline: none;">
+                <option value="" disabled selected style="background:#0a1526;">Select your relationship</option>
+                <option value="owner" style="background:#0a1526;">Owner</option>
+                <option value="authorized_manager" style="background:#0a1526;">Authorized Manager</option>
+                <option value="dealer" style="background:#0a1526;">Dealer</option>
+              </select>
+            </div>
+
+            <div>
+              <label style="display: block; color: rgba(255,255,255,0.6); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Government ID (Aadhaar or PAN) <span style="font-weight:normal; opacity:0.6;">(Optional)</span></label>
+              <input type="text" name="gov_id" placeholder="e.g. 12-digit Aadhaar / 10-digit PAN" style="width: 100%; padding: 11px 13px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 9px; color: #fff; font-size: 13.5px; outline: none;" />
+            </div>
+
+            <div>
+              <label style="display: block; color: rgba(255,255,255,0.6); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Personal Phone Number <span style="font-weight:normal; opacity:0.6;">(Optional)</span></label>
+              <input type="tel" name="personal_phone" placeholder="e.g. 9876543210" style="width: 100%; padding: 11px 13px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 9px; color: #fff; font-size: 13.5px; outline: none;" />
+            </div>
+
+            <button type="button" onclick="showTab(2)" style="width: 100%; margin-top: 14px; padding: 12px; background: #22c55e; border: none; border-radius: 10px; color: #fff; font-weight: 700; font-size: 14px; cursor: pointer; transition: opacity 0.2s;">Continue to Operational Details →</button>
+          </div>
+        </div>
+
+        <!-- ==================== TAB 2: OPERATIONAL DETAILS ==================== -->
+        <div id="tab-content-2" style="display: none;">
+          <div style="display: flex; flex-direction: column; gap: 16px;">
+            <div>
+              <label style="display: block; color: rgba(255,255,255,0.6); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Fuel Types Offered *</label>
+              <p style="color: rgba(255,255,255,0.45); font-size: 12px; margin-bottom: 12px;">Select all fuel types available at this outlet:</p>
+              
+              <div class="setup-fuel-grid">
+                <input class="setup-fuel-chk" type="checkbox" id="sf-petrol" name="fuel_types" value="petrol" checked />
+                <label class="setup-fuel-btn" for="sf-petrol">🔴 Petrol</label>
+
+                <input class="setup-fuel-chk" type="checkbox" id="sf-diesel" name="fuel_types" value="diesel" checked />
+                <label class="setup-fuel-btn" for="sf-diesel">🟤 Diesel</label>
+
+                <input class="setup-fuel-chk" type="checkbox" id="sf-cng" name="fuel_types" value="cng" />
+                <label class="setup-fuel-btn" for="sf-cng">🔵 CNG</label>
+
+                <input class="setup-fuel-chk" type="checkbox" id="sf-ev" name="fuel_types" value="ev" />
+                <label class="setup-fuel-btn" for="sf-ev">🟢 EV Charging</label>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 12px; margin-top: 14px;">
+              <button type="button" onclick="showTab(1)" style="flex: 1; padding: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; color: #fff; font-weight: 700; font-size: 14px; cursor: pointer;">← Back</button>
+              <button type="button" onclick="showTab(3)" style="flex: 1; padding: 12px; background: #22c55e; border: none; border-radius: 10px; color: #fff; font-weight: 700; font-size: 14px; cursor: pointer;">Continue to Proof & Map →</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== TAB 3: PUMP PROOF & MAP ==================== -->
+        <div id="tab-content-3" style="display: none;">
+          <div style="display: flex; flex-direction: column; gap: 16px;">
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div>
+                <label style="display: block; color: rgba(255,255,255,0.6); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">OMC Dealership Brand *</label>
+                <select name="dealership_name" required style="width: 100%; padding: 11px 13px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 9px; color: #fff; font-size: 13.5px; outline: none;">
+                  <option value="IOCL" selected style="background:#0a1526;">IOCL (Indian Oil)</option>
+                  <option value="BPCL" style="background:#0a1526;">BPCL (Bharat Petroleum)</option>
+                  <option value="HPCL" style="background:#0a1526;">HPCL (Hindustan Petroleum)</option>
+                  <option value="Private" style="background:#0a1526;">Private Outlet (Jio-bp / Nayara / Shell)</option>
+                  <option value="Other" style="background:#0a1526;">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label style="display: block; color: rgba(255,255,255,0.6); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Dealership Allotment Letter No <span style="font-weight:normal; opacity:0.6;">(Optional)</span></label>
+                <input type="text" name="dealership_agreement_number" placeholder="e.g. DL-HP-1892" style="width: 100%; padding: 11px 13px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 9px; color: #fff; font-size: 13.5px; outline: none;" />
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div>
+                <label style="display: block; color: rgba(255,255,255,0.6); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Station Name *</label>
+                <input type="text" id="station_name" name="station_name" value="RoadBuddy Fuel Station" required style="width: 100%; padding: 11px 13px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 9px; color: #fff; font-size: 13.5px; outline: none;" />
+              </div>
+
+              <div>
+                <label style="display: block; color: rgba(255,255,255,0.6); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">GSTIN <span style="font-weight:normal; opacity:0.6;">(Optional)</span></label>
+                <input type="text" name="gstin" placeholder="e.g. 08AAAAA1111A1Z1" style="width: 100%; padding: 11px 13px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 9px; color: #fff; font-size: 13.5px; outline: none;" />
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 12px;">
+              <div>
+                <label style="display: block; color: rgba(255,255,255,0.6); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Registered Address *</label>
+                <input type="text" name="station_address" placeholder="Registered address matching actual location" required style="width: 100%; padding: 11px 13px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 9px; color: #fff; font-size: 13.5px; outline: none;" />
+              </div>
+              <div>
+                <label style="display: block; color: rgba(255,255,255,0.6); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Route Tag</label>
+                <input type="text" name="route_tag" placeholder="NH48-Jaipur-Delhi" style="width: 100%; padding: 11px 13px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 9px; color: #fff; font-size: 13.5px; outline: none;" />
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div>
+                <label style="display: block; color: rgba(255,255,255,0.6); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Latitude *</label>
+                <input type="number" step="any" id="lat-input" name="station_latitude" value="27.270711" required style="width: 100%; padding: 11px 13px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 9px; color: #fff; font-size: 13.5px; outline: none;" />
+              </div>
+              <div>
+                <label style="display: block; color: rgba(255,255,255,0.6); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Longitude *</label>
+                <input type="number" step="any" id="lng-input" name="station_longitude" value="76.770233" required style="width: 100%; padding: 11px 13px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 9px; color: #fff; font-size: 13.5px; outline: none;" />
+              </div>
+            </div>
+
+            <!-- Service Road Info Details -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 4px;">
+              <div>
+                <label style="display: block; color: rgba(255,255,255,0.6); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Highway Side</label>
+                <select name="highway_side" style="width: 100%; padding: 11px 13px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 9px; color: #fff; font-size: 13.5px; outline: none;">
+                  <option value="left" selected style="background:#0a1526;">Left Side</option>
+                  <option value="right" style="background:#0a1526;">Right Side</option>
+                </select>
+              </div>
+              <div>
+                <label style="display: block; color: rgba(255,255,255,0.6); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Entry Position</label>
+                <select name="entry_position" style="width: 100%; padding: 11px 13px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 9px; color: #fff; font-size: 13.5px; outline: none;">
+                  <option value="before_pump" selected style="background:#0a1526;">Before Pump</option>
+                  <option value="at_pump" style="background:#0a1526;">At Pump</option>
+                  <option value="after_pump" style="background:#0a1526;">After Pump</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Map Verification Container -->
+            <div>
+              <label style="display: block; color: rgba(255,255,255,0.6); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Verify Pump Location on Map</label>
+              <div id="setup-map" style="width: 100%; height: 180px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); margin-bottom: 10px;"></div>
+              
+              <input type="hidden" name="location_verified" id="location-verified-input" value="false" />
+              <button type="button" id="btn-verify-location" onclick="verifyLocation()" style="width: 100%; padding: 10px; background: rgba(239, 68, 68, 0.15); border: 1.5px dashed #ef4444; border-radius: 10px; color: #fca5a5; font-size: 12.5px; font-weight: 700; cursor: pointer; transition: all 0.2s;">🔍 Locate & Verify Pump Location</button>
+            </div>
+
+            <div style="display: flex; gap: 12px; margin-top: 8px;">
+              <button type="button" onclick="showTab(2)" style="flex: 1; padding: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; color: #fff; font-weight: 700; font-size: 14px; cursor: pointer;">← Back</button>
+              <button type="submit" id="btn-complete-setup" disabled style="flex: 2; padding: 12px; background: linear-gradient(135deg, #16a34a, #15803d); color: #fff; font-weight: 700; font-size: 14.5px; border: none; border-radius: 10px; cursor: not-allowed; opacity: 0.5; transition: opacity 0.2s;">Complete Setup & Activate Dashboard →</button>
+            </div>
+          </div>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <script>
+    let setupMap = null;
+    let setupMarker = null;
+
+    function showTab(tabNum) {
+      document.getElementById('tab-content-1').style.display = tabNum === 1 ? 'block' : 'none';
+      document.getElementById('tab-content-2').style.display = tabNum === 2 ? 'block' : 'none';
+      document.getElementById('tab-content-3').style.display = tabNum === 3 ? 'block' : 'none';
+
+      // Style buttons
+      for (let i = 1; i <= 3; i++) {
+        const btn = document.getElementById('tab-btn-' + i);
+        if (i === tabNum) {
+          btn.style.borderBottomColor = '#22c55e';
+          btn.style.color = '#fff';
+        } else {
+          btn.style.borderBottomColor = 'transparent';
+          btn.style.color = 'rgba(255,255,255,0.4)';
+        }
+      }
+
+      // Initialize map on Tab 3 load
+      if (tabNum === 3) {
+        setTimeout(initSetupMap, 150);
+      }
+    }
+
+    function initSetupMap() {
+      if (setupMap) {
+        setupMap.resize();
+        return;
+      }
+
+      const lat = parseFloat(document.getElementById('lat-input').value) || 27.270711;
+      const lng = parseFloat(document.getElementById('lng-input').value) || 76.770233;
+
+      mapboxgl.accessToken = '{{ MAPBOX_ACCESS_TOKEN }}';
+      setupMap = new mapboxgl.Map({
+        container: 'setup-map',
+        style: 'mapbox://styles/mapbox/dark-v11',
+        center: [lng, lat],
+        zoom: 14,
+        interactive: false // Read-only map as requested: "cant chnge the location on map or cant do anything with the map, just verify the pump"
+      });
+
+      // Add a green glowing pulsing marker to show the pump location
+      const el = document.createElement('div');
+      el.innerHTML = `<div style="background-color: #22c55e; width: 24px; height: 24px; border-radius: 50%; border: 3px solid #86efac; display: flex; align-items: center; justify-content: center; font-size: 11px; box-shadow: 0 0 10px rgba(34, 197, 94, 0.7); position: relative; cursor: default;">
+        ⛽
+      </div>`;
+
+      setupMarker = new mapboxgl.Marker({ element: el })
+        .setLngLat([lng, lat])
+        .addTo(setupMap);
+
+      // Listen for latitude/longitude coordinate updates to relocate the marker dynamically
+      document.getElementById('lat-input').addEventListener('input', updateMarkerPosition);
+      document.getElementById('lng-input').addEventListener('input', updateMarkerPosition);
+    }
+
+    function updateMarkerPosition() {
+      if (!setupMap || !setupMarker) return;
+      const lat = parseFloat(document.getElementById('lat-input').value);
+      const lng = parseFloat(document.getElementById('lng-input').value);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        setupMarker.setLngLat([lng, lat]);
+        setupMap.panTo([lng, lat]);
+      }
+    }
+
+    function verifyLocation() {
+      const isVerified = document.getElementById('location-verified-input');
+      const btn = document.getElementById('btn-verify-location');
+      const submitBtn = document.getElementById('btn-complete-setup');
+
+      isVerified.value = "true";
+      
+      btn.textContent = "Pump Location Verified ✓";
+      btn.style.background = "rgba(34, 197, 94, 0.15)";
+      btn.style.border = "1.5px solid #22c55e";
+      btn.style.color = "#86efac";
+      btn.disabled = true;
+
+      // Unlock submit
+      submitBtn.disabled = false;
+      submitBtn.style.cursor = "pointer";
+      submitBtn.style.opacity = "1";
+    }
+  </script>
+  {% endif %}
+
+  {% if not show_setup %}
+  <!-- Station pill -->
+  <div class="station-pill">
+    <span class="dot"></span>
+    <div class="station-meta">
+      <div class="station-meta-item">
+        <span class="label">Station</span>
+        <span class="value">{{ station.name }}</span>
+      </div>
+      {% if station.brand %}
+      <div class="station-meta-item">
+        <span class="label">Brand</span>
+        <span class="value">{{ station.brand }}</span>
+      </div>
+      {% endif %}
+      {% if station.route_tag %}
+      <div class="station-meta-item">
+        <span class="label">Route</span>
+        <span class="value">{{ station.route_tag }}</span>
+      </div>
+      {% endif %}
+      <div class="station-meta-item">
+        <span class="label">Station ID</span>
+        <span class="value">#{{ station.id }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Live Fuel Status Cards -->
+  <div class="card-title" style="margin-bottom:14px;">
+    <span>📊</span> LIVE FUEL STATUS
+  </div>
+  <div class="fuel-cards">
+    {% for f in fuel_data %}
+    {% set conf = f.confidence %}
+    {% if f.fuel_type == 'petrol' %}{% set ficon = '🔴' %}{% elif f.fuel_type == 'diesel' %}{% set ficon = '🟤' %}{% elif f.fuel_type == 'cng' %}{% set ficon = '🔵' %}{% else %}{% set ficon = '🟢' %}{% endif %}
+    <div class="fuel-card {{ f.fuel_type }}">
+      <div class="fuel-card-header">
+        <span class="fuel-type-label">{{ f.fuel_type.upper() }}</span>
+        <span class="fuel-icon">{{ ficon }}</span>
+      </div>
+
+      {% if conf.reported_status == 'available' %}
+        <span class="status-pill available">✓ Available</span>
+      {% elif conf.reported_status == 'unavailable' %}
+        <span class="status-pill unavailable">✗ Unavailable</span>
+      {% else %}
+        <span class="status-pill nodata">— No Data</span>
+      {% endif %}
+
+      <div class="conf-bar-wrap">
+        <div class="conf-label">
+          <span>Confidence</span>
+          <span class="score">{{ conf.score }}%</span>
+        </div>
+        <div class="conf-bar">
+          {% if conf.score >= 60 %}{% set bar_class = 'high' %}
+          {% elif conf.score >= 30 %}{% set bar_class = 'mid' %}
+          {% elif conf.score > 0 %}{% set bar_class = 'low' %}
+          {% else %}{% set bar_class = 'zero' %}{% endif %}
+          <div class="conf-bar-fill {{ bar_class }}" style="width: {{ conf.score }}%"></div>
+        </div>
+        <div class="conf-freshness">{{ conf.label }}</div>
+      </div>
+    </div>
+    {% else %}
+    <div class="fuel-card" style="opacity:0.4;">
+      <div class="fuel-card-header"><span class="fuel-type-label">No fuels added</span></div>
+      <p style="font-size:12px;color:rgba(255,255,255,0.3);">Register fuel types to get started.</p>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Update Availability Form -->
+  <div class="update-card">
+    <div class="card-title">
+      <span>✏️</span> UPDATE FUEL AVAILABILITY
+    </div>
+    <form method="POST" action="/fuel-operator/update-availability">
+      <div class="update-form-grid">
+        <div class="form-group">
+          <label>Fuel Type</label>
+          <div class="fuel-btn-group">
+            {% for f in fuel_data %}
+            <input class="fuel-radio" type="radio" name="fuel_type" id="ur-{{ f.fuel_type }}" value="{{ f.fuel_type }}" {% if loop.first %}checked{% endif %} />
+            <label class="fuel-radio-btn" for="ur-{{ f.fuel_type }}">
+              {% if f.fuel_type == 'petrol' %}🔴{% elif f.fuel_type == 'diesel' %}🟤{% elif f.fuel_type == 'cng' %}🔵{% else %}🟢{% endif %}
+              {{ f.fuel_type.upper() }}
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Status</label>
+          <div class="status-btn-group">
+            <input class="status-radio avail" type="radio" name="reported_status" id="ur-avail" value="available" checked />
+            <label class="status-radio-btn" for="ur-avail">✅ Available</label>
+
+            <input class="status-radio unavail" type="radio" name="reported_status" id="ur-unavail" value="unavailable" />
+            <label class="status-radio-btn" for="ur-unavail">❌ Unavailable</label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>&nbsp;</label>
+          <button class="btn-update" type="submit">Update Now ⚡</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- Bottom Grid -->
+  <div class="grid-2">
+
+    <!-- Recent Activity Log -->
+    <div class="card">
+      <div class="card-title"><span>📋</span> RECENT UPDATE LOG</div>
+      {% if recent_updates %}
+      <table class="log-table">
+        <thead>
+          <tr>
+            <th>Fuel</th>
+            <th>Status</th>
+            <th>Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in recent_updates %}
+          <tr>
+            <td><span class="tag {{ u.fuel_type }}">{{ u.fuel_type.upper() }}</span></td>
+            <td><span class="tag {{ u.reported_status }}">{{ u.reported_status }}</span></td>
+            <td style="color:rgba(255,255,255,0.35);font-size:12px;">
+              {{ u.reported_at.strftime('%d %b, %H:%M') if u.reported_at else '—' }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-log">No updates yet. Use the form above to post your first update.</div>
+      {% endif %}
+    </div>
+
+    <!-- Station Info -->
+    <div class="card">
+      <div class="card-title"><span>ℹ️</span> STATION INFO</div>
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="ilabel">Operator Name</div>
+          <div class="ival">{{ operator.name }}</div>
+        </div>
+        <div class="info-item">
+          <div class="ilabel">Relationship</div>
+          <div class="ival" style="text-transform: capitalize;">{{ operator.relationship_to_pump }}</div>
+        </div>
+        <div class="info-item">
+          <div class="ilabel">Lat / Lon</div>
+          <div class="ival">{{ station.latitude }}, {{ station.longitude }}</div>
+        </div>
+        <div class="info-item">
+          <div class="ilabel">Verification</div>
+          <div class="ival" style="color: #86efac; font-weight:700;">VERIFIED</div>
+        </div>
+        {% if operator.gov_id %}
+        <div class="info-item">
+          <div class="ilabel">Gov ID</div>
+          <div class="ival">{{ operator.gov_id }}</div>
+        </div>
+        {% endif %}
+        {% if station.gstin %}
+        <div class="info-item">
+          <div class="ilabel">GSTIN</div>
+          <div class="ival">{{ station.gstin }}</div>
+        </div>
+        {% endif %}
+        {% if station.address %}
+        <div class="info-item" style="grid-column: 1/-1;">
+          <div class="ilabel">Address</div>
+          <div class="ival" style="font-size:13px;">{{ station.address }}</div>
+        </div>
+        {% endif %}
+      </div>
+
+      {% if service_road %}
+      <div style="margin-top:18px;">
+        <div class="card-title" style="margin-bottom:10px;"><span>🛣️</span> SERVICE ROAD</div>
+        <div class="info-grid">
+          <div class="info-item">
+            <div class="ilabel">Highway Side</div>
+            <div class="ival">{{ service_road.highway_side or '—' }}</div>
+          </div>
+          <div class="info-item">
+            <div class="ilabel">U-Turn Required</div>
+            <div class="ival">{{ '⚠️ Yes' if service_road.requires_u_turn else '✅ No' }}</div>
+          </div>
+        </div>
+        {% if service_road.notes %}
+        <div style="margin-top:10px;font-size:12px;color:rgba(255,255,255,0.35);">{{ service_road.notes }}</div>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <div style="margin-top:18px;">
+        <div class="card-title" style="margin-bottom:8px;"><span>🔑</span> API KEY</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.35);margin-bottom:6px;">Use this key to post updates via the REST API</div>
+        <div class="api-key-box" id="apikey">{{ operator.api_key }}</div>
+        <button onclick="copyKey()" style="margin-top:8px;background:none;border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.4);font-size:11px;padding:5px 12px;border-radius:6px;cursor:pointer;">Copy Key</button>
+      </div>
+    </div>
+
+  </div><!-- /grid-2 -->
+  {% endif %}
+</div><!-- /main -->
+
+{% if request.query_params.get('updated') %}
+<div class="toast" id="toast">✅ Fuel availability updated successfully!</div>
+{% endif %}
+
+{% if request.query_params.get('setup_completed') %}
+<div class="toast" id="toast">⚡ Quick pump registration completed successfully!</div>
+{% endif %}
+
+<script>
+  // Auto-hide toast
+  const toast = document.getElementById('toast');
+  if (toast) {
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transition = 'opacity 0.5s';
+      setTimeout(() => toast.remove(), 500);
+    }, 3500);
+  }
+
+  function copyKey() {
+    const key = document.getElementById('apikey').textContent.trim();
+    navigator.clipboard.writeText(key).then(() => {
+      const btn = event.target;
+      btn.textContent = '✅ Copied!';
+      setTimeout(() => btn.textContent = 'Copy Key', 2000);
+    });
+  }
+</script>
+</body>
+</html>

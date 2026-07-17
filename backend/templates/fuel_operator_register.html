@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Register Your Fuel Station — RoadBuddy</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #0a0f1e 0%, #0d1b2a 50%, #0f2340 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 16px;
+    }
+    .card {
+      background: rgba(255,255,255,0.04);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 20px;
+      padding: 40px 36px;
+      width: 100%;
+      max-width: 460px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+    }
+    .logo { font-size: 48px; text-align: center; margin-bottom: 8px; }
+    h1 { color: #fff; font-size: 22px; font-weight: 800; text-align: center; margin-bottom: 6px; }
+    .subtitle { color: rgba(255,255,255,0.45); font-size: 13px; text-align: center; margin-bottom: 28px; }
+    
+    label { display: block; color: rgba(255,255,255,0.6); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; margin-top: 16px; }
+    input[type="text"], input[type="password"], input[type="email"] {
+      width: 100%;
+      padding: 12px 14px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 10px;
+      color: #fff;
+      font-size: 14px;
+      font-family: 'Inter', sans-serif;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus { border-color: #22c55e; background: rgba(255,255,255,0.09); }
+    input::placeholder { color: rgba(255,255,255,0.25); }
+    
+    .pw-wrap { position: relative; }
+    .pw-wrap input { padding-right: 44px; }
+    .toggle-pw {
+      position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer; font-size: 16px; opacity: 0.5;
+    }
+    button[type="submit"] {
+      width: 100%;
+      margin-top: 28px;
+      padding: 14px;
+      background: linear-gradient(135deg, #16a34a, #15803d);
+      color: #fff; font-weight: 700; font-size: 15px;
+      border: none; border-radius: 12px; cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s; letter-spacing: 0.3px;
+    }
+    button[type="submit"]:hover { opacity: 0.92; transform: translateY(-1px); }
+    button[type="submit"]:active { transform: scale(0.98); }
+    
+    .footer { text-align: center; margin-top: 20px; font-size: 13px; color: rgba(255,255,255,0.35); }
+    .footer a { color: #22c55e; font-weight: 600; text-decoration: none; }
+    .error { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; font-size: 13px; padding: 10px 14px; border-radius: 10px; margin-bottom: 16px; }
+    .badge { display: inline-block; background: rgba(34,197,94,0.15); color: #86efac; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(34,197,94,0.25); margin-left: 8px; vertical-align: middle; }
+    .hint { color: rgba(255,255,255,0.3); font-size: 11px; margin-top: 5px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">⛽</div>
+    <h1>Register Your Station <span class="badge">Operator</span></h1>
+    <p class="subtitle">Quick register and list your fuel station on RoadBuddy</p>
+
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+    <form method="POST" action="/fuel-operator/register" id="reg-form">
+      <label for="email">Gmail / Email *</label>
+      <input type="email" id="email" name="email" placeholder="e.g. operator@gmail.com" required />
+
+      <label for="password">Create Password *</label>
+      <div class="pw-wrap">
+        <input type="password" id="password" name="password" placeholder="Min 6 characters" required minlength="6" />
+        <button type="button" class="toggle-pw" onclick="togglePw('password', this)">👁</button>
+      </div>
+
+      <label for="confirm_password">Confirm Password *</label>
+      <div class="pw-wrap">
+        <input type="password" id="confirm_password" name="confirm_password" placeholder="Re-enter password" required minlength="6" />
+        <button type="button" class="toggle-pw" onclick="togglePw('confirm_password', this)">👁</button>
+      </div>
+
+      <div style="margin-top: 20px; display: flex; gap: 10px; align-items: flex-end;">
+        <div style="flex: 1;">
+          <label for="otp">Enter Verification OTP *</label>
+          <input type="text" id="otp" name="otp" placeholder="Enter 4-digit OTP" required disabled maxlength="4" style="height: 46px;" />
+        </div>
+        <button type="button" id="btn-otp" onclick="sendOTP()" style="padding: 12px 16px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.2s; white-space: nowrap; height: 46px;">Generate OTP</button>
+      </div>
+      <p class="hint" id="otp-hint" style="display: none; color: #86efac; font-weight: 500;">💡 Demo OTP: <b>1234</b></p>
+
+      <button type="submit" id="btn-submit" disabled style="opacity: 0.5; cursor: not-allowed;">Register My Station →</button>
+    </form>
+
+    <div class="footer">
+      <p>Already registered? <a href="/fuel-operator/login">Login here</a></p>
+    </div>
+  </div>
+
+  <script>
+    function togglePw(id, btn) {
+      const inp = document.getElementById(id);
+      if (inp.type === 'password') {
+        inp.type = 'text';
+        btn.textContent = '🙈';
+      } else {
+        inp.type = 'password';
+        btn.textContent = '👁';
+      }
+    }
+
+    function sendOTP() {
+      const email = document.getElementById('email').value.trim();
+      if (!email || !email.includes('@')) {
+        alert("Please enter a valid email address first.");
+        return;
+      }
+      
+      const btn = document.getElementById('btn-otp');
+      const otpInput = document.getElementById('otp');
+      const hint = document.getElementById('otp-hint');
+      const submitBtn = document.getElementById('btn-submit');
+      
+      btn.textContent = "OTP Generated ✅";
+      btn.style.background = "rgba(34,197,94,0.15)";
+      btn.style.borderColor = "#22c55e";
+      btn.style.color = "#86efac";
+      btn.disabled = true;
+      
+      otpInput.disabled = false;
+      otpInput.focus();
+      hint.style.display = "block";
+      
+      submitBtn.disabled = false;
+      submitBtn.style.opacity = "1";
+      submitBtn.style.cursor = "pointer";
+    }
+
+    document.getElementById('reg-form').addEventListener('submit', function(e) {
+      const pw = document.getElementById('password').value;
+      const cpw = document.getElementById('confirm_password').value;
+      const otp = document.getElementById('otp').value;
+      
+      if (pw !== cpw) {
+        e.preventDefault();
+        alert("Passwords do not match!");
+        return;
+      }
+      
+      if (otp !== '1234') {
+        e.preventDefault();
+        alert("Incorrect OTP! Please use 1234.");
+        return;
+      }
+    });
+  </script>
+</body>
+</html>
