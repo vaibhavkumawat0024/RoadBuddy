@@ -588,7 +588,7 @@ async def chat_with_roadbuddy(message: str, history: list[dict] = None, user_con
         messages = truncated_history + [{"role": "user", "content": message}]
         if db:
             db.rollback()
-        if settings.gemini_api_key:
+        if settings.gemini_api_key or settings.groq_api_key:
             try:
                 response_text = await call_groq_chat(messages, user_context)
             except Exception as e:

@@ -776,7 +776,7 @@ async def chat_with_provider_bot(message: str, history: list[dict] = None, provi
                 updated_history = messages + [{"role": "assistant", "content": update_response}]
                 return {"response": update_response, "history": updated_history, "total_messages": len(updated_history)}
 
-        if settings.gemini_api_key:
+        if settings.gemini_api_key or settings.groq_api_key:
             try:
                 dynamic_prompt = SYSTEM_PROMPT
                 if db and provider_id:
