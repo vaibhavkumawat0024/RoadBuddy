@@ -317,6 +317,16 @@ def list_stations(
                 "reported_status": confidence["reported_status"],
             })
 
+        service_road = None
+        if s.service_road_info:
+            sr = s.service_road_info
+            service_road = {
+                "highway_side": sr.highway_side,
+                "entry_position": sr.entry_position,
+                "requires_u_turn": sr.requires_u_turn,
+                "notes": sr.notes,
+            }
+
         result.append({
             "id": s.id,
             "name": s.name,
@@ -326,6 +336,7 @@ def list_stations(
             "route_tag": s.route_tag,
             "is_demo": s.is_demo,
             "fuel_types": fuel_summaries,
+            "service_road_info": service_road,
         })
 
     return {"stations": result, "count": len(result)}

@@ -106,7 +106,8 @@ async def run_migrations():
         "ALTER TABLE fuel_station_operators ADD COLUMN IF NOT EXISTS gov_id VARCHAR;",
         "ALTER TABLE fuel_station_operators ADD COLUMN IF NOT EXISTS dealership_agreement_number VARCHAR;",
         "ALTER TABLE fuel_stations ADD COLUMN IF NOT EXISTS gstin VARCHAR;",
-        "ALTER TABLE fuel_stations ADD COLUMN IF NOT EXISTS location_verified BOOLEAN DEFAULT FALSE;"
+        "ALTER TABLE fuel_stations ADD COLUMN IF NOT EXISTS location_verified BOOLEAN DEFAULT FALSE;",
+        "ALTER TABLE availability_updates ADD COLUMN IF NOT EXISTS ttl_hours FLOAT;"
     ]
     with engine.begin() as connection:
         dialect = connection.dialect.name

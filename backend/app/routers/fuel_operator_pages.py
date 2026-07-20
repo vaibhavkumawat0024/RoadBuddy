@@ -12,6 +12,7 @@ URLs:
   GET  /fuel-operator/logout     — Clear cookie and redirect
   GET  /fuel-operator/dashboard  — Main operator dashboard
   POST /fuel-operator/setup      — Complete quick pump registration
+  POST /fuel-operator/reverify   — Re-verify expired fuel availability timer
   POST /fuel-operator/update-availability — Update fuel availability
 """
 
@@ -89,7 +90,8 @@ def _build_dashboard_data(operator: FuelStationOperator, db: Session) -> dict:
             "fuel_data": [],
             "service_road": None,
             "recent_updates": [],
-            "show_setup": True
+            "show_setup": True,
+            "expired_prompts": []
         }
 
     station = db.query(FuelStation).filter(FuelStation.id == operator.station_id).first()
@@ -97,6 +99,9 @@ def _build_dashboard_data(operator: FuelStationOperator, db: Session) -> dict:
     service_road = db.query(ServiceRoadInfo).filter(ServiceRoadInfo.station_id == station.id).first()
 
     fuel_data = []
+    expired_prompts = []
+    current_time = datetime.now(timezone.utc)
+
     for row in fuel_rows:
         updates = (
             db.query(AvailabilityUpdate)
@@ -107,13 +112,35 @@ def _build_dashboard_data(operator: FuelStationOperator, db: Session) -> dict:
             .order_by(AvailabilityUpdate.reported_at.desc())
             .all()
         )
-        conf = get_best_confidence(updates)
+        conf = get_best_confidence(updates, current_time)
         fuel_data.append({
             "fuel_type": row.fuel_type,
             "is_offered": row.is_offered,
             "confidence": conf,
             "update_count": len(updates),
         })
+
+        # Check for expired available timers to prompt re-verification
+        if row.is_offered and len(updates) > 0:
+            latest_update = updates[0]
+            if latest_update.reported_status == "available" and latest_update.ttl_hours is not None:
+                if latest_update.ttl_hours == -1.0:
+                    continue  # 24/7 available never expires!
+
+                reported_at = latest_update.reported_at
+                if reported_at.tzinfo is None:
+                    reported_at = reported_at.replace(tzinfo=timezone.utc)
+
+                elapsed_seconds = (current_time - reported_at).total_seconds()
+                ttl_seconds = latest_update.ttl_hours * 3600.0
+
+                if elapsed_seconds > ttl_seconds:
+                    # Timer expired, prompt operator
+                    expired_prompts.append({
+                        "fuel_type": row.fuel_type,
+                        "ttl_hours": latest_update.ttl_hours,
+                        "reported_at_str": reported_at.strftime("%I:%M %p")
+                    })
 
     # Recent update log (last 10)
     recent_updates = (
@@ -130,7 +157,8 @@ def _build_dashboard_data(operator: FuelStationOperator, db: Session) -> dict:
         "fuel_data": fuel_data,
         "service_road": service_road,
         "recent_updates": recent_updates,
-        "show_setup": False
+        "show_setup": False,
+        "expired_prompts": expired_prompts
     }
 
 
@@ -355,6 +383,7 @@ def update_availability(
     request: Request,
     fuel_type: str = Form(...),
     reported_status: str = Form(...),
+    ttl_hours: Optional[float] = Form(None),
     db: Session = Depends(get_db),
 ):
     operator = _get_operator_from_cookie(request, db)
@@ -368,6 +397,10 @@ def update_availability(
         data["error"] = "Invalid fuel type or status."
         return templates.TemplateResponse(request, "fuel_operator_dashboard.html", data)
 
+    final_ttl = None
+    if reported_status == "available":
+        final_ttl = ttl_hours if ttl_hours is not None else 1.0
+
     # APPEND-ONLY — always insert a new row
     db.add(AvailabilityUpdate(
         station_id=operator.station_id,
@@ -376,7 +409,46 @@ def update_availability(
         reported_status=reported_status,
         reported_at=datetime.now(timezone.utc),
         reported_by=operator.id,
+        ttl_hours=final_ttl,
     ))
+    db.commit()
+
+    return RedirectResponse("/fuel-operator/dashboard?updated=1", status_code=303)
+
+
+@router.post("/reverify", response_class=HTMLResponse)
+def reverify_availability(
+    request: Request,
+    fuel_type: str = Form(...),
+    still_available: str = Form(...),  # yes | no
+    new_ttl_hours: Optional[float] = Form(None),
+    db: Session = Depends(get_db),
+):
+    operator = _get_operator_from_cookie(request, db)
+    if not operator:
+        return RedirectResponse("/fuel-operator/login", status_code=303)
+
+    if still_available == "no":
+        db.add(AvailabilityUpdate(
+            station_id=operator.station_id,
+            fuel_type=fuel_type,
+            source="operator",
+            reported_status="unavailable",
+            reported_at=datetime.now(timezone.utc),
+            reported_by=operator.id,
+            ttl_hours=None,
+        ))
+    else:
+        final_ttl = new_ttl_hours if new_ttl_hours is not None else 1.0
+        db.add(AvailabilityUpdate(
+            station_id=operator.station_id,
+            fuel_type=fuel_type,
+            source="operator",
+            reported_status="available",
+            reported_at=datetime.now(timezone.utc),
+            reported_by=operator.id,
+            ttl_hours=final_ttl,
+        ))
     db.commit()
 
     return RedirectResponse("/fuel-operator/dashboard?updated=1", status_code=303)

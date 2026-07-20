@@ -670,6 +670,7 @@ class AvailabilityUpdate(Base):
     reported_status = Column(String, nullable=False)     # available | unavailable
     reported_at     = Column(DateTime, nullable=False, server_default=func.now())
     reported_by     = Column(Integer, nullable=True)     # operator_id or user_id; nullable for anonymous
+    ttl_hours       = Column(Float, nullable=True)       # estimated time for how long fuel is 100% available
 
     station = relationship("FuelStation", back_populates="availability_log")
 
