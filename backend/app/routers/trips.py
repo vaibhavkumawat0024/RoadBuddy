@@ -839,24 +839,27 @@ Do not include any explanation, markdown formatting (no ```json, no ```), or not
 
     try:
         if settings.gemini_api_key or settings.groq_api_key:
-            result = await call_groq(prompt)
-            return result
-        else:
-            # Fallback mock itinerary if no API keys are set
-            itinerary = []
-            for day in range(1, days + 1):
-                itinerary.append({
-                    "day": day,
-                    "attractions": [f"Famous Landmark {day}A", f"Scenic Viewpoint {day}B", f"Cultural Activity {day}C"],
-                    "dining": [f"Popular Local Cafe {day}", f"Traditional Dinner spot {day}"],
-                    "summary": f"Discover the wonderful sights of {destination} on Day {day}. Start with a visit to the local landmark followed by a scenic walk. Enjoy authentic cuisine for lunch and wrap up the evening exploring markets."
-                })
-            return {
-                "destination": destination,
-                "days_count": days,
-                "title": f"Explore the Best of {destination}",
-                "itinerary": itinerary
-            }
+            try:
+                result = await call_groq(prompt)
+                return result
+            except Exception as api_err:
+                print(f"Quick itinerary generation API call failed ({api_err}). Falling back to mock itinerary.")
+
+        # Fallback mock itinerary if API call failed or no API keys are set
+        itinerary = []
+        for day in range(1, days + 1):
+            itinerary.append({
+                "day": day,
+                "attractions": [f"Famous Landmark {day}A", f"Scenic Viewpoint {day}B", f"Cultural Activity {day}C"],
+                "dining": [f"Popular Local Cafe {day}", f"Traditional Dinner spot {day}"],
+                "summary": f"Discover the wonderful sights of {destination} on Day {day}. Start with a visit to the local landmark followed by a scenic walk. Enjoy authentic cuisine for lunch and wrap up the evening exploring markets."
+            })
+        return {
+            "destination": destination,
+            "days_count": days,
+            "title": f"Explore the Best of {destination}",
+            "itinerary": itinerary
+        }
     except Exception as e:
         print(f"Quick itinerary generation failed: {e}")
         raise HTTPException(status_code=500, detail="Failed to generate itinerary. Please try again.")
