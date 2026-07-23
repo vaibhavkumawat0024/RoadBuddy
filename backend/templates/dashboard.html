@@ -2094,9 +2094,10 @@ function startMapNavigation() {
   hud.style.display = 'block';
   document.getElementById('sim-route-checkbox').checked = false;
   
-  // Switch to Satellite Hybrid Style for Google Maps navigation!
+  // Start navigation in Streets view (or user's selected currentStyleId), customizable via layers panel
   if (dashboardMap) {
-    dashboardMap.setStyle('mapbox://styles/mapbox/satellite-streets-v12');
+    const activeStyle = currentStyleId || 'streets-v12';
+    dashboardMap.setStyle(`mapbox://styles/mapbox/${activeStyle}`);
   }
 
   dashboardMap.easeTo({
