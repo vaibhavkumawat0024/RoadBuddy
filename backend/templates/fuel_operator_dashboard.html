@@ -16,6 +16,12 @@
       color: #fff;
     }
 
+    /* ── Dropdown Select Options Styling Fix ── */
+    select option {
+      background: #0a1526 !important;
+      color: #fff !important;
+    }
+
     /* ── Topbar ── */
     .topbar {
       background: rgba(255,255,255,0.04);
@@ -138,7 +144,7 @@
     .conf-bar-fill.mid    { background: linear-gradient(90deg, #f59e0b, #d97706); }
     .conf-bar-fill.low    { background: linear-gradient(90deg, #ef4444, #dc2626); }
     .conf-bar-fill.zero   { background: rgba(255,255,255,0.15); }
-    .conf-freshness { font-size: 11px; color: rgba(255,255,255,0.35); margin-top: 5px; }
+    .conf-freshness { font-size: 11px; color: rgba(255,255,255,0.35); margin-top: 5px; line-height: 1.3; }
 
     /* ── Update Form ── */
     .update-card {
@@ -149,8 +155,8 @@
       margin-bottom: 28px;
     }
     .update-card .card-title { color: #86efac; }
-    .update-form-grid { display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; align-items: end; }
-    @media(max-width: 600px) { .update-form-grid { grid-template-columns: 1fr; } }
+    .update-form-grid { display: grid; grid-template-columns: 1.2fr 1fr 1.2fr auto; gap: 16px; align-items: end; }
+    @media(max-width: 800px) { .update-form-grid { grid-template-columns: 1fr; } }
 
     .form-group label { display: block; font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 7px; }
     .fuel-btn-group { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -200,6 +206,7 @@
       color: #fff; font-size: 14px; font-weight: 700;
       border: none; border-radius: 10px; cursor: pointer;
       transition: opacity 0.2s, transform 0.1s; white-space: nowrap;
+      height: 38px;
     }
     .btn-update:hover { opacity: 0.88; transform: translateY(-1px); }
     .btn-update:active { transform: scale(0.97); }
@@ -281,6 +288,11 @@
       border-color: #22c55e;
       color: #86efac;
     }
+
+    @keyframes popupSlideIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
   </style>
 </head>
 <body>
@@ -340,7 +352,8 @@
       </div>
 
       <form id="setup-form" method="POST" action="/fuel-operator/setup" style="display: flex; flex-direction: column; gap: 18px;">
-        
+        <input type="hidden" name="existing_station_id" id="existing-station-id-input" value="" />
+
         <!-- ==================== TAB 1: PERSONAL ID ==================== -->
         <div id="tab-content-1" style="display: block;">
           <div style="display: flex; flex-direction: column; gap: 16px;">
@@ -352,10 +365,10 @@
             <div>
               <label style="display: block; color: rgba(255,255,255,0.6); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Relationship to the Pump *</label>
               <select name="relationship_to_pump" required style="width: 100%; padding: 11px 13px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 9px; color: #fff; font-size: 13.5px; outline: none;">
-                <option value="" disabled selected style="background:#0a1526;">Select your relationship</option>
-                <option value="owner" style="background:#0a1526;">Owner</option>
-                <option value="authorized_manager" style="background:#0a1526;">Authorized Manager</option>
-                <option value="dealer" style="background:#0a1526;">Dealer</option>
+                <option value="" disabled selected>Select your relationship</option>
+                <option value="owner">Owner</option>
+                <option value="authorized_manager">Authorized Manager</option>
+                <option value="dealer">Dealer</option>
               </select>
             </div>
 
@@ -406,15 +419,28 @@
         <div id="tab-content-3" style="display: none;">
           <div style="display: flex; flex-direction: column; gap: 16px;">
             
+            <!-- Link to Existing Station Dropdown -->
+            <div>
+              <label style="display: block; color: rgba(255,255,255,0.6); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Link to Existing Petrol Pump <span style="font-weight:normal; opacity:0.6;">(Optional)</span></label>
+              <select id="link-existing-station" onchange="onSelectExistingStation(this)" style="width: 100%; padding: 11px 13px; background: rgba(255,255,255,0.05); border: 1.5px solid #22c55e; border-radius: 9px; color: #fff; font-size: 13.5px; outline: none;">
+                <option value="">-- Create a new Petrol Pump from scratch --</option>
+                {% for s in existing_stations %}
+                  <option value="{{ s.id }}" data-name="{{ s.name }}" data-brand="{{ s.brand or '' }}" data-route="{{ s.route_tag or '' }}" data-address="{{ s.address or '' }}" data-lat="{{ s.latitude }}" data-lng="{{ s.longitude }}">
+                    {{ s.name }} ({{ s.brand or 'Other' }} - {{ s.latitude }}, {{ s.longitude }})
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
               <div>
                 <label style="display: block; color: rgba(255,255,255,0.6); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">OMC Dealership Brand *</label>
-                <select name="dealership_name" required style="width: 100%; padding: 11px 13px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 9px; color: #fff; font-size: 13.5px; outline: none;">
-                  <option value="IOCL" selected style="background:#0a1526;">IOCL (Indian Oil)</option>
-                  <option value="BPCL" style="background:#0a1526;">BPCL (Bharat Petroleum)</option>
-                  <option value="HPCL" style="background:#0a1526;">HPCL (Hindustan Petroleum)</option>
-                  <option value="Private" style="background:#0a1526;">Private Outlet (Jio-bp / Nayara / Shell)</option>
-                  <option value="Other" style="background:#0a1526;">Other</option>
+                <select id="dealership_name_select" name="dealership_name" required style="width: 100%; padding: 11px 13px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 9px; color: #fff; font-size: 13.5px; outline: none;">
+                  <option value="IOCL" selected>IOCL (Indian Oil)</option>
+                  <option value="BPCL">BPCL (Bharat Petroleum)</option>
+                  <option value="HPCL">HPCL (Hindustan Petroleum)</option>
+                  <option value="Private">Private Outlet (Jio-bp / Nayara / Shell)</option>
+                  <option value="Other">Other</option>
                 </select>
               </div>
 
@@ -439,11 +465,11 @@
             <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 12px;">
               <div>
                 <label style="display: block; color: rgba(255,255,255,0.6); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Registered Address *</label>
-                <input type="text" name="station_address" placeholder="Registered address matching actual location" required style="width: 100%; padding: 11px 13px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 9px; color: #fff; font-size: 13.5px; outline: none;" />
+                <input type="text" id="station_address" name="station_address" placeholder="Registered address matching actual location" required style="width: 100%; padding: 11px 13px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 9px; color: #fff; font-size: 13.5px; outline: none;" />
               </div>
               <div>
                 <label style="display: block; color: rgba(255,255,255,0.6); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Route Tag</label>
-                <input type="text" name="route_tag" placeholder="NH48-Jaipur-Delhi" style="width: 100%; padding: 11px 13px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 9px; color: #fff; font-size: 13.5px; outline: none;" />
+                <input type="text" id="route_tag" name="route_tag" placeholder="NH48-Jaipur-Delhi" style="width: 100%; padding: 11px 13px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 9px; color: #fff; font-size: 13.5px; outline: none;" />
               </div>
             </div>
 
@@ -463,16 +489,16 @@
               <div>
                 <label style="display: block; color: rgba(255,255,255,0.6); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Highway Side</label>
                 <select name="highway_side" style="width: 100%; padding: 11px 13px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 9px; color: #fff; font-size: 13.5px; outline: none;">
-                  <option value="left" selected style="background:#0a1526;">Left Side</option>
-                  <option value="right" style="background:#0a1526;">Right Side</option>
+                  <option value="left" selected>Left Side</option>
+                  <option value="right">Right Side</option>
                 </select>
               </div>
               <div>
                 <label style="display: block; color: rgba(255,255,255,0.6); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Entry Position</label>
                 <select name="entry_position" style="width: 100%; padding: 11px 13px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 9px; color: #fff; font-size: 13.5px; outline: none;">
-                  <option value="before_pump" selected style="background:#0a1526;">Before Pump</option>
-                  <option value="at_pump" style="background:#0a1526;">At Pump</option>
-                  <option value="after_pump" style="background:#0a1526;">After Pump</option>
+                  <option value="before_pump" selected>Before Pump</option>
+                  <option value="at_pump">At Pump</option>
+                  <option value="after_pump">After Pump</option>
                 </select>
               </div>
             </div>
@@ -522,6 +548,40 @@
       if (tabNum === 3) {
         setTimeout(initSetupMap, 150);
       }
+    }
+
+    function onSelectExistingStation(selectEl) {
+      const selectedOpt = selectEl.options[selectEl.selectedIndex];
+      if (!selectedOpt.value) {
+        // Clear prefilled fields
+        document.getElementById('station_name').value = "RoadBuddy Fuel Station";
+        document.getElementById('lat-input').value = "27.270711";
+        document.getElementById('lng-input').value = "76.770233";
+        document.getElementById('station_address').value = "";
+        document.getElementById('route_tag').value = "";
+        document.getElementById('existing-station-id-input').value = "";
+        updateMarkerPosition();
+        return;
+      }
+      
+      // Prefill fields
+      document.getElementById('station_name').value = selectedOpt.getAttribute('data-name');
+      document.getElementById('lat-input').value = selectedOpt.getAttribute('data-lat');
+      document.getElementById('lng-input').value = selectedOpt.getAttribute('data-lng');
+      document.getElementById('station_address').value = selectedOpt.getAttribute('data-address');
+      document.getElementById('route_tag').value = selectedOpt.getAttribute('data-route');
+      
+      const brand = selectedOpt.getAttribute('data-brand');
+      const brandSelect = document.getElementById('dealership_name_select');
+      if (brand && brandSelect) {
+        brandSelect.value = brand;
+      }
+
+      // Set hidden field so backend knows to update/link this existing station
+      document.getElementById('existing-station-id-input').value = selectedOpt.value;
+      
+      // Update map marker
+      updateMarkerPosition();
     }
 
     function initSetupMap() {
@@ -589,6 +649,62 @@
   {% endif %}
 
   {% if not show_setup %}
+  <!-- Verification Re-verification Prompts if timer ended -->
+  {% if expired_prompts %}
+  <div style="display: flex; flex-direction: column; gap: 14px; margin-bottom: 28px;">
+    {% for prompt in expired_prompts %}
+    <div id="prompt-card-{{ prompt.fuel_type }}" style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 12px; animation: popupSlideIn 0.3s ease;">
+      <div style="display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 24px;">⏰</span>
+          <div>
+            <h4 style="color: #fde68a; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Verification Required</h4>
+            <p style="color: rgba(255,255,255,0.7); font-size: 13.5px; margin-top: 2px;">
+              Is <strong>{{ prompt.fuel_type.upper() }}</strong> still available at your station? (Last confirmed at {{ prompt.reported_at_str }}).
+            </p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Yes / No choices -->
+      <div id="choices-{{ prompt.fuel_type }}" style="display: flex; gap: 10px; align-items: center;">
+        <button type="button" onclick="confirmStillAvailable('{{ prompt.fuel_type }}', 'no')" style="padding: 9px 18px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; color: #fca5a5; font-size: 12.5px; font-weight: 700; cursor: pointer; transition: all 0.2s;">❌ No, Out of Stock</button>
+        <button type="button" onclick="showTtlSelect('{{ prompt.fuel_type }}')" style="padding: 9px 18px; background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 8px; color: #86efac; font-size: 12.5px; font-weight: 700; cursor: pointer; transition: all 0.2s;">✅ Yes, Still Available</button>
+      </div>
+
+      <!-- Yes Duration Selector (hidden initially) -->
+      <div id="ttl-select-container-{{ prompt.fuel_type }}" style="display: none; flex-direction: column; gap: 8px; background: rgba(255,255,255,0.02); padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); width: fit-content;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <label style="color: rgba(255,255,255,0.6); font-size: 11px; font-weight: 700; text-transform: uppercase;">For how long? *</label>
+          <select id="new-ttl-select-{{ prompt.fuel_type }}" onchange="onReverifyTtlChange('{{ prompt.fuel_type }}')" style="padding: 7px 12px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; color: #fff; font-size: 12px; outline: none; height: 32px;">
+            <option value="1.0" selected>1 Hour</option>
+            <option value="2.0">2 Hours</option>
+            <option value="4.0">4 Hours</option>
+            <option value="8.0">8 Hours</option>
+            <option value="12.0">12 Hours</option>
+            <option value="24.0">24 Hours</option>
+            <option value="-1.0">24/7 Available (No Expiry)</option>
+            <option value="custom">Custom Duration...</option>
+          </select>
+          <button type="button" onclick="confirmStillAvailable('{{ prompt.fuel_type }}', 'yes')" style="padding: 7px 14px; background: #22c55e; border: none; border-radius: 6px; color: #fff; font-size: 12px; font-weight: 700; cursor: pointer;">Confirm ✓</button>
+          <button type="button" onclick="cancelTtlSelect('{{ prompt.fuel_type }}')" style="padding: 7px 14px; background: none; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: rgba(255,255,255,0.6); font-size: 12px; cursor: pointer;">Cancel</button>
+        </div>
+        
+        <!-- Custom duration inputs (hidden initially) -->
+        <div id="reverify-custom-ttl-container-{{ prompt.fuel_type }}" style="display: none; align-items: center; gap: 8px; margin-top: 4px;">
+          <input type="number" id="reverify-custom-hours-{{ prompt.fuel_type }}" oninput="updateReverifyCustomValue('{{ prompt.fuel_type }}')" placeholder="Hours" min="0" max="72" value="1" style="width: 60px; padding: 5px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.12); border-radius: 5px; color: #fff; font-size: 11px; outline: none;" />
+          <span style="font-size: 11px; color: rgba(255,255,255,0.6);">h</span>
+          <input type="number" id="reverify-custom-minutes-{{ prompt.fuel_type }}" oninput="updateReverifyCustomValue('{{ prompt.fuel_type }}')" placeholder="Mins" min="0" max="59" value="30" style="width: 60px; padding: 5px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.12); border-radius: 5px; color: #fff; font-size: 11px; outline: none;" />
+          <span style="font-size: 11px; color: rgba(255,255,255,0.6);">m</span>
+        </div>
+        <input type="hidden" id="reverify-ttl-hidden-{{ prompt.fuel_type }}" value="1.0" />
+      </div>
+
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
   <!-- Station pill -->
   <div class="station-pill">
     <span class="dot"></span>
@@ -690,6 +806,30 @@
             <input class="status-radio unavail" type="radio" name="reported_status" id="ur-unavail" value="unavailable" />
             <label class="status-radio-btn" for="ur-unavail">❌ Unavailable</label>
           </div>
+        </div>
+
+        <!-- Est Availability Timer setting -->
+        <div class="form-group" id="ttl-group">
+          <label>Est. Availability Time</label>
+          <select id="update-ttl-select" onchange="onTtlSelectChange('update')" style="width: 100%; padding: 9px 12px; background: rgba(255,255,255,0.05); border: 1.5px solid rgba(255,255,255,0.10); border-radius: 9px; color: #fff; font-size: 13px; outline: none; height: 38px;">
+            <option value="1.0" selected>1 Hour</option>
+            <option value="2.0">2 Hours</option>
+            <option value="4.0">4 Hours</option>
+            <option value="8.0">8 Hours</option>
+            <option value="12.0">12 Hours</option>
+            <option value="24.0">24 Hours</option>
+            <option value="-1.0">24/7 Available (No Expiry)</option>
+            <option value="custom">Custom Duration...</option>
+          </select>
+          
+          <!-- Custom manual duration picker -->
+          <div id="update-custom-ttl-container" style="display: none; align-items: center; gap: 8px; margin-top: 8px;">
+            <input type="number" id="update-custom-hours" placeholder="Hours" min="0" max="72" value="1" style="width: 70px; padding: 7px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.10); border-radius: 6px; color: #fff; font-size: 12px; outline: none; height: 32px;" />
+            <span style="font-size: 12px; color: rgba(255,255,255,0.6);">h</span>
+            <input type="number" id="update-custom-minutes" placeholder="Mins" min="0" max="59" value="30" style="width: 70px; padding: 7px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.10); border-radius: 6px; color: #fff; font-size: 12px; outline: none; height: 32px;" />
+            <span style="font-size: 12px; color: rgba(255,255,255,0.6);">m</span>
+          </div>
+          <input type="hidden" name="ttl_hours" id="update-ttl-hidden" value="1.0" />
         </div>
 
         <div class="form-group">
@@ -829,6 +969,105 @@
       btn.textContent = '✅ Copied!';
       setTimeout(() => btn.textContent = 'Copy Key', 2000);
     });
+  }
+
+  // Toggle TTL dropdown display based on selected reported_status
+  document.querySelectorAll('input[name="reported_status"]').forEach(el => {
+    el.addEventListener('change', (e) => {
+      const ttlGroup = document.getElementById('ttl-group');
+      if (e.target.value === 'available') {
+        ttlGroup.style.display = 'block';
+      } else {
+        ttlGroup.style.display = 'none';
+      }
+    });
+  });
+
+  // TTL select onchange handlers
+  function onTtlSelectChange(scope) {
+    const selectEl = document.getElementById(scope + '-ttl-select');
+    const customContainer = document.getElementById(scope + '-custom-ttl-container');
+    const hiddenInput = document.getElementById(scope + '-ttl-hidden');
+    
+    if (selectEl.value === 'custom') {
+      customContainer.style.display = 'flex';
+      updateCustomTtlValue(scope);
+    } else {
+      customContainer.style.display = 'none';
+      hiddenInput.value = selectEl.value;
+    }
+  }
+
+  function updateCustomTtlValue(scope) {
+    const h = parseFloat(document.getElementById(scope + '-custom-hours').value) || 0;
+    const m = parseFloat(document.getElementById(scope + '-custom-minutes').value) || 0;
+    const totalHours = h + (m / 60.0);
+    document.getElementById(scope + '-ttl-hidden').value = totalHours.toFixed(4);
+  }
+
+  // Listen to manual hour/minute custom input typing updates
+  document.getElementById('update-custom-hours').addEventListener('input', () => updateCustomTtlValue('update'));
+  document.getElementById('update-custom-minutes').addEventListener('input', () => updateCustomTtlValue('update'));
+
+  // Re-verification Choices JS
+  function showTtlSelect(fuelType) {
+    document.getElementById('choices-' + fuelType).style.display = 'none';
+    document.getElementById('ttl-select-container-' + fuelType).style.display = 'flex';
+  }
+
+  function cancelTtlSelect(fuelType) {
+    document.getElementById('ttl-select-container-' + fuelType).style.display = 'none';
+    document.getElementById('choices-' + fuelType).style.display = 'flex';
+  }
+
+  function onReverifyTtlChange(fuelType) {
+    const selectEl = document.getElementById('new-ttl-select-' + fuelType);
+    const customContainer = document.getElementById('reverify-custom-ttl-container-' + fuelType);
+    const hiddenInput = document.getElementById('reverify-ttl-hidden-' + fuelType);
+
+    if (selectEl.value === 'custom') {
+      customContainer.style.display = 'flex';
+      updateReverifyCustomValue(fuelType);
+    } else {
+      customContainer.style.display = 'none';
+      hiddenInput.value = selectEl.value;
+    }
+  }
+
+  function updateReverifyCustomValue(fuelType) {
+    const h = parseFloat(document.getElementById('reverify-custom-hours-' + fuelType).value) || 0;
+    const m = parseFloat(document.getElementById('reverify-custom-minutes-' + fuelType).value) || 0;
+    const totalHours = h + (m / 60.0);
+    document.getElementById('reverify-ttl-hidden-' + fuelType).value = totalHours.toFixed(4);
+  }
+
+  function confirmStillAvailable(fuelType, choice) {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/fuel-operator/reverify';
+
+    const ftInput = document.createElement('input');
+    ftInput.type = 'hidden';
+    ftInput.name = 'fuel_type';
+    ftInput.value = fuelType;
+    form.appendChild(ftInput);
+
+    const choiceInput = document.createElement('input');
+    choiceInput.type = 'hidden';
+    choiceInput.name = 'still_available';
+    choiceInput.value = choice;
+    form.appendChild(choiceInput);
+
+    if (choice === 'yes') {
+      const ttlInput = document.createElement('input');
+      ttlInput.type = 'hidden';
+      ttlInput.name = 'new_ttl_hours';
+      ttlInput.value = document.getElementById('reverify-ttl-hidden-' + fuelType).value;
+      form.appendChild(ttlInput);
+    }
+
+    document.body.appendChild(form);
+    form.submit();
   }
 </script>
 </body>

@@ -2134,11 +2134,16 @@ async function loadPartnerFuelStationsOnMap() {
           const statusColor = f.reported_status === 'available' ? '#16a34a' : '#dc2626';
           const statusText = f.reported_status === 'available' ? 'Available' : 'Unavailable';
           const confidenceText = f.confidence_score !== undefined ? `(${f.confidence_score}% Confident)` : '';
+          
+          const freshnessLabelHtml = f.confidence_label ? `<div style="font-size:9.5px; color:#64748b; font-weight:normal; margin-top:1px; text-align:right;">⏱️ ${escapeHTML(f.confidence_label)}</div>` : '';
 
           availabilityHtml += `
-            <div style="font-size:11px; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
-              <span style="font-weight:600;">${emoji} ${f.fuel_type.toUpperCase()}</span>
-              <span style="color:${statusColor}; font-weight:700;">${statusText} <span style="font-size:9.5px; color:#64748b; font-weight:normal;">${confidenceText}</span></span>
+            <div style="font-size:11px; margin-bottom:6px; border-bottom:1px dashed rgba(0,0,0,0.04); padding-bottom:4px;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-weight:600;">${emoji} ${f.fuel_type.toUpperCase()}</span>
+                <span style="color:${statusColor}; font-weight:700;">${statusText} <span style="font-size:9.5px; color:#64748b; font-weight:normal;">${confidenceText}</span></span>
+              </div>
+              ${freshnessLabelHtml}
             </div>
           `;
         });
@@ -2147,13 +2152,33 @@ async function loadPartnerFuelStationsOnMap() {
       }
       availabilityHtml += '</div>';
 
+      // Parse and display Service Road Layout Details
+      let serviceRoadHtml = '';
+      if (s.service_road_info) {
+        const sr = s.service_road_info;
+        const sideText = sr.highway_side === 'left' ? 'Left Side ◀️' : 'Right Side ▶️';
+        const entryText = sr.entry_position ? sr.entry_position.replace('_', ' ') : 'before pump';
+        const uTurnText = sr.requires_u_turn ? '⚠️ U-Turn Required' : '✅ Direct Entry';
+        
+        serviceRoadHtml = `
+          <div style="margin-top:6px; border-top:1px dashed rgba(0,0,0,0.08); padding-top:6px; font-size:10.5px; color:#475569;">
+            <div style="font-weight:700; color:#0f172a; margin-bottom:2px;">🛣️ Highway Side & Layout</div>
+            <div>• Side: <b>${sideText}</b></div>
+            <div>• Entry: <span style="text-transform:capitalize;"><b>${entryText}</b></span></div>
+            <div>• Access: <b>${uTurnText}</b></div>
+            ${sr.notes ? `<div style="font-size:9.5px; color:#64748b; margin-top:2px; font-style:italic;">"${escapeHTML(sr.notes)}"</div>` : ''}
+          </div>
+        `;
+      }
+
       const popupContent = `
-        <div style="font-family:'Plus Jakarta Sans',sans-serif; padding:4px; min-width:200px; text-align: left; color:#0f172a;">
-          <div style="font-size: 9.5px; font-weight: 800; color: #16a34a; text-transform: uppercase; margin-bottom: 2px;">⚡ RoadBuddy Station</div>
-          <div style="font-weight:800; font-size:13.5px; margin-bottom:4px;">⛽ ${escapeHTML(s.name)}</div>
+        <div style="font-family:'Plus Jakarta Sans',sans-serif; padding:2px; min-width:215px; max-height:220px; overflow-y:auto; text-align: left; color:#0f172a; line-height: 1.35;">
+          <div style="font-size: 9.5px; font-weight: 800; color: #16a34a; text-transform: uppercase; margin-bottom: 2px;">⚡ RoadBuddy Partner Station</div>
+          <div style="font-weight:800; font-size:13px; margin-bottom:4px;">⛽ ${escapeHTML(s.name)}</div>
           ${distanceHtml}
-          <div style="font-size:11px; color:#64748b; margin-bottom:4px;">Brand: <b>${escapeHTML(s.brand || 'Other')}</b></div>
+          <div style="font-size:10.5px; color:#64748b; margin-bottom:4px;">Brand: <b>${escapeHTML(s.brand || 'Other')}</b></div>
           ${availabilityHtml}
+          ${serviceRoadHtml}
         </div>
       `;
 
@@ -2163,6 +2188,20 @@ async function loadPartnerFuelStationsOnMap() {
       </div>`;
 
       const popup = new mapboxgl.Popup({ offset: 25, maxWidth: '260px' }).setHTML(popupContent);
+      
+      el.addEventListener('click', () => {
+        // Fly directly to center the marker coordinates
+        map.flyTo({
+          center: [s.longitude, s.latitude],
+          essential: true,
+          speed: 0.8
+        });
+        // Pan the map down by 80px after flying to ensure popup is fully visible and not cut off by screen boundaries
+        setTimeout(() => {
+          map.panBy([0, -85], { duration: 400 });
+        }, 250);
+      });
+
       const marker = new mapboxgl.Marker({ element: el })
         .setLngLat([s.longitude, s.latitude])
         .setPopup(popup)
