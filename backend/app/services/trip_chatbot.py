@@ -35,27 +35,31 @@ def is_relevant_query(message: str) -> bool:
     import re
     message_lower = message.lower().strip()
     
-    # Allow greetings, thanks, and bot/user identity questions
-    if re.match(r'^(hi+|hello+|hey+|namaste|hola|greetings|thank+|thanks)\b', message_lower):
+    # 1. System map context is ALWAYS relevant
+    if "[system map context" in message_lower:
+        return True
+
+    # 2. Greetings, thanks, identity & profile queries are ALWAYS relevant
+    if re.search(r'\b(hi+|hello+|hey+|namaste|hola|greetings|good\s+morning|good\s+afternoon|good\s+evening|yo|sup|howdy|thanks|thank\s+you)\b', message_lower):
         return True
     
     allowed_greetings = {"hi", "hello", "hey", "hola", "namaste", "thanks", "thank you", "help", "who are you", "what is your name", "what can you do", "who am i", "my name"}
-    if message_lower in allowed_greetings or any(g in message_lower for g in ["how are you", "who are you", "what can you", "what is your name", "who am i", "my name", "my booking", "my ticket", "my stay", "my profile"]):
+    if message_lower in allowed_greetings or any(g in message_lower for g in ["how are you", "who are you", "what can you", "what is your name", "who am i", "my name", "my booking", "my ticket", "my stay", "my profile", "my trip", "current trip", "active trip"]):
         return True
         
-    # Travel and RoadBuddy keywords
+    # 3. Travel & RoadBuddy keywords
     keywords = [
-        "trip", "travel", "road", "route", "highway", "nh-", "nh ", "hotel", "dhaba", "restaurant", "food", 
-        "fuel", "toll", "cost", "budget", "price", "km", "mile", "car", "bike", "vehicle", "cab", "bus", 
-        "train", "flight", "destination", "origin", "map", "navigate", "navigation", "compass", "itinerary", 
-        "pack", "weather", "booking", "tourist", "visit", "attraction", "sightseeing", "driver", "passenger", 
-        "seat", "stay", "room", "city", "state", "india", "ticket", "planner", "buddy", "drive", "ride",
+        "trip", "trips", "travel", "road", "route", "routes", "highway", "nh-", "nh ", "hotel", "hotels", "dhaba", "dhabas", "restaurant", "restaurants", "food", 
+        "fuel", "toll", "tolls", "cost", "costs", "budget", "price", "prices", "km", "mile", "car", "bike", "vehicle", "vehicles", "cab", "cabs", "bus", "buses", 
+        "train", "trains", "flight", "flights", "destination", "origin", "map", "maps", "navigate", "navigation", "compass", "itinerary", 
+        "pack", "weather", "booking", "bookings", "tourist", "visit", "attraction", "sightseeing", "driver", "passenger", 
+        "seat", "seats", "stay", "room", "city", "state", "india", "ticket", "tickets", "planner", "buddy", "drive", "ride",
         "himalay", "goa", "jaipur", "udaipur", "delhi", "mumbai", "manali", "tour", "place", "location", "distance",
         "gas", "petrol", "diesel", "ev ", "charging",
         # conversational follow-up keywords
         "how", "what", "where", "when", "why", "who", "yes", "no", "ok", "okay", "sure", "yeah", "yep", "fine", "cool",
         "thanks", "thank", "please", "help", "detail", "details", "info", "show", "list", "plan", "suggest", "recommend",
-        "book", "reserve", "reservation", "reservations", "tickets", "cabs", "hotels", "buses", "trains", "flights"
+        "book", "reserve", "reservation", "reservations"
     ]
     return any(kw in message_lower for kw in keywords)
 
@@ -122,13 +126,13 @@ def mock_chat_response(message: str, user_context: str = None) -> str:
         else:
             return "🔍 I checked your profile, but you don't have any registered vehicles yet! You can add one under My Vehicles. 🚗"
             
-    if user_context and any(word in message_lower for word in ["trip", "trips", "itinerary"]):
+    if user_context and any(word in message_lower for word in ["trip", "trips", "itinerary", "route", "routes", "active trip", "current trip", "my trip"]):
         lines = [line.strip() for line in user_context.split("\n") if line.strip()]
         trip_lines = [line for line in lines if "trip:" in line.lower()]
         if trip_lines:
-            return "🗺️ Here are your active trips:\n" + "\n".join([f"{t}" for t in trip_lines])
+            return "🗺️ Here are your active trip details:\n" + "\n".join([f"• {t}" for t in trip_lines])
         else:
-            return "🔍 I checked your profile, but you don't have any active trips yet! Let's plan one. 🚗"
+            return "🔍 I checked your profile, but you don't have any active trips recorded yet! Let's plan one together. 🚗"
 
     if any(word in message_lower for word in ["hi", "hello", "hey", "namaste", "hola", "greetings"]):
         return ("👋 Hello! I am RoadBuddy AI, your friendly road trip assistant. "
@@ -554,14 +558,33 @@ async def chat_with_roadbuddy(message: str, history: list[dict] = None, user_con
         # Apply sliding window of last 10 messages (5 turns)
         truncated_history = filtered_history[-10:]
         
-        # Intercept greetings like hi, hii, hello, namaste, etc. directly at the python layer
+        # Check if the message is ONLY a standalone greeting or thanks (without additional question words)
         msg_clean = message.lower().strip()
         import re
-        if re.match(r'^(hi+|hello+|hey+|namaste|hola|greetings)\b', msg_clean):
-            response_text = "👋 Hello! I am RoadBuddy AI, your friendly road trip assistant. How can I help you plan your journey, check bookings, or find best routes today? 🚗"
+        is_pure_greeting = bool(re.match(r'^(hi+|hello+|hey+|namaste|hola|greetings|good\s+morning|good\s+afternoon|good\s+evening|yo|sup|howdy)[!\.\?\s]*$', msg_clean))
+        is_pure_thanks = bool(re.match(r'^(thank+|thanks|thank\s+you)[!\.\?\s]*$', msg_clean))
+        
+        if is_pure_greeting:
+            user_name = "traveler"
+            active_info = ""
+            if user_context:
+                for line in user_context.split("\n"):
+                    if line.startswith("User Name:") and len(line.split(":")) > 1:
+                        user_name = line.split(":")[1].strip()
+                    elif ("Trip:" in line or "User Trips:" in line) and not active_info:
+                        active_info = line.strip()
+                    elif ("Booking:" in line or "Transit" in line) and not active_info:
+                        active_info = line.strip()
+
+            if active_info:
+                response_text = f"👋 Hello {user_name}! I am RoadBuddy AI, your friendly road trip assistant. I see your active details on record. How can I help you plan your journey, check bookings, or find best routes today? 🚗"
+            else:
+                response_text = f"👋 Hello {user_name}! I am RoadBuddy AI, your friendly road trip assistant. How can I help you plan your journey, check bookings, or find best routes today? 🚗"
+
             updated_history = truncated_history + [{"role": "user", "content": message}, {"role": "assistant", "content": response_text}]
             return {"response": response_text, "history": updated_history, "total_messages": len(updated_history)}
-        elif re.match(r'^(thank+|thanks)\b', msg_clean):
+            
+        elif is_pure_thanks:
             response_text = "😊 You're very welcome! Let me know if you need help with anything else. Safe travels! 🚗"
             updated_history = truncated_history + [{"role": "user", "content": message}, {"role": "assistant", "content": response_text}]
             return {"response": response_text, "history": updated_history, "total_messages": len(updated_history)}
@@ -588,7 +611,7 @@ async def chat_with_roadbuddy(message: str, history: list[dict] = None, user_con
         messages = truncated_history + [{"role": "user", "content": message}]
         if db:
             db.rollback()
-        if settings.gemini_api_key:
+        if settings.gemini_api_key or settings.groq_api_key:
             try:
                 response_text = await call_groq_chat(messages, user_context)
             except Exception as e:

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
   <title>{% block title %}RoadBuddy{% endblock %}</title>
   <link rel="stylesheet" href="/static/css/style.css?v=3.0">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
@@ -12,6 +12,25 @@
   <script src="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.js"></script>
 
   <style>
+    :root {
+      /* Centralized Z-Index Hierarchy Matrix */
+      --z-map: 1;
+      --z-map-controls: 10;
+      --z-poi-bar: 20;
+      --z-nav-hud: 30;
+      --z-search-panel: 40;
+      --z-search-expanded: 50;
+      --z-chatbot-fab: 60;
+      --z-modal: 9999;
+      --z-chatbot-card: 99999;
+
+      /* Layered Zone Heights */
+      --topbar-h: calc(54px + env(safe-area-inset-top, 0px));
+      --searchbar-h: 0px;
+      --poi-bar-h: 48px;
+      --bottom-safe: env(safe-area-inset-bottom, 0px);
+    }
+
     /* Hide Leaflet routing text control panels */
     .leaflet-routing-container {
       display: none !important;
@@ -24,10 +43,10 @@
 
     /* Force Chatbot elements to render on top too */
     .chat-badge, .chatbot-fab {
-      z-index: 99999 !important;
+      z-index: var(--z-chatbot-fab) !important;
     }
     .floating-chatbot-card {
-      z-index: 99999 !important;
+      z-index: var(--z-chatbot-card) !important;
     }
 
     /* Utility class for hiding elements */
@@ -134,7 +153,12 @@
           <div style="font-size: 11px; color: var(--text-muted); line-height: 1.2;">Your trip assistant</div>
         </div>
       </div>
-      <button class="floating-chatbot-close" id="floating-chatbot-close" aria-label="Minimize chatbot">&times;</button>
+      <div style="display: flex; align-items: center; gap: 6px; margin-left: auto;">
+        <button onclick="clearChatHistory()" title="Clear Chat Memory" style="background: none; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px; border-radius: 6px; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.1)'; this.style.color='#ef4444';" onmouseout="this.style.background='none'; this.style.color='var(--text-muted)';">
+          <span class="material-symbols-outlined" style="font-size: 18px;">delete_sweep</span>
+        </button>
+        <button class="floating-chatbot-close" id="floating-chatbot-close" aria-label="Minimize chatbot">&times;</button>
+      </div>
     </div>
     <div class="chat-messages" id="chat-messages">
       <div class="chat-msg ai-msg">🚗 Hi! I'm RoadBuddy AI. Ask me to plan a trip, suggest routes, or estimate costs!</div>
@@ -299,6 +323,8 @@
       const chatbotCard = document.getElementById("floating-chatbot-card");
       const chatbotClose = document.getElementById("floating-chatbot-close");
 
+      restoreChatSession();
+
       console.log("initFloatingWidgets: chatbotFab=", chatbotFab, "chatbotCard=", chatbotCard, "chatbotClose=", chatbotClose);
       if (chatbotFab && chatbotCard && chatbotClose) {
         const solid = chatbotFab.querySelector(".chat-badge__solid");
@@ -387,6 +413,51 @@
     const API = '';
     let chatHistory = [];
 
+    // Restore conversation memory from sessionStorage if present across page navigation/refreshes
+    try {
+      const savedHistory = sessionStorage.getItem('roadbuddy_chat_history');
+      if (savedHistory) {
+        chatHistory = JSON.parse(savedHistory);
+      }
+    } catch(e) {}
+
+    function saveChatSession() {
+      try {
+        sessionStorage.setItem('roadbuddy_chat_history', JSON.stringify(chatHistory));
+        const box = document.getElementById('chat-messages');
+        if (box) {
+          sessionStorage.setItem('roadbuddy_chat_html', box.innerHTML);
+        }
+      } catch(e) {}
+    }
+
+    function restoreChatSession() {
+      try {
+        const savedHtml = sessionStorage.getItem('roadbuddy_chat_html');
+        const box = document.getElementById('chat-messages');
+        if (savedHtml && box) {
+          box.innerHTML = savedHtml;
+          box.scrollTop = box.scrollHeight;
+        }
+      } catch(e) {}
+    }
+
+    function clearChatHistory() {
+      chatHistory = [];
+      try {
+        sessionStorage.removeItem('roadbuddy_chat_history');
+        sessionStorage.removeItem('roadbuddy_chat_html');
+      } catch(e) {}
+      const box = document.getElementById('chat-messages');
+      if (box) {
+        box.innerHTML = `
+          <div class="chat-msg ai-msg">
+            🚗 Hi! I'm RoadBuddy AI. Memory cleared! What destination or route would you like to plan now?
+          </div>
+        `;
+      }
+    }
+
     function escapeHTML(str) {
       if (str === null || str === undefined) return '';
       return String(str).replace(/[&<>'"]/g, 
@@ -465,7 +536,8 @@
         const data = await res.json();
         removeThinking();
         appendMsg(data.response, 'ai');
-        chatHistory = data.history;
+        chatHistory = data.history || [];
+        saveChatSession();
       } catch (e) {
         removeThinking();
         appendMsg('Sorry, something went wrong. Please try again.', 'ai');

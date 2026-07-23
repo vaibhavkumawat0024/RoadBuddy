@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
 <title>RoadBuddy — Smart Map</title>
 
 <!-- Mapbox GL JS v3 -->
@@ -2285,6 +2285,18 @@ async function loadPartnerFuelStationsOnMap() {
       attributionControl: true
     });
     map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+    // Handle layout shifts (virtual keyboard open/close & device orientation change)
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', () => {
+        if (map && map.resize) map.resize();
+      });
+    }
+    window.addEventListener('orientationchange', () => {
+      setTimeout(() => {
+        if (map && map.resize) map.resize();
+      }, 300);
+    });
 
     map.on('dragstart', handleMapInteraction);
     map.on('zoomstart', handleMapInteraction);
