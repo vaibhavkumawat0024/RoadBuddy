@@ -566,29 +566,59 @@
   }
   .spinner-sm {
     width: 22px; height: 22px;
-    border: 2px solid var(--border-  /* ─── DIRECT HOTEL NAVIGATION MODE (UNCLUTTERED VIEW) ─── */
+    border: 2px solid var(--border);
+  }
+
+  /* ─── DIRECT HOTEL NAVIGATION MODE (UNCLUTTERED VIEW WITH HEADLINE) ─── */
+  body.hotel-nav-mode .topbar-actions-right,
+  body.hotel-nav-mode .splitwise-trigger-btn,
+  body.hotel-nav-mode .back-to-itinerary,
   body.hotel-nav-mode .transport-bar,
   body.hotel-nav-mode .left-panel,
-  body.hotel-nav-mode #trip-expense-splitter {
+  body.hotel-nav-mode .mobile-drawer-handle,
+  body.hotel-nav-mode #poi-sidebar-bar,
+  body.hotel-nav-mode #trip-expense-splitter,
+  body.hotel-nav-mode .trip-expense-splitter,
+  body.hotel-nav-mode #nav-toggle-btn,
+  body.hotel-nav-mode #mobile-ticket-modal,
+  body.hotel-nav-mode .booking-ticket-card,
+  body.hotel-nav-mode #route-selection-pills {
     display: none !important;
   }
-  body.hotel-nav-mode .main-layout {
-    height: calc(100vh - 54px - env(safe-area-inset-top, 0px)) !important;
+  body.hotel-nav-mode .topbar {
+    display: flex !important;
+    height: 54px !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 0 16px !important;
+    background: #ffffff !important;
+    border-bottom: 1px solid var(--border-color, #e2e8f0) !important;
     position: relative !important;
-    width: 100% !important;
+    z-index: 20 !important;
+  }
+  body.hotel-nav-mode .btn-hotel-nav-dashboard {
+    display: inline-flex !important;
+  }
+  body.hotel-nav-mode .main-layout {
+    height: calc(100vh - 54px) !important;
+    position: relative !important;
+    width: 100vw !important;
+    margin: 0 !important;
+    padding: 0 !important;
     overflow: hidden !important;
+    z-index: 10 !important;
   }
   body.hotel-nav-mode .right-map-area {
     position: absolute !important;
     top: 0 !important;
     left: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
+    width: 100vw !important;
+    height: calc(100vh - 54px) !important;
     z-index: 1 !important;
   }
   body.hotel-nav-mode #map {
-    width: 100% !important;
-    height: 100% !important;
+    width: 100vw !important;
+    height: calc(100vh - 54px) !important;
   }
 
   /* ─── MOBILE MEDIA RESPONSIVENESS OVERRIDES (DASHBOARD PARITY) ─── */
@@ -1052,11 +1082,18 @@
 <body>
 
 <div class="topbar" style="justify-content: space-between; width: 100%; flex-wrap: wrap; gap: 10px;">
-  <div style="display: flex; align-items: center;">
-    <a href="/dashboard" class="logo" style="text-decoration: none;">Road<span>Buddy</span></a>
-    <span class="topbar-subtitle">Smart Route Map</span>
+  <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <a href="/dashboard" class="logo" style="text-decoration: none;">Road<span>Buddy</span></a>
+      <span class="topbar-subtitle">Smart Route Map</span>
+    </div>
+
+    <!-- Direct Dashboard Return Link for Hotel Navigation Mode -->
+    <a href="/dashboard" class="btn-hotel-nav-dashboard" style="display: none; font-size: 12.5px; font-weight: 700; color: #0f172a; background: #f1f5f9; border: 1px solid #cbd5e1; padding: 6px 14px; border-radius: 8px; text-decoration: none; align-items: center; gap: 6px; transition: all 0.2s;" onmouseover="this.style.background='#e2e8f0';" onmouseout="this.style.background='#f1f5f9';">
+      🏠 Dashboard
+    </a>
   </div>
-  <div style="display: flex; gap: 10px; align-items: center; margin-left: auto;">
+  <div class="topbar-actions-right" style="display: flex; gap: 10px; align-items: center; margin-left: auto;">
     <button onclick="openSplitwiseModal()" class="splitwise-trigger-btn" style="
       font-size: 13px;
       font-weight: 700;
@@ -5237,22 +5274,26 @@ async function loadPartnerFuelStationsOnMap() {
     isNavigating = true;
     prevGpsCoords = null;
     lastRouteUpdateCoords = null;
-    document.getElementById('nav-toggle-btn').textContent = '🛑 Stop Navigation';
     document.body.classList.add('nav-active');
     
-    const hotelBanner = document.getElementById('hotel-route-banner');
-    if (hotelBanner) hotelBanner.style.display = 'none';
+    const hotelBtn = document.getElementById('hotel-nav-start-btn');
+    if (hotelBtn) {
+      hotelBtn.innerHTML = '🛑 Stop Navigation';
+      hotelBtn.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+      hotelBtn.onclick = stopNavigation;
+    }
+
+    const navBtn = document.getElementById('nav-toggle-btn');
+    if (navBtn) navBtn.textContent = '🛑 Stop Navigation';
 
     initDeviceOrientation();
     
-    const hudCard = document.getElementById('nav-hud-card');
-    if (hudCard) {
-      hudCard.style.display = 'block';
-    }
+    if (!document.body.classList.contains('hotel-nav-mode')) {
+      const hudCard = document.getElementById('nav-hud-card');
+      if (hudCard) hudCard.style.display = 'block';
 
-    const poiBar = document.getElementById('poi-sidebar-bar');
-    if (poiBar) {
-      poiBar.style.display = 'flex';
+      const poiBar = document.getElementById('poi-sidebar-bar');
+      if (poiBar) poiBar.style.display = 'flex';
     }
     
     document.getElementById('nav-hud').classList.add('visible');
@@ -5382,12 +5423,16 @@ async function loadPartnerFuelStationsOnMap() {
       clearTimeout(reFocusTimeout);
       reFocusTimeout = null;
     }
-    document.getElementById('nav-toggle-btn').textContent = '🚀 Start Navigation';
-    
-    if (document.body.classList.contains('hotel-nav-mode')) {
-      const hotelBanner = document.getElementById('hotel-route-banner');
-      if (hotelBanner) hotelBanner.style.display = 'flex';
+
+    const hotelBtn = document.getElementById('hotel-nav-start-btn');
+    if (hotelBtn) {
+      hotelBtn.innerHTML = '🚀 Start Navigation';
+      hotelBtn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+      hotelBtn.onclick = startNavigation;
     }
+
+    const navBtn = document.getElementById('nav-toggle-btn');
+    if (navBtn) navBtn.textContent = '🚀 Start Navigation';
 
     const hudCard = document.getElementById('nav-hud-card');
     if (hudCard) {
@@ -5395,7 +5440,7 @@ async function loadPartnerFuelStationsOnMap() {
     }
 
     const poiBar = document.getElementById('poi-sidebar-bar');
-    if (poiBar) {
+    if (poiBar && !document.body.classList.contains('hotel-nav-mode')) {
       poiBar.style.display = 'flex';
     }
     
