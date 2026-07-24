@@ -5241,11 +5241,27 @@ const ITINERARY_STOPS = [
       }
 
       // 6. Render custom markers with Day pill + pin + Place name
-      points.forEach(p => {
+      points.forEach((p, idx) => {
         const color = DAY_COLORS[(p.day - 1) % DAY_COLORS.length];
 
+        // Proximity detection: if two markers are close (< ~600m), stagger their badges
+        let isNearby = false;
+        for (let j = 0; j < points.length; j++) {
+          if (j !== idx) {
+            const dist = Math.hypot(p.lat - points[j].lat, p.lon - points[j].lon);
+            if (dist < 0.007) { isNearby = true; break; }
+          }
+        }
+
+        let staggerCss = '';
+        if (isNearby) {
+          const shiftX = (idx % 2 === 0) ? -22 : 22;
+          const shiftY = (idx % 3 === 0) ? -12 : (idx % 3 === 1 ? 0 : 12);
+          staggerCss = `transform: translate(${shiftX}px, ${shiftY}px);`;
+        }
+
         const el = document.createElement('div');
-        el.style.cssText = 'display:flex;flex-direction:column;align-items:center;cursor:pointer;';
+        el.style.cssText = `display:flex;flex-direction:column;align-items:center;cursor:pointer;z-index:${100 + idx};${staggerCss}`;
         el.innerHTML = `
           <div style="
             background:rgba(255,255,255,0.98);color:#0f172a;
@@ -5281,6 +5297,7 @@ const ITINERARY_STOPS = [
           ))
           .addTo(map);
       });
+
 
       // 7. Fit bounds so all pins are framed comfortably
       const bounds = points.reduce(

@@ -77,58 +77,60 @@ def calculate_haversine_distance(lat1, lon1, lat2, lon2):
     distance = R * c
     # Multiply by 1.3 to get realistic road distance (since roads are not straight lines)
     return round(distance * 1.3, 1)
-
-
 def build_own_vehicle_prompt(trip: TripCreate, vehicle_info: dict) -> str:
     fuel_type = vehicle_info.get("fuel_type", "petrol")
     category  = vehicle_info.get("category", "car")
     mileage   = vehicle_info.get("mileage_kmpl", 15.0)
     season    = get_season(trip.start_date)
     
+    # Calculate exact total trip days from start_date and end_date
+    try:
+        s_dt = datetime.strptime(trip.start_date, "%Y-%m-%d")
+        e_dt = datetime.strptime(trip.end_date, "%Y-%m-%d")
+        total_days = max((e_dt - s_dt).days + 1, 1)
+    except Exception:
+        total_days = 3
+
     lat1, lon1 = trip.origin_lat, trip.origin_lon
     lat2, lon2 = trip.destination_lat, trip.destination_lon
     dist = calculate_haversine_distance(lat1, lon1, lat2, lon2)
     
     road_trip_instructions = ""
     if dist > 400:
-        road_trip_instructions = f"Since the one-way distance is {dist:.1f} km (which is > 400 km), the drive will take approximately 1.5 to 2 days to arrive safely. Therefore, structure the itinerary so that Day 1 is dedicated to highway driving (NH roads, dhabas, refuelling, and a midway night hotel stay). Day 2 morning should cover the final drive, arriving at {trip.destination} around 12:00 PM (noon) to check in and rest. Destination sightseeing and hotel stay should start on Day 2 afternoon/evening. The middle days are destination exploration, and the final day is the return journey back home."
+        road_trip_instructions = f"Since the one-way distance is {dist:.1f} km (which is > 400 km), the drive will take approximately 1.5 to 2 days to arrive safely. Structure the itinerary across all {total_days} days so that Day 1 is dedicated to highway driving (NH roads, dhabas, refuelling, and a midway night hotel stay). Day 2 morning covers the final drive, arriving at {trip.destination} around 12:00 PM (noon). Destination exploration runs through middle days, and Day {total_days} is the return journey."
     else:
-        road_trip_instructions = f"Since the one-way distance is {dist:.1f} km (which is <= 400 km), the drive will take under 1 day. Day 1 morning/afternoon should cover the highway travel, refueling, and roadside dhaba stops, with arrival at {trip.destination} by afternoon/evening to check in. Local sightseeing should start from Day 1 evening/night."
+        road_trip_instructions = f"Since the one-way distance is {dist:.1f} km (which is <= 400 km), the drive will take under 1 day. Day 1 morning covers highway travel with arrival at {trip.destination} by afternoon/evening. Destination sightseeing runs from Day 1 evening through Day {total_days - 1 if total_days > 1 else 1}, and Day {total_days} covers local breakfast, final shopping, and the return drive home."
 
     if trip.travel_mode == TravelMode.cab_service:
         vehicle_details = "Hired Cab Service (traveling by road in a cab with driver)."
-        summary_instruction = f'7. The "ai_summary" field MUST be customized and personalized. Describe the road trip experience by Cab Service for the group size ({trip.num_people} travelers) on this specific Indian route. Do not mention "your vehicle", "mileage", or "fuel cost" as it is a hired cab.'
+        summary_instruction = f'7. The "ai_summary" field MUST be customized. Describe the road trip experience by Cab Service for {trip.num_people} travelers on this specific Indian route.'
     else:
         vehicle_details = f"{category.upper()} running on {fuel_type.upper()} with an efficiency/mileage of {mileage} KMPL."
-        summary_instruction = f'7. The "ai_summary" field MUST be customized and personalized. Mention the specific vehicle selected ({category.upper()} running on {fuel_type.upper()}) and describe the driving experience in your own vehicle for the group size ({trip.num_people} travelers) on this specific Indian route.'
+        summary_instruction = f'7. The "ai_summary" field MUST be customized. Mention the selected vehicle ({category.upper()} running on {fuel_type.upper()}) and describe the driving experience for {trip.num_people} travelers on this route.'
 
     return f"""You are RoadBuddy AI, India's expert road trip planner. This entire road trip must be within INDIA only. All places, landmarks, dhabas, cities, and NH highways must be real and located in India.
 
 Trip: {trip.origin} to {trip.destination} | {trip.start_date} to {trip.end_date}
-Distance: Approximately {dist:.1f} km one-way (so total round-trip distance is {dist * 2:.1f} km).
-Vehicle Selected by User: {vehicle_details}
+Total Trip Duration: EXACTLY {total_days} DAYS (From Day 1 to Day {total_days}).
+Distance: Approximately {dist:.1f} km one-way (round-trip distance is {dist * 2:.1f} km).
+Vehicle Selected: {vehicle_details}
 Season: {season.upper()}
 {get_budget_breakdown(trip.budget_inr, trip.num_people, fuel_type, "own_vehicle")}
 Group: {get_group_tips(trip.group_type, trip.num_people)} (Total {trip.num_people} travelers)
-Season tip: {get_season_tips(season, trip.destination)}
 
 Road Trip Plan Details:
 {road_trip_instructions}
 
-Generate a complete road trip covering GOING ROUTE, DESTINATION, and RETURN ROUTE.
-CRITICAL ITINERARY RULES:
-1. Provide exactly 4 detailed stops for EVERY day of the trip (from Day 1 to the final day). Cover 'morning', 'afternoon', 'evening', and 'night' (such as dinners, night markets, stargazing, or rest tips) to ensure the itinerary is complete.
-2. The sequence MUST represent a logical chronological progression of the day: morning (6:00 AM – 11:00 AM), afternoon (12:00 PM – 4:00 PM), evening (5:00 PM – 8:00 PM), and night (9:00 PM – 11:00 PM).
-3. The "place_name" of each stop MUST start with a specific time range (e.g. "07:30 AM - HP Petrol Pump, NH-48", "01:30 PM - Midway Family Dhaba", "06:00 PM - Sunset View Point", "09:30 PM - Old Town Dinner & Nightwalk").
-4. Each stop description MUST be a detailed, rich paragraph (at least 3-4 sentences, minimum 40 words) providing extensive local context, what to see, what to eat, travel advice, parking info, and specific highway safety/rest recommendations. Do not return short or generic descriptions.
-5. All estimated costs ("estimated_cost_inr") for food, tickets, activities, and hotels MUST be calculated and scaled for the entire group of {trip.num_people} people (not per-person).
-6. Calculate the fuel cost based on:
-   - Round-trip distance of {dist * 2:.1f} km.
-   - Vehicle mileage of {mileage} KMPL.
-   - Average fuel prices in India: Petrol (~104 INR/L), Diesel (~94 INR/L), CNG (~85 INR/L), Electric (Rs 2.5 per km).
+CRITICAL ACCURACY & ITINERARY RULES:
+1. Generate an itinerary spanning EXACTLY {total_days} DAYS (from Day 1 to Day {total_days}). Provide exactly 4 detailed stops per day ('morning', 'afternoon', 'evening', and 'night').
+2. Group nearby tourist places, activities, and dining spots logically for each day to minimize travel time within {trip.destination}.
+3. Ensure all tourist spots, dhabas, cafes, and activities are strictly real, authentic, famous places located in or near {trip.destination}, India.
+4. The sequence MUST represent a logical chronological progression: morning (6:00 AM – 11:00 AM), afternoon (12:00 PM – 4:00 PM), evening (5:00 PM – 8:00 PM), and night (9:00 PM – 11:00 PM).
+5. The "place_name" of each stop MUST start with a specific time range (e.g. "07:30 AM - HP Petrol Pump, NH-48", "01:30 PM - Midway Family Dhaba", "06:00 PM - City Palace", "09:30 PM - Old Town Market & Dinner").
+6. Each stop description MUST be a detailed paragraph (at least 3-4 sentences, minimum 40 words) providing extensive local context, what to see, what to eat, and travel tips.
 {summary_instruction}
 
-Return ONLY valid JSON, no markdown:
+Return ONLY valid JSON matching this schema:
 {{
   "total_distance_km": {dist * 2},
   "fuel_cost_inr": 2400,
@@ -147,7 +149,7 @@ Return ONLY valid JSON, no markdown:
       "time_slot": "morning",
       "place_name": "07:30 AM - HP Petrol Pump, NH-48, Ajmer Road, Jaipur",
       "place_type": "fuel",
-      "description": "Stop at HP Petrol Pump, NH-48, Jaipur. This pump is known for high-quality fuel and fast service. Take this opportunity to fill up your tank, inspect tyre pressure, and check windshield cleanliness for safe highway driving. A small convenience store on-site allows purchasing mineral water and travel snacks before starting.",
+      "description": "Stop at HP Petrol Pump, NH-48, Jaipur. This pump is known for high-quality fuel and fast service. Take this opportunity to fill up your tank, inspect tyre pressure, and check windshield cleanliness for safe highway driving.",
       "estimated_cost_inr": 2400,
       "highway": "NH-48",
       "lat": null,
@@ -160,23 +162,33 @@ Place types: going_route, fuel, food, hotel, sightseeing, destination_food, retu
 
 def build_transport_prompt(trip: TripCreate) -> str:
     season = get_season(trip.start_date)
+    try:
+        s_dt = datetime.strptime(trip.start_date, "%Y-%m-%d")
+        e_dt = datetime.strptime(trip.end_date, "%Y-%m-%d")
+        total_days = max((e_dt - s_dt).days + 1, 1)
+    except Exception:
+        total_days = 3
+
     return f"""You are RoadBuddy AI, India's expert trip planner. This entire trip must be within INDIA only. All places, landmarks, restaurants, and cities must be real and located in India.
 
 Destination: {trip.destination} | {trip.start_date} to {trip.end_date}
+Total Trip Duration: EXACTLY {total_days} DAYS (From Day 1 to Day {total_days}).
 Season: {season.upper()}
 {get_budget_breakdown(trip.budget_inr, trip.num_people, "na", "public")}
 Group: {get_group_tips(trip.group_type, trip.num_people)} (Total {trip.num_people} travelers)
 
-Generate a destination-only itinerary. NO highway/fuel/toll stops.
+Generate a high-quality destination-only itinerary for EXACTLY {total_days} DAYS. NO highway/fuel/toll stops.
 CRITICAL ITINERARY RULES:
-1. Provide exactly 4 detailed stops per day covering 'morning' (activities), 'afternoon' (lunch/sightseeing), 'evening' (sunset/shopping), and 'night' (dinner/night life/rest) to ensure a complete day and night plan.
-2. The sequence MUST represent a logical chronological progression of the day: morning (6:00 AM – 11:00 AM), afternoon (12:00 PM – 4:00 PM), evening (5:00 PM – 8:00 PM), and night (9:00 PM – 11:00 PM).
-3. The "place_name" of each stop MUST start with a specific time range (e.g. "09:00 AM - Hadimba Devi Temple", "01:30 PM - Mall Road Cafe", "05:30 PM - Solang Valley Sunset", "08:30 PM - Johnson's Cafe Dinner").
-4. Each stop description MUST be a detailed, rich paragraph (at least 3-4 sentences, minimum 40 words) providing extensive local context, what to see, what to eat, public transport guidance, and safety tips. Do not return short or generic descriptions.
-5. All estimated costs ("estimated_cost_inr") for food, tickets, activities, and hotels MUST be calculated and scaled for the entire group of {trip.num_people} people (not per-person).
-6. The "ai_summary" field MUST be customized and personalized. Mention the travel mode ({trip.travel_mode.value if hasattr(trip.travel_mode, 'value') else trip.travel_mode}) and describe the vacation experience for the group size ({trip.num_people} travelers) at this destination. Do not write a generic summary.
+1. Structure the plan across EXACTLY {total_days} DAYS (from Day 1 to Day {total_days}). Provide exactly 4 detailed stops per day covering 'morning', 'afternoon', 'evening', and 'night'.
+2. Group nearby tourist attractions, activities, and dining spots logically for each day to minimize travel time within {trip.destination}.
+3. All tourist spots, cafes, and activities MUST be real, authentic, famous places located in or near {trip.destination}, India.
+4. The sequence MUST represent a logical chronological progression: morning (6:00 AM – 11:00 AM), afternoon (12:00 PM – 4:00 PM), evening (5:00 PM – 8:00 PM), and night (9:00 PM – 11:00 PM).
+5. The "place_name" of each stop MUST start with a specific time range (e.g. "09:00 AM - Hadimba Devi Temple", "01:30 PM - Mall Road Cafe", "05:30 PM - Solang Valley Sunset", "08:30 PM - Johnson's Cafe Dinner").
+6. Each stop description MUST be a detailed paragraph (3-4 sentences, minimum 40 words) providing extensive local context, what to see, what to eat, and travel guidance.
+7. All estimated costs ("estimated_cost_inr") MUST be calculated and scaled for all {trip.num_people} travelers.
+8. The "ai_summary" field MUST be customized for {trip.num_people} travelers going to {trip.destination}.
 
-Return ONLY valid JSON, no markdown:
+Return ONLY valid JSON matching this schema:
 {{
   "total_distance_km": 0,
   "hotel_cost_inr": 3000,
@@ -191,7 +203,7 @@ Return ONLY valid JSON, no markdown:
       "time_slot": "morning",
       "place_name": "09:00 AM - Hadimba Devi Temple, Manali",
       "place_type": "sightseeing",
-      "description": "Hadimba Devi Temple is an ancient wooden structure constructed in 1553, surrounded by a majestic cedar and deodar forest. You can view the wooden carvings on the walls and doors depicting mythological scenes, and see local artists showing rabbits and yaks. It is highly recommended to wear walking shoes as paths can be rocky and slippery, especially during monsoon season.",
+      "description": "Hadimba Devi Temple is an ancient wooden structure constructed in 1553, surrounded by a majestic cedar and deodar forest.",
       "estimated_cost_inr": 50,
       "highway": null,
       "lat": null,
@@ -337,8 +349,8 @@ def mock_own_vehicle(trip: TripCreate, vehicle_info: dict = None) -> dict:
                  "place_type": "return_route", "description": "Rest at home. Share your favorite road trip moments and mileage stats with friends on RoadBuddy.", "estimated_cost_inr": 0, "highway": None, "lat": None, "lng": None}
             ])
         else:
-            # Middle Exploration Days
-            custom_attr = get_destination_attractions(trip.destination)
+            # Middle Exploration Days — use destination attractions if available, or city landmarks dictionary
+            custom_attr = get_destination_attractions(trip.destination) if 'get_destination_attractions' in globals() else None
             if custom_attr:
                 stops.extend([
                     {"day": day, "time_slot": "morning", "place_name": custom_attr[0][0], "place_type": custom_attr[0][1], "description": custom_attr[0][2], "estimated_cost_inr": 150 * num_p, "highway": None, "lat": None, "lng": None},
@@ -347,16 +359,37 @@ def mock_own_vehicle(trip: TripCreate, vehicle_info: dict = None) -> dict:
                     {"day": day, "time_slot": "night", "place_name": custom_attr[3][0], "place_type": custom_attr[3][1], "description": custom_attr[3][2], "estimated_cost_inr": 350 * num_p, "highway": None, "lat": None, "lng": None}
                 ])
             else:
-                stops.extend([
-                    {"day": day, "time_slot": "morning", "place_name": f"09:00 AM - Top Sightseeing Spot, {trip.destination}",
-                     "place_type": "sightseeing", "description": f"Visit iconic landmarks and scenic viewpoints in {trip.destination}. Take pictures, breathe fresh air, and enjoy local nature hikes.", "estimated_cost_inr": 100 * num_p, "highway": None, "lat": None, "lng": None},
-                    {"day": day, "time_slot": "afternoon", "place_name": f"01:30 PM - Famous Local Cafe & Lunch, {trip.destination}",
-                     "place_type": "destination_food", "description": f"Savor authentic regional cuisine and wood-fired specialties at a highly recommended eatery in {trip.destination}.", "estimated_cost_inr": 250 * num_p, "highway": None, "lat": None, "lng": None},
-                    {"day": day, "time_slot": "evening", "place_name": f"05:30 PM - Heritage Walk & Sunset Point, {trip.destination}",
-                     "place_type": "sightseeing", "description": f"Explore local heritage streets, handicrafts showrooms, and buy traditional artwork in {trip.destination}.", "estimated_cost_inr": 100 * num_p, "highway": None, "lat": None, "lng": None},
-                    {"day": day, "time_slot": "night", "place_name": f"08:30 PM - Traditional Dinner & Nightwalk, {trip.destination}",
-                     "place_type": "destination_food", "description": f"Enjoy dinner at a courtyard restaurant and stroll through illuminated night market lanes in {trip.destination}.", "estimated_cost_inr": 350 * num_p, "highway": None, "lat": None, "lng": None}
+                dest_key = trip.destination.lower().strip()
+                city_places = {
+                    "delhi": [("Red Fort", "Qutub Minar"), ("India Gate & Kartavya Path", "Humayun's Tomb"), ("Akshardham Temple", "Lotus Temple"), ("Jama Masjid", "National Museum")],
+                    "udaipur": [("City Palace Udaipur", "Jagdish Temple"), ("Fateh Sagar Lake", "Saheliyon Ki Bari"), ("Sajjangarh Monsoon Palace", "Bagore Ki Haveli"), ("Jaisamand Lake", "Ambrai Ghat Viewpoint")],
+                    "jaipur": [("Amber Palace & Fort", "Hawa Mahal"), ("City Palace Jaipur", "Jantar Mantar"), ("Nahargarh Fort Sunset Point", "Albert Hall Museum"), ("Jaigarh Fort", "Birla Mandir")],
+                    "goa": [("Baga Beach & Calangute", "Fort Aguada"), ("Basilica of Bom Jesus", "Dudhsagar Waterfalls"), ("Anjuna Flea Market", "Chapora Fort"), ("Palolem Beach Sunset", "Panjim Heritage Quarter")],
+                    "manali": [("Hadimba Devi Temple", "Solang Valley Adventure Spot"), ("Jogini Waterfall Hike", "Vashisth Hot Springs"), ("Rohtang Pass Viewpoint", "Atal Tunnel"), ("Old Manali Cafe Walk", "Mall Road Square")],
+                    "mumbai": [("Gateway of India & Taj Hotel", "Elephanta Caves"), ("Marine Drive", "CSMT Heritage Building"), ("Siddhivinayak Temple", "Bandra Bandstand"), ("Colaba Causeway", "Juhu Beach Sunset")],
+                    "agra": [("Taj Mahal Sunrise View", "Agra Fort"), ("Mehtab Bagh Sunset Point", "Fatehpur Sikri"), ("Itmad-ud-Daulah (Baby Taj)", "Kinari Bazar"), ("Akbar's Tomb Sikandra", "Sadari Bazar Walk")],
+                    "shimla": [("The Ridge & Christ Church", "Jakhoo Hanuman Temple"), ("Mall Road & Scandal Point", "Kufri Adventure Park"), ("Summer Hill & Viceregal Lodge", "Tara Devi Temple"), ("Annandale Ground", "Chadwick Falls")]
+                }
+                landmarks = city_places.get(dest_key, [
+                    (f"{trip.destination} Central Heritage Fort", f"{trip.destination} Famous Market & Bazaar"),
+                    (f"{trip.destination} Scenic Lake & Park", f"{trip.destination} Cultural Museum & Arts"),
+                    (f"{trip.destination} Hillside Sunset Point", f"{trip.destination} Old City Heritage Walk"),
+                    (f"{trip.destination} Botanical Gardens", f"{trip.destination} Royal Palace & Courtyard")
                 ])
+                idx = (day - 2) % len(landmarks)
+                morn_spot, eve_spot = landmarks[idx]
+
+                stops.extend([
+                    {"day": day, "time_slot": "morning", "place_name": f"09:00 AM - {morn_spot}, {trip.destination}",
+                     "place_type": "sightseeing", "description": f"Visit {morn_spot} in {trip.destination}. Take pictures, breathe fresh air, and explore local historical structures.", "estimated_cost_inr": 100 * num_p, "highway": None, "lat": None, "lng": None},
+                    {"day": day, "time_slot": "afternoon", "place_name": f"01:30 PM - Rooftop Cafe & Regional Lunch, {trip.destination}",
+                     "place_type": "destination_food", "description": f"Savor fresh regional dishes and local thali with a panoramic view of {trip.destination}.", "estimated_cost_inr": 250 * num_p, "highway": None, "lat": None, "lng": None},
+                    {"day": day, "time_slot": "evening", "place_name": f"05:30 PM - {eve_spot}, {trip.destination}",
+                     "place_type": "sightseeing", "description": f"Explore {eve_spot} in {trip.destination}. Walk through vibrant lanes, handicrafts showrooms, and capture sunset photos.", "estimated_cost_inr": 100 * num_p, "highway": None, "lat": None, "lng": None},
+                    {"day": day, "time_slot": "night", "place_name": f"08:30 PM - Traditional Dinner & Night Walk, {trip.destination}",
+                     "place_type": "destination_food", "description": "Treat yourself to an authentic local dinner under the stars at a highly-rated local courtyard restaurant.", "estimated_cost_inr": 350 * num_p, "highway": None, "lat": None, "lng": None}
+                ])
+
             
     return {
         "total_distance_km": dist * 2,
@@ -419,16 +452,37 @@ def mock_transport_itinerary(trip: TripCreate) -> dict:
                  "place_type": "sightseeing", "description": "Arrive safely back home, unpack your bags, and get a peaceful night's rest.", "estimated_cost_inr": 0, "highway": None, "lat": None, "lng": None},
             ])
         else:
+            dest_key = trip.destination.lower().strip()
+            city_places = {
+                "delhi": [("Red Fort", "Qutub Minar"), ("India Gate & Kartavya Path", "Humayun's Tomb"), ("Akshardham Temple", "Lotus Temple"), ("Jama Masjid", "National Museum")],
+                "udaipur": [("City Palace Udaipur", "Jagdish Temple"), ("Fateh Sagar Lake", "Saheliyon Ki Bari"), ("Sajjangarh Monsoon Palace", "Bagore Ki Haveli"), ("Jaisamand Lake", "Ambrai Ghat Viewpoint")],
+                "jaipur": [("Amber Palace & Fort", "Hawa Mahal"), ("City Palace Jaipur", "Jantar Mantar"), ("Nahargarh Fort Sunset Point", "Albert Hall Museum"), ("Jaigarh Fort", "Birla Mandir")],
+                "goa": [("Baga Beach & Calangute", "Fort Aguada"), ("Basilica of Bom Jesus", "Dudhsagar Waterfalls"), ("Anjuna Flea Market", "Chapora Fort"), ("Palolem Beach Sunset", "Panjim Heritage Quarter")],
+                "manali": [("Hadimba Devi Temple", "Solang Valley Adventure Spot"), ("Jogini Waterfall Hike", "Vashisth Hot Springs"), ("Rohtang Pass Viewpoint", "Atal Tunnel"), ("Old Manali Cafe Walk", "Mall Road Square")],
+                "mumbai": [("Gateway of India & Taj Hotel", "Elephanta Caves"), ("Marine Drive", "CSMT Heritage Building"), ("Siddhivinayak Temple", "Bandra Bandstand"), ("Colaba Causeway", "Juhu Beach Sunset")],
+                "agra": [("Taj Mahal Sunrise View", "Agra Fort"), ("Mehtab Bagh Sunset Point", "Fatehpur Sikri"), ("Itmad-ud-Daulah (Baby Taj)", "Kinari Bazar"), ("Akbar's Tomb Sikandra", "Sadari Bazar Walk")],
+                "shimla": [("The Ridge & Christ Church", "Jakhoo Hanuman Temple"), ("Mall Road & Scandal Point", "Kufri Adventure Park"), ("Summer Hill & Viceregal Lodge", "Tara Devi Temple"), ("Annandale Ground", "Chadwick Falls")]
+            }
+            landmarks = city_places.get(dest_key, [
+                (f"{trip.destination} Central Heritage Fort", f"{trip.destination} Famous Market & Bazaar"),
+                (f"{trip.destination} Scenic Lake & Park", f"{trip.destination} Cultural Museum & Arts"),
+                (f"{trip.destination} Hillside Sunset Point", f"{trip.destination} Old City Heritage Walk"),
+                (f"{trip.destination} Botanical Gardens", f"{trip.destination} Royal Palace & Courtyard")
+            ])
+            idx = (day - 2) % len(landmarks)
+            morn_spot, eve_spot = landmarks[idx]
+
             stops.extend([
-                {"day": day, "time_slot": "morning", "place_name": f"09:00 AM - Sightseeing Exploration, {trip.destination}",
-                 "place_type": "sightseeing", "description": "Explore the famous spots, temples, scenic parks, or valley viewpoints in the region.", "estimated_cost_inr": 100 * num_p, "highway": None, "lat": None, "lng": None},
-                {"day": day, "time_slot": "afternoon", "place_name": "01:30 PM - Traditional Cuisine Lunch",
+                {"day": day, "time_slot": "morning", "place_name": f"09:00 AM - {morn_spot}, {trip.destination}",
+                 "place_type": "sightseeing", "description": f"Explore {morn_spot} in {trip.destination}.", "estimated_cost_inr": 100 * num_p, "highway": None, "lat": None, "lng": None},
+                {"day": day, "time_slot": "afternoon", "place_name": f"01:30 PM - Regional Restaurant & Lunch, {trip.destination}",
                  "place_type": "destination_food", "description": "Have an authentic lunch at a heritage restaurant specializing in regional cuisine.", "estimated_cost_inr": 200 * num_p, "highway": None, "lat": None, "lng": None},
-                {"day": day, "time_slot": "evening", "place_name": "05:30 PM - Lakeside / Mountain Sunset Walk",
-                 "place_type": "sightseeing", "description": "Stroll around scenic waterfronts or sunset points to enjoy the peaceful evening atmosphere.", "estimated_cost_inr": 50 * num_p, "highway": None, "lat": None, "lng": None},
-                {"day": day, "time_slot": "night", "place_name": "08:30 PM - Local Dinner & Nightwalk",
+                {"day": day, "time_slot": "evening", "place_name": f"05:30 PM - {eve_spot}, {trip.destination}",
+                 "place_type": "sightseeing", "description": f"Stroll around {eve_spot} to enjoy the evening atmosphere.", "estimated_cost_inr": 50 * num_p, "highway": None, "lat": None, "lng": None},
+                {"day": day, "time_slot": "night", "place_name": f"08:30 PM - Local Dinner & Nightwalk, {trip.destination}",
                  "place_type": "destination_food", "description": "Have dinner at a cozy eatery and walk around the quiet lanes before heading back to the hotel.", "estimated_cost_inr": 250 * num_p, "highway": None, "lat": None, "lng": None},
             ])
+
             
     return {
         "total_distance_km": 0,
