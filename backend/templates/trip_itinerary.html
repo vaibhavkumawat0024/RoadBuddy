@@ -842,15 +842,11 @@
             Start Map Navigation
           </a>
           {% else %}
-          <a href="/start-trip?trip_id={{ trip.id }}&origin={{ trip.origin|urlencode }}&destination={{ trip.destination|urlencode }}&date={{ trip.start_date }}" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-5 py-3 rounded-lg transition-all active:scale-95 duration-100 inline-flex items-center gap-1.5 shadow-sm">
+          <a href="/start-trip?trip_id={{ trip.id }}&origin={{ trip.origin|urlencode }}&destination={{ trip.destination|urlencode }}&date={{ trip.start_date }}&mode=view_route" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-5 py-3 rounded-lg transition-all active:scale-95 duration-100 inline-flex items-center gap-1.5 shadow-sm">
             <span class="material-symbols-outlined text-sm">map</span>
             Show Route
           </a>
           {% endif %}
-          <a href="/my-trips" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold px-5 py-3 rounded-lg transition-all active:scale-95 duration-100 inline-flex items-center gap-1.5">
-            <span class="material-symbols-outlined text-sm">list</span>
-            All Trips
-          </a>
         </div>
       </section>
 

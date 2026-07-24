@@ -62,9 +62,11 @@
     padding: 0 24px;
     display: flex;
     align-items: center;
+    justify-content: space-between;
     height: 60px;
     z-index: 10;
     flex-shrink: 0;
+    box-sizing: border-box;
   }
   .logo { 
     font-family: 'Outfit', sans-serif;
@@ -75,6 +77,29 @@
   }
   .logo span { color: var(--text-dark); }
   .topbar-subtitle { font-size: 13px; color: var(--text-muted); margin-left: 10px; font-weight: 500; }
+
+  .topbar-actions-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    height: 100%;
+  }
+
+  .topbar-actions-right button,
+  .topbar-actions-right a {
+    height: 36px !important;
+    padding: 0 12px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    border-radius: 8px !important;
+    margin: 0 !important;
+    line-height: 1 !important;
+  }
 
   /* ─── TRANSPORT SELECTOR TABS ─── */
   .transport-bar {
@@ -616,9 +641,39 @@
     height: calc(100vh - 54px) !important;
     z-index: 1 !important;
   }
-  body.hotel-nav-mode #map {
-    width: 100vw !important;
-    height: calc(100vh - 54px) !important;
+  /* ─── HIDE START NAVIGATION, NIGHT MODE, SPLIT EXPENSES, POI SIDEBAR & MAP LAYERS IN VIEW ROUTE MODE ─── */
+  {% if (trip and trip.status == 'completed') or mode == 'view_route' %}
+  #nav-toggle-btn,
+  #hotel-nav-start-btn,
+  .hotel-start-nav-btn,
+  #night-btn,
+  .map-ctrl-btn,
+  .splitwise-trigger-btn,
+  #poi-sidebar-bar,
+  .poi-categories-bar,
+  #map-layers-widget,
+  .nav-hud,
+  #nav-hud,
+  #compass-widget,
+  #gps-btn-wrap,
+  #gps-status-row {
+    display: none !important;
+  }
+  {% endif %}
+
+  body.view-route-mode #nav-toggle-btn,
+  body.view-route-mode #hotel-nav-start-btn,
+  body.view-route-mode .hotel-start-nav-btn,
+  body.view-route-mode #night-btn,
+  body.view-route-mode .map-ctrl-btn,
+  body.view-route-mode .splitwise-trigger-btn,
+  body.view-route-mode #poi-sidebar-bar,
+  body.view-route-mode .poi-categories-bar,
+  body.view-route-mode #map-layers-widget,
+  body.view-route-mode .nav-hud,
+  body.view-route-mode #nav-hud,
+  body.view-route-mode #compass-widget {
+    display: none !important;
   }
 
   /* ─── MOBILE MEDIA RESPONSIVENESS OVERRIDES (DASHBOARD PARITY) ─── */
@@ -1081,67 +1136,29 @@
 </head>
 <body>
 
-<div class="topbar" style="justify-content: space-between; width: 100%; flex-wrap: wrap; gap: 10px;">
-  <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-    <div style="display: flex; align-items: center; gap: 8px;">
-      <a href="/dashboard" class="logo" style="text-decoration: none;">Road<span>Buddy</span></a>
-      <span class="topbar-subtitle">Smart Route Map</span>
-    </div>
-
+<div class="topbar">
+  <div style="display: flex; align-items: center; gap: 8px;">
+    <a href="/dashboard" class="logo" style="text-decoration: none;">Road<span>Buddy</span></a>
+    <span class="topbar-subtitle">Smart Route Map</span>
+    
     <!-- Direct Dashboard Return Link for Hotel Navigation Mode -->
     <a href="/dashboard" class="btn-hotel-nav-dashboard" style="display: none; font-size: 12.5px; font-weight: 700; color: #0f172a; background: #f1f5f9; border: 1px solid #cbd5e1; padding: 6px 14px; border-radius: 8px; text-decoration: none; align-items: center; gap: 6px; transition: all 0.2s;" onmouseover="this.style.background='#e2e8f0';" onmouseout="this.style.background='#f1f5f9';">
       🏠 Dashboard
     </a>
   </div>
-  <div class="topbar-actions-right" style="display: flex; gap: 10px; align-items: center; margin-left: auto;">
-    <button onclick="openSplitwiseModal()" class="splitwise-trigger-btn" style="
-      font-size: 13px;
-      font-weight: 700;
-      color: #1d9e75;
-      background: #f0fdf9;
-      border: 1.5px solid #1d9e75;
-      padding: 8px 14px;
-      border-radius: 8px;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      transition: all 0.2s;
-      outline: none;
-    ">
+
+  <div class="topbar-actions-right">
+    <button onclick="openSplitwiseModal()" class="splitwise-trigger-btn">
       💰 <span class="btn-text">Split Expenses</span>
     </button>
-    <a class="back-to-itinerary" href="{% if trip_id %}/my-trips/{{ trip_id }}/itinerary{% else %}/my-trips{% endif %}" style="
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--text-muted);
-      background: var(--surface);
-      border: 1.5px solid var(--border-color);
-      padding: 8px 14px;
-      border-radius: 8px;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      transition: all 0.2s;
-    ">← <span class="btn-text">AI Itinerary</span></a>
-    <a href="/dashboard" style="text-decoration: none; color: var(--text-muted); font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 8px; border: 1.5px solid var(--border-color); background: var(--surface); transition: all 0.2s ease;" onmouseover="this.style.borderColor='var(--primary)'; this.style.color='var(--primary)';" onmouseout="this.style.borderColor='var(--border-color)'; this.style.color='var(--text-muted)';">🏠 <span class="btn-text">Dashboard</span></a>
+    <a class="back-to-itinerary" href="{% if trip_id %}/my-trips/{{ trip_id }}/itinerary{% else %}/my-trips{% endif %}">
+      ← <span class="btn-text">AI Itinerary</span>
+    </a>
+    <a href="/dashboard" style="text-decoration: none; color: var(--text-muted); background: var(--surface); border: 1.5px solid var(--border-color);">
+      🏠 <span class="btn-text">Dashboard</span>
+    </a>
     {% if trip_id and (not trip or trip.status != 'completed') %}
-    <button onclick="endTrip()" style="
-      font-size: 13px;
-      font-weight: 700;
-      color: #ffffff;
-      background: #ef4444;
-      border: 1.5px solid #ef4444;
-      padding: 8px 14px;
-      border-radius: 8px;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      transition: all 0.2s;
-      outline: none;
-    " onmouseover="this.style.background='#dc2626'; this.style.borderColor='#dc2626';" onmouseout="this.style.background='#ef4444'; this.style.borderColor='#ef4444';">
+    <button onclick="endTrip()" style="color: #ffffff; background: #ef4444; border: 1.5px solid #ef4444;" onmouseover="this.style.background='#dc2626'; this.style.borderColor='#dc2626';" onmouseout="this.style.background='#ef4444'; this.style.borderColor='#ef4444';">
       🏁 <span class="btn-text">End Trip</span>
     </button>
     {% endif %}
@@ -1235,11 +1252,7 @@
         <div class="autocomplete-dropdown" id="ac-destination"></div>
       </div>
 
-      <div class="panel-label" style="margin-top:10px;">Travel Date</div>
-      <div class="autocomplete-wrap">
-        <span class="input-icon">📅</span>
-        <input type="date" class="loc-input" id="travel-date-input" style="padding-left: 36px;" />
-      </div>
+      <div style="margin-top: 10px;"></div>
 
       <button class="get-routes-btn" id="get-routes-btn" onclick="getRoutes()" disabled>
         🗺️ Get Routes
@@ -2213,7 +2226,7 @@ let partnerFuelStationMarkers = [];
   const tripItineraryStops = [];
   {% if trip and trip.stops %}
     {% for s in trip.stops %}
-      tripStops.push("{{ s.place_name }}");
+      tripStops.push({{ s.place_name|tojson }});
       tripItineraryStops.push({
         id: {{ s.id }},
         day: {{ s.day or 1 }},
@@ -2221,9 +2234,9 @@ let partnerFuelStationMarkers = [];
         place_name: {{ (s.place_name or '')|tojson }},
         place_type: {{ (s.place_type or 'sightseeing')|tojson }},
         estimated_cost_inr: {{ s.estimated_cost_inr or 0 }},
-        duration_mins: {{ s.duration_mins or 60 }},
-        lat: {{ s.lat or 'null' }},
-        lon: {{ s.lon or 'null' }}
+        duration_mins: 60,
+        lat: null,
+        lon: null
       });
     {% endfor %}
   {% endif %}
@@ -3003,7 +3016,7 @@ async function loadPartnerFuelStationsOnMap() {
         gpsLocked = true;
 
         dot.className = 'gps-dot locked';
-        statusTxt.textContent = `GPS locked — ${gpsCoords.lat.toFixed(4)}, ${gpsCoords.lon.toFixed(4)}`;
+        statusTxt.textContent = `GPS locked`;
         statusTxt.style.color = '#1D9E75';
 
         btn.className = 'gps-detect-btn locked';
@@ -3011,8 +3024,7 @@ async function loadPartnerFuelStationsOnMap() {
         btn.disabled = false;
 
         const coordsDisplay = document.getElementById('gps-coords-display');
-        coordsDisplay.style.display = 'block';
-        coordsDisplay.textContent = `📡 Lat ${gpsCoords.lat.toFixed(5)}, Lon ${gpsCoords.lon.toFixed(5)}`;
+        if (coordsDisplay) coordsDisplay.style.display = 'none';
 
         if (userMarker) userMarker.remove();
         userMarker = new mapboxgl.Marker({ element: createNavArrowElement(userHeading) })
@@ -3021,40 +3033,46 @@ async function loadPartnerFuelStationsOnMap() {
           .addTo(map);
         map.flyTo({ center: [gpsCoords.lon, gpsCoords.lat], zoom: 12 });
 
-        // Reverse-geocode to populate manual input if in Cab mode
-        if (currentMode === 'cab') {
-          const originInput = document.getElementById('origin-manual');
-          originInput.value = "Fetching address...";
-          fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${gpsCoords.lat}&lon=${gpsCoords.lon}`)
-            .then(res => res.json())
-            .then(data => {
-              if (data && data.display_name) {
-                const addr = data.address || {};
-                const shortName = addr.road || addr.suburb || addr.city || addr.town || data.display_name.split(',')[0];
-                const fullCity = [shortName, addr.city || addr.town || '', addr.state || ''].filter(Boolean).join(', ');
-                originInput.value = fullCity;
-                originInput.dataset.lat = gpsCoords.lat;
-                originInput.dataset.lon = gpsCoords.lon;
-              } else {
-                originInput.value = `${gpsCoords.lat.toFixed(5)}, ${gpsCoords.lon.toFixed(5)}`;
-                originInput.dataset.lat = gpsCoords.lat;
-                originInput.dataset.lon = gpsCoords.lon;
-              }
-              checkEnableRouteBtn();
-            })
-            .catch(() => {
-              originInput.value = `${gpsCoords.lat.toFixed(5)}, ${gpsCoords.lon.toFixed(5)}`;
-              originInput.dataset.lat = gpsCoords.lat;
-              originInput.dataset.lon = gpsCoords.lon;
-              checkEnableRouteBtn();
-            });
+        const originInput = document.getElementById('origin-manual');
+        if (originInput) {
+          originInput.dataset.lat = gpsCoords.lat;
+          originInput.dataset.lon = gpsCoords.lon;
         }
 
-        checkEnableRouteBtn();
-        const destInput = document.getElementById('destination-input');
-        if (destInput && destInput.value.trim() !== '') {
-          getRoutes();
-        }
+        // Reverse-geocode to display city name instead of raw coordinates
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${gpsCoords.lat}&lon=${gpsCoords.lon}`)
+          .then(res => res.json())
+          .then(data => {
+            let cityName = "My Location";
+            if (data && data.address) {
+              const addr = data.address;
+              cityName = addr.city || addr.town || addr.village || addr.suburb || addr.county || addr.state || "My Location";
+            }
+            statusTxt.textContent = `GPS locked — ${cityName}`;
+            if (originInput) {
+              originInput.value = cityName;
+              originInput.dataset.lat = gpsCoords.lat;
+              originInput.dataset.lon = gpsCoords.lon;
+            }
+            checkEnableRouteBtn();
+            const destInput = document.getElementById('destination-input');
+            if (destInput && destInput.value.trim() !== '') {
+              getRoutes();
+            }
+          })
+          .catch(() => {
+            statusTxt.textContent = `GPS locked — My Location`;
+            if (originInput) {
+              originInput.value = "My Location";
+              originInput.dataset.lat = gpsCoords.lat;
+              originInput.dataset.lon = gpsCoords.lon;
+            }
+            checkEnableRouteBtn();
+            const destInput = document.getElementById('destination-input');
+            if (destInput && destInput.value.trim() !== '') {
+              getRoutes();
+            }
+          });
       },
       (err) => {
         dot.className = 'gps-dot';
@@ -3295,13 +3313,38 @@ async function loadPartnerFuelStationsOnMap() {
   async function geocode(query) {
     if (!query) return null;
     const q = query.trim();
-    if (q.toLowerCase() === 'my location') return null;
+    if (q.toLowerCase() === 'my location') {
+      if (gpsCoords && gpsCoords.lat && gpsCoords.lon) {
+        return { lat: gpsCoords.lat, lon: gpsCoords.lon };
+      }
+      if (map) {
+        const c = map.getCenter();
+        return { lat: c.lat, lon: c.lng };
+      }
+      return null;
+    }
 
     if (/^[-\d.]+\s*,\s*[-\d.]+$/.test(q)) {
       const [lat, lon] = q.split(',').map(Number);
       return { lat, lon };
     }
 
+    // 1. Mapbox Geocoding API (Instant 10ms response time, high accuracy)
+    if (typeof mapboxgl !== 'undefined' && mapboxgl.accessToken) {
+      try {
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json?access_token=${mapboxgl.accessToken}&country=IN&limit=1`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data && data.features && data.features.length > 0) {
+          const [lon, lat] = data.features[0].center;
+          return { lat, lon };
+        }
+      } catch (e) {
+        console.warn('Mapbox geocoding error:', e);
+      }
+    }
+
+    // 2. Nominatim fallback
     const queriesToTry = [
       q.toLowerCase().includes('india') ? q : q + ', India'
     ];
@@ -3327,35 +3370,72 @@ async function loadPartnerFuelStationsOnMap() {
   // ─── GET ROUTES MAIN ENTRY ───────────────────────────────
   async function getRoutes() {
     const destInput = document.getElementById('destination-input');
-    const destVal = destInput.value.trim();
+    const destVal = destInput ? destInput.value.trim() : '';
 
     showLoading('Finding best routes...');
     resetDirections(false);
 
     if (window.innerWidth <= 768) {
-      document.getElementById('sidebar-panel').classList.add('collapsed-view');
+      const sidebar = document.getElementById('sidebar-panel');
+      if (sidebar) sidebar.classList.add('collapsed-view');
     }
 
     const originInput = document.getElementById('origin-manual');
-    const originVal = originInput ? originInput.value.trim() : '';
+    let originVal = originInput ? originInput.value.trim() : '';
 
     let originCoords = null;
-    const isMyLoc = originVal.toLowerCase() === 'my location' || !originVal;
+    let destCoords = null;
 
-    if (isGPSModeActive() || isMyLoc) {
-      originCoords = await getCurrentGpsCoordsPromise();
-      if (!originCoords && originVal && originVal.toLowerCase() !== 'my location') {
-        originCoords = (originInput.dataset.lat && originInput.dataset.lon) ? 
-          { lat: parseFloat(originInput.dataset.lat), lon: parseFloat(originInput.dataset.lon) } : await geocode(originVal);
-      }
-    } else {
-      originCoords = (originInput.dataset.lat && originInput.dataset.lon) ? 
-        { lat: parseFloat(originInput.dataset.lat), lon: parseFloat(originInput.dataset.lon) } : await geocode(originVal);
+    // 1. Try dataset coordinates on inputs first
+    if (originInput && originInput.dataset.lat && originInput.dataset.lon) {
+      originCoords = { lat: parseFloat(originInput.dataset.lat), lon: parseFloat(originInput.dataset.lon) };
+    }
+    if (destInput && destInput.dataset.lat && destInput.dataset.lon) {
+      destCoords = { lat: parseFloat(destInput.dataset.lat), lon: parseFloat(destInput.dataset.lon) };
     }
 
-    let destCoords = (destInput.dataset.lat && destInput.dataset.lon) ? 
-      { lat: parseFloat(destInput.dataset.lat), lon: parseFloat(destInput.dataset.lon) } : await geocode(destVal);
-    
+    // 2. If originCoords still missing, try GPS promise
+    if (!originCoords && (isGPSModeActive() || !originVal || originVal.toLowerCase() === 'my location')) {
+      originCoords = await getCurrentGpsCoordsPromise();
+    }
+
+    // 3. Parse raw string coords if present
+    if (!originCoords && originVal && originVal.includes(',')) {
+      const parts = originVal.split(',');
+      const pLat = parseFloat(parts[0]);
+      const pLon = parseFloat(parts[1]);
+      if (!isNaN(pLat) && !isNaN(pLon)) originCoords = { lat: pLat, lon: pLon };
+    }
+
+    // 4. Geocode fallbacks
+    if (!originCoords && originVal && originVal.toLowerCase() !== 'my location') {
+      originCoords = await geocode(originVal);
+    }
+    if (!originCoords && prefillOrigin && prefillOrigin.toLowerCase() !== 'my location') {
+      originCoords = await geocode(prefillOrigin);
+    }
+
+    if (!destCoords && destVal) {
+      if (destVal.includes(',')) {
+        const parts = destVal.split(',');
+        const pLat = parseFloat(parts[0]);
+        const pLon = parseFloat(parts[1]);
+        if (!isNaN(pLat) && !isNaN(pLon)) destCoords = { lat: pLat, lon: pLon };
+      }
+      if (!destCoords) destCoords = await geocode(destVal);
+    }
+    if (!destCoords && prefillDestination) {
+      destCoords = await geocode(prefillDestination);
+    }
+
+    if (!originCoords && gpsCoords) {
+      originCoords = { lat: gpsCoords.lat, lon: gpsCoords.lon };
+    }
+    if (!originCoords && map) {
+      const c = map.getCenter();
+      originCoords = { lat: c.lat, lon: c.lng };
+    }
+
     if (!originCoords || !destCoords) {
       hideLoading();
       showDirEmpty('Could not locate origin or hotel destination. Please enable GPS location access or type a city name.');
@@ -3366,19 +3446,24 @@ async function loadPartnerFuelStationsOnMap() {
       originInput.dataset.lat = originCoords.lat;
       originInput.dataset.lon = originCoords.lon;
     }
+    if (destInput && destCoords) {
+      destInput.dataset.lat = destCoords.lat;
+      destInput.dataset.lon = destCoords.lon;
+    }
+
     hideLoading();
     if (currentMode === 'car' || currentMode === 'own_vehicle') {
-      drawCarRoute(originCoords, destCoords, destVal);
+      drawCarRoute(originCoords, destCoords, destVal || prefillDestination);
     } else if (currentMode === 'cab') {
-      drawTransitOptions(currentMode, originCoords, destCoords, originVal || 'My Location', destVal);
-      loadCabServices(originVal || 'My Location', destVal);
+      drawTransitOptions(currentMode, originCoords, destCoords, originVal || 'My Location', destVal || prefillDestination);
+      loadCabServices(originVal || 'My Location', destVal || prefillDestination);
     } else if (['bus', 'train', 'flight'].includes(currentMode)) {
-      drawTransitOptions(currentMode, originCoords, destCoords, originVal || 'My Location', destVal);
-      loadTransitOptions(currentMode, originVal || 'My Location', destVal);
+      drawTransitOptions(currentMode, originCoords, destCoords, originVal || 'My Location', destVal || prefillDestination);
+      loadTransitOptions(currentMode, originVal || 'My Location', destVal || prefillDestination);
     } else {
-      drawCarRoute(originCoords, destCoords, destVal);
+      drawCarRoute(originCoords, destCoords, destVal || prefillDestination);
     }
-    collapseSearchForm(originVal || 'My Location', destVal);
+    collapseSearchForm(originVal || 'My Location', destVal || prefillDestination);
   }
 
   function openMobileTicketModal() {
@@ -5005,10 +5090,21 @@ async function loadPartnerFuelStationsOnMap() {
 
     if (!isNavUpdate && activeRoute && activeRoute.geometry && activeRoute.geometry.coordinates) {
       loadPartnerRestaurantsOnMap();
+      plotItineraryStopsOnMap();
       const bounds = new mapboxgl.LngLatBounds();
       activeRoute.geometry.coordinates.forEach(c => bounds.extend(c));
       map.fitBounds(bounds, { padding: 50 });
     }
+  }
+
+  let itineraryMarkers = [];
+  function plotItineraryStopsOnMap() {
+    itineraryMarkers.forEach(m => {
+      if (m && m.marker) m.marker.remove();
+      else if (m && m.remove) m.remove();
+    });
+    itineraryMarkers = [];
+    return; // AI itinerary stop markers disabled on map canvas
   }
 
   function selectCarRoute(idx) {
@@ -5016,9 +5112,11 @@ async function loadPartnerFuelStationsOnMap() {
     activeCarRouteIndex = idx;
     const selectedRoute = loadedCarRoutes[idx];
 
-    drawAllCarRoutesOnMap(loadedCarRoutes, activeCarRouteIndex, true);
-
+    // Set currentPolyline FIRST so it is available to plotItineraryStopsOnMap!
     currentPolyline = selectedRoute.geometry.coordinates.map(c => ({ lat: c[1], lng: c[0], lon: c[0] }));
+
+    drawAllCarRoutesOnMap(loadedCarRoutes, activeCarRouteIndex, true);
+    plotItineraryStopsOnMap();
 
     const distKm = (selectedRoute.distance / 1000).toFixed(1);
     const durHrs = Math.floor(selectedRoute.duration / 3600);
@@ -6069,7 +6167,24 @@ async function loadPartnerFuelStationsOnMap() {
     if (prefillOrigin) {
       const originInput = document.getElementById('origin-manual');
       if (originInput) {
-        originInput.value = prefillOrigin;
+        if (/^[-\d.]+\s*,\s*[-\d.]+$/.test(prefillOrigin.trim())) {
+          const [plat, plon] = prefillOrigin.trim().split(',').map(Number);
+          originInput.dataset.lat = plat;
+          originInput.dataset.lon = plon;
+          fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${plat}&lon=${plon}`)
+            .then(r => r.json())
+            .then(d => {
+              if (d && d.address) {
+                const c = d.address.city || d.address.town || d.address.village || d.address.suburb || d.address.county || d.address.state || "My Location";
+                originInput.value = c;
+              } else {
+                originInput.value = "My Location";
+              }
+            })
+            .catch(() => { originInput.value = "My Location"; });
+        } else {
+          originInput.value = prefillOrigin;
+        }
         {% if trip and trip.origin_lat and trip.origin_lon %}
           originInput.dataset.lat = "{{ trip.origin_lat }}";
           originInput.dataset.lon = "{{ trip.origin_lon }}";
@@ -6081,6 +6196,19 @@ async function loadPartnerFuelStationsOnMap() {
     const urlParams = new URLSearchParams(window.location.search);
     const navType = urlParams.get('nav_type') || "{{ nav_type|default('') }}";
     const rawHotelName = urlParams.get('hotel_name') || "{{ hotel_name|default('') }}";
+
+    const isViewRoute = (urlParams.get('mode') === 'view_route') || ("{{ mode|default('') }}" === 'view_route') || {% if trip and trip.status == 'completed' %}true{% else %}false{% endif %};
+    if (isViewRoute) {
+      document.body.classList.add('view-route-mode');
+      const navBtn = document.getElementById('nav-toggle-btn');
+      if (navBtn) navBtn.style.display = 'none';
+      const hotelStartBtn = document.getElementById('hotel-nav-start-btn');
+      if (hotelStartBtn) hotelStartBtn.style.display = 'none';
+      const nightBtn = document.getElementById('night-btn');
+      if (nightBtn) nightBtn.style.display = 'none';
+      const splitBtns = document.querySelectorAll('.splitwise-trigger-btn');
+      splitBtns.forEach(b => b.style.display = 'none');
+    }
 
     if (navType === 'hotel' || rawHotelName) {
       document.body.classList.add('hotel-nav-mode');
@@ -6095,6 +6223,11 @@ async function loadPartnerFuelStationsOnMap() {
     if ((prefillOrigin && prefillDestination) || prefillDestination) {
       setTimeout(() => {
         getRoutes();
+        plotItineraryStopsOnMap();
+      }, 500);
+    } else if (tripItineraryStops && tripItineraryStops.length > 0) {
+      setTimeout(() => {
+        plotItineraryStopsOnMap();
       }, 500);
     }
     
