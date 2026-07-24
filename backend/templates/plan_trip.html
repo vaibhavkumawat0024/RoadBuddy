@@ -256,7 +256,7 @@
           .then(res => res.json())
           .then(data => {
             const addr = data.address || {};
-            const city = addr.city || addr.town || addr.village || addr.suburb || addr.state || "Detected Location";
+            const city = addr.city || addr.town || addr.village || addr.suburb || addr.county || addr.state || "My Location";
             originInput.value = city;
 
             detectGpsBtn.disabled = false;
@@ -264,7 +264,7 @@
           })
           .catch(err => {
             console.error(err);
-            originInput.value = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+            originInput.value = "My Location";
             detectGpsBtn.disabled = false;
             detectGpsBtn.innerHTML = `<span class="material-symbols-outlined text-[12px] leading-none">my_location</span> Detect Location`;
           });

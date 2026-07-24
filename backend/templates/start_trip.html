@@ -1265,11 +1265,7 @@
         <div class="autocomplete-dropdown" id="ac-destination"></div>
       </div>
 
-      <div class="panel-label" style="margin-top:10px;">Travel Date</div>
-      <div class="autocomplete-wrap">
-        <span class="input-icon">📅</span>
-        <input type="date" class="loc-input" id="travel-date-input" style="padding-left: 36px;" />
-      </div>
+      <div style="margin-top: 10px;"></div>
 
       <button class="get-routes-btn" id="get-routes-btn" onclick="getRoutes()" disabled>
         🗺️ Get Routes
@@ -3033,7 +3029,7 @@ async function loadPartnerFuelStationsOnMap() {
         gpsLocked = true;
 
         dot.className = 'gps-dot locked';
-        statusTxt.textContent = `GPS locked — ${gpsCoords.lat.toFixed(4)}, ${gpsCoords.lon.toFixed(4)}`;
+        statusTxt.textContent = `GPS locked`;
         statusTxt.style.color = '#1D9E75';
 
         btn.className = 'gps-detect-btn locked';
@@ -3041,8 +3037,7 @@ async function loadPartnerFuelStationsOnMap() {
         btn.disabled = false;
 
         const coordsDisplay = document.getElementById('gps-coords-display');
-        coordsDisplay.style.display = 'block';
-        coordsDisplay.textContent = `📡 Lat ${gpsCoords.lat.toFixed(5)}, Lon ${gpsCoords.lon.toFixed(5)}`;
+        if (coordsDisplay) coordsDisplay.style.display = 'none';
 
         if (userMarker) userMarker.remove();
         userMarker = new mapboxgl.Marker({ element: createNavArrowElement(userHeading) })
@@ -3051,40 +3046,46 @@ async function loadPartnerFuelStationsOnMap() {
           .addTo(map);
         map.flyTo({ center: [gpsCoords.lon, gpsCoords.lat], zoom: 12 });
 
-        // Reverse-geocode to populate manual input if in Cab mode
-        if (currentMode === 'cab') {
-          const originInput = document.getElementById('origin-manual');
-          originInput.value = "Fetching address...";
-          fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${gpsCoords.lat}&lon=${gpsCoords.lon}`)
-            .then(res => res.json())
-            .then(data => {
-              if (data && data.display_name) {
-                const addr = data.address || {};
-                const shortName = addr.road || addr.suburb || addr.city || addr.town || data.display_name.split(',')[0];
-                const fullCity = [shortName, addr.city || addr.town || '', addr.state || ''].filter(Boolean).join(', ');
-                originInput.value = fullCity;
-                originInput.dataset.lat = gpsCoords.lat;
-                originInput.dataset.lon = gpsCoords.lon;
-              } else {
-                originInput.value = `${gpsCoords.lat.toFixed(5)}, ${gpsCoords.lon.toFixed(5)}`;
-                originInput.dataset.lat = gpsCoords.lat;
-                originInput.dataset.lon = gpsCoords.lon;
-              }
-              checkEnableRouteBtn();
-            })
-            .catch(() => {
-              originInput.value = `${gpsCoords.lat.toFixed(5)}, ${gpsCoords.lon.toFixed(5)}`;
-              originInput.dataset.lat = gpsCoords.lat;
-              originInput.dataset.lon = gpsCoords.lon;
-              checkEnableRouteBtn();
-            });
+        const originInput = document.getElementById('origin-manual');
+        if (originInput) {
+          originInput.dataset.lat = gpsCoords.lat;
+          originInput.dataset.lon = gpsCoords.lon;
         }
 
-        checkEnableRouteBtn();
-        const destInput = document.getElementById('destination-input');
-        if (destInput && destInput.value.trim() !== '') {
-          getRoutes();
-        }
+        // Reverse-geocode to display city name instead of raw coordinates
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${gpsCoords.lat}&lon=${gpsCoords.lon}`)
+          .then(res => res.json())
+          .then(data => {
+            let cityName = "My Location";
+            if (data && data.address) {
+              const addr = data.address;
+              cityName = addr.city || addr.town || addr.village || addr.suburb || addr.county || addr.state || "My Location";
+            }
+            statusTxt.textContent = `GPS locked — ${cityName}`;
+            if (originInput) {
+              originInput.value = cityName;
+              originInput.dataset.lat = gpsCoords.lat;
+              originInput.dataset.lon = gpsCoords.lon;
+            }
+            checkEnableRouteBtn();
+            const destInput = document.getElementById('destination-input');
+            if (destInput && destInput.value.trim() !== '') {
+              getRoutes();
+            }
+          })
+          .catch(() => {
+            statusTxt.textContent = `GPS locked — My Location`;
+            if (originInput) {
+              originInput.value = "My Location";
+              originInput.dataset.lat = gpsCoords.lat;
+              originInput.dataset.lon = gpsCoords.lon;
+            }
+            checkEnableRouteBtn();
+            const destInput = document.getElementById('destination-input');
+            if (destInput && destInput.value.trim() !== '') {
+              getRoutes();
+            }
+          });
       },
       (err) => {
         dot.className = 'gps-dot';
@@ -3325,7 +3326,16 @@ async function loadPartnerFuelStationsOnMap() {
   async function geocode(query) {
     if (!query) return null;
     const q = query.trim();
-    if (q.toLowerCase() === 'my location') return null;
+    if (q.toLowerCase() === 'my location') {
+      if (gpsCoords && gpsCoords.lat && gpsCoords.lon) {
+        return { lat: gpsCoords.lat, lon: gpsCoords.lon };
+      }
+      if (map) {
+        const c = map.getCenter();
+        return { lat: c.lat, lon: c.lng };
+      }
+      return null;
+    }
 
     if (/^[-\d.]+\s*,\s*[-\d.]+$/.test(q)) {
       const [lat, lon] = q.split(',').map(Number);
@@ -3357,35 +3367,72 @@ async function loadPartnerFuelStationsOnMap() {
   // ─── GET ROUTES MAIN ENTRY ───────────────────────────────
   async function getRoutes() {
     const destInput = document.getElementById('destination-input');
-    const destVal = destInput.value.trim();
+    const destVal = destInput ? destInput.value.trim() : '';
 
     showLoading('Finding best routes...');
     resetDirections(false);
 
     if (window.innerWidth <= 768) {
-      document.getElementById('sidebar-panel').classList.add('collapsed-view');
+      const sidebar = document.getElementById('sidebar-panel');
+      if (sidebar) sidebar.classList.add('collapsed-view');
     }
 
     const originInput = document.getElementById('origin-manual');
-    const originVal = originInput ? originInput.value.trim() : '';
+    let originVal = originInput ? originInput.value.trim() : '';
 
     let originCoords = null;
-    const isMyLoc = originVal.toLowerCase() === 'my location' || !originVal;
+    let destCoords = null;
 
-    if (isGPSModeActive() || isMyLoc) {
-      originCoords = await getCurrentGpsCoordsPromise();
-      if (!originCoords && originVal && originVal.toLowerCase() !== 'my location') {
-        originCoords = (originInput.dataset.lat && originInput.dataset.lon) ? 
-          { lat: parseFloat(originInput.dataset.lat), lon: parseFloat(originInput.dataset.lon) } : await geocode(originVal);
-      }
-    } else {
-      originCoords = (originInput.dataset.lat && originInput.dataset.lon) ? 
-        { lat: parseFloat(originInput.dataset.lat), lon: parseFloat(originInput.dataset.lon) } : await geocode(originVal);
+    // 1. Try dataset coordinates on inputs first
+    if (originInput && originInput.dataset.lat && originInput.dataset.lon) {
+      originCoords = { lat: parseFloat(originInput.dataset.lat), lon: parseFloat(originInput.dataset.lon) };
+    }
+    if (destInput && destInput.dataset.lat && destInput.dataset.lon) {
+      destCoords = { lat: parseFloat(destInput.dataset.lat), lon: parseFloat(destInput.dataset.lon) };
     }
 
-    let destCoords = (destInput.dataset.lat && destInput.dataset.lon) ? 
-      { lat: parseFloat(destInput.dataset.lat), lon: parseFloat(destInput.dataset.lon) } : await geocode(destVal);
-    
+    // 2. If originCoords still missing, try GPS promise
+    if (!originCoords && (isGPSModeActive() || !originVal || originVal.toLowerCase() === 'my location')) {
+      originCoords = await getCurrentGpsCoordsPromise();
+    }
+
+    // 3. Parse raw string coords if present
+    if (!originCoords && originVal && originVal.includes(',')) {
+      const parts = originVal.split(',');
+      const pLat = parseFloat(parts[0]);
+      const pLon = parseFloat(parts[1]);
+      if (!isNaN(pLat) && !isNaN(pLon)) originCoords = { lat: pLat, lon: pLon };
+    }
+
+    // 4. Geocode fallbacks
+    if (!originCoords && originVal && originVal.toLowerCase() !== 'my location') {
+      originCoords = await geocode(originVal);
+    }
+    if (!originCoords && prefillOrigin && prefillOrigin.toLowerCase() !== 'my location') {
+      originCoords = await geocode(prefillOrigin);
+    }
+
+    if (!destCoords && destVal) {
+      if (destVal.includes(',')) {
+        const parts = destVal.split(',');
+        const pLat = parseFloat(parts[0]);
+        const pLon = parseFloat(parts[1]);
+        if (!isNaN(pLat) && !isNaN(pLon)) destCoords = { lat: pLat, lon: pLon };
+      }
+      if (!destCoords) destCoords = await geocode(destVal);
+    }
+    if (!destCoords && prefillDestination) {
+      destCoords = await geocode(prefillDestination);
+    }
+
+    if (!originCoords && gpsCoords) {
+      originCoords = { lat: gpsCoords.lat, lon: gpsCoords.lon };
+    }
+    if (!originCoords && map) {
+      const c = map.getCenter();
+      originCoords = { lat: c.lat, lon: c.lng };
+    }
+
     if (!originCoords || !destCoords) {
       hideLoading();
       showDirEmpty('Could not locate origin or hotel destination. Please enable GPS location access or type a city name.');
@@ -3396,19 +3443,24 @@ async function loadPartnerFuelStationsOnMap() {
       originInput.dataset.lat = originCoords.lat;
       originInput.dataset.lon = originCoords.lon;
     }
+    if (destInput && destCoords) {
+      destInput.dataset.lat = destCoords.lat;
+      destInput.dataset.lon = destCoords.lon;
+    }
+
     hideLoading();
     if (currentMode === 'car' || currentMode === 'own_vehicle') {
-      drawCarRoute(originCoords, destCoords, destVal);
+      drawCarRoute(originCoords, destCoords, destVal || prefillDestination);
     } else if (currentMode === 'cab') {
-      drawTransitOptions(currentMode, originCoords, destCoords, originVal || 'My Location', destVal);
-      loadCabServices(originVal || 'My Location', destVal);
+      drawTransitOptions(currentMode, originCoords, destCoords, originVal || 'My Location', destVal || prefillDestination);
+      loadCabServices(originVal || 'My Location', destVal || prefillDestination);
     } else if (['bus', 'train', 'flight'].includes(currentMode)) {
-      drawTransitOptions(currentMode, originCoords, destCoords, originVal || 'My Location', destVal);
-      loadTransitOptions(currentMode, originVal || 'My Location', destVal);
+      drawTransitOptions(currentMode, originCoords, destCoords, originVal || 'My Location', destVal || prefillDestination);
+      loadTransitOptions(currentMode, originVal || 'My Location', destVal || prefillDestination);
     } else {
-      drawCarRoute(originCoords, destCoords, destVal);
+      drawCarRoute(originCoords, destCoords, destVal || prefillDestination);
     }
-    collapseSearchForm(originVal || 'My Location', destVal);
+    collapseSearchForm(originVal || 'My Location', destVal || prefillDestination);
   }
 
   function openMobileTicketModal() {
