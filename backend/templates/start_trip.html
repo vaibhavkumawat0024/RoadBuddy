@@ -616,9 +616,39 @@
     height: calc(100vh - 54px) !important;
     z-index: 1 !important;
   }
-  body.hotel-nav-mode #map {
-    width: 100vw !important;
-    height: calc(100vh - 54px) !important;
+  /* ─── HIDE START NAVIGATION, NIGHT MODE, SPLIT EXPENSES, POI SIDEBAR & MAP LAYERS IN VIEW ROUTE MODE ─── */
+  {% if (trip and trip.status == 'completed') or mode == 'view_route' %}
+  #nav-toggle-btn,
+  #hotel-nav-start-btn,
+  .hotel-start-nav-btn,
+  #night-btn,
+  .map-ctrl-btn,
+  .splitwise-trigger-btn,
+  #poi-sidebar-bar,
+  .poi-categories-bar,
+  #map-layers-widget,
+  .nav-hud,
+  #nav-hud,
+  #compass-widget,
+  #gps-btn-wrap,
+  #gps-status-row {
+    display: none !important;
+  }
+  {% endif %}
+
+  body.view-route-mode #nav-toggle-btn,
+  body.view-route-mode #hotel-nav-start-btn,
+  body.view-route-mode .hotel-start-nav-btn,
+  body.view-route-mode #night-btn,
+  body.view-route-mode .map-ctrl-btn,
+  body.view-route-mode .splitwise-trigger-btn,
+  body.view-route-mode #poi-sidebar-bar,
+  body.view-route-mode .poi-categories-bar,
+  body.view-route-mode #map-layers-widget,
+  body.view-route-mode .nav-hud,
+  body.view-route-mode #nav-hud,
+  body.view-route-mode #compass-widget {
+    display: none !important;
   }
 
   /* ─── MOBILE MEDIA RESPONSIVENESS OVERRIDES (DASHBOARD PARITY) ─── */
@@ -2213,7 +2243,7 @@ let partnerFuelStationMarkers = [];
   const tripItineraryStops = [];
   {% if trip and trip.stops %}
     {% for s in trip.stops %}
-      tripStops.push("{{ s.place_name }}");
+      tripStops.push({{ s.place_name|tojson }});
       tripItineraryStops.push({
         id: {{ s.id }},
         day: {{ s.day or 1 }},
@@ -2221,9 +2251,9 @@ let partnerFuelStationMarkers = [];
         place_name: {{ (s.place_name or '')|tojson }},
         place_type: {{ (s.place_type or 'sightseeing')|tojson }},
         estimated_cost_inr: {{ s.estimated_cost_inr or 0 }},
-        duration_mins: {{ s.duration_mins or 60 }},
-        lat: {{ s.lat or 'null' }},
-        lon: {{ s.lon or 'null' }}
+        duration_mins: 60,
+        lat: null,
+        lon: null
       });
     {% endfor %}
   {% endif %}
@@ -5005,9 +5035,142 @@ async function loadPartnerFuelStationsOnMap() {
 
     if (!isNavUpdate && activeRoute && activeRoute.geometry && activeRoute.geometry.coordinates) {
       loadPartnerRestaurantsOnMap();
+      plotItineraryStopsOnMap();
       const bounds = new mapboxgl.LngLatBounds();
       activeRoute.geometry.coordinates.forEach(c => bounds.extend(c));
       map.fitBounds(bounds, { padding: 50 });
+    }
+  }
+
+  let itineraryMarkers = [];
+  function plotItineraryStopsOnMap() {
+    itineraryMarkers.forEach(m => {
+      if (m && m.marker) m.marker.remove();
+      else if (m && m.remove) m.remove();
+    });
+    itineraryMarkers = [];
+
+    if (!tripItineraryStops || tripItineraryStops.length === 0) return;
+
+    const placeTypeEmojis = {
+      fuel: '⛽',
+      food: '🍽️',
+      hotel: '🏨',
+      sightseeing: '🏛️',
+      destination_food: '🍴',
+      going_route: '🚗',
+      return_route: '🏠',
+      toll: '🛣️'
+    };
+
+    const destCity = prefillDestination || "";
+    const totalStops = tripItineraryStops.length;
+
+    // STEP 1: Render all stop markers INSTANTLY using route polyline interpolation (0ms delay!)
+    for (let i = 0; i < totalStops; i++) {
+      const stop = tripItineraryStops[i];
+      let stopLat = stop.lat;
+      let stopLon = stop.lon;
+
+      // Instant polyline interpolation fallback if coordinates not in DB
+      if ((!stopLat || !stopLon) && currentPolyline && currentPolyline.length > 0) {
+        const stepIndex = Math.floor(((i + 0.5) / totalStops) * currentPolyline.length);
+        const polyPoint = currentPolyline[Math.min(Math.max(0, stepIndex), currentPolyline.length - 1)];
+        if (polyPoint) {
+          stopLat = polyPoint.lat;
+          stopLon = polyPoint.lng || polyPoint.lon;
+        }
+      }
+
+      // Fallback to destination if no polyline yet
+      if (!stopLat || !stopLon) {
+        const destInput = document.getElementById('destination-input');
+        if (destInput && destInput.dataset.lat && destInput.dataset.lon) {
+          stopLat = parseFloat(destInput.dataset.lat);
+          stopLon = parseFloat(destInput.dataset.lon);
+        }
+      }
+
+      if (stopLat && stopLon) {
+        const emoji = placeTypeEmojis[stop.place_type] || '📍';
+        
+        const outerEl = document.createElement('div');
+        outerEl.className = 'itinerary-stop-marker-wrap';
+        
+        const innerDot = document.createElement('div');
+        innerDot.className = 'itinerary-stop-dot-inner';
+        innerDot.style.cssText = `
+          width: 22px;
+          height: 22px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #10b981, #059669);
+          border: 2px solid #ffffff;
+          box-shadow: 0 3px 10px rgba(0,0,0,0.4);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 11px;
+          cursor: pointer;
+          transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        `;
+        innerDot.title = `Day ${stop.day}: ${stop.place_name}`;
+        innerDot.innerHTML = `<span style="font-size: 11px; line-height: 1; pointer-events: none;">${emoji}</span>`;
+
+        innerDot.onmouseover = () => {
+          innerDot.style.transform = 'scale(1.35)';
+        };
+        innerDot.onmouseout = () => {
+          innerDot.style.transform = 'scale(1)';
+        };
+
+        outerEl.appendChild(innerDot);
+
+        const popupHTML = `
+          <div style="font-family: 'Plus Jakarta Sans', sans-serif; padding: 6px 8px; max-width: 230px; text-align: left;">
+            <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: #10b981; letter-spacing: 0.5px; margin-bottom: 2px;">Day ${stop.day} Stop</div>
+            <div style="font-weight: 800; font-size: 13.5px; color: #0f172a; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+              <span>${emoji}</span> <span>${escapeHTML(stop.place_name)}</span>
+            </div>
+            <div style="font-size: 11.5px; color: #64748b; margin-bottom: 2px;">⏳ <strong>Duration:</strong> ${stop.duration_mins || 60} mins</div>
+            ${stop.time_slot ? `<div style="font-size: 11px; color: #475569; font-weight: 600;">🕒 <strong>Time Slot:</strong> ${escapeHTML(stop.time_slot)}</div>` : ''}
+            ${stop.estimated_cost_inr ? `<div style="font-size: 11.5px; color: #059669; font-weight: 700; margin-top: 4px;">💰 Est. Cost: ₹${stop.estimated_cost_inr}</div>` : ''}
+          </div>
+        `;
+
+        const marker = new mapboxgl.Marker({ element: outerEl, anchor: 'center' })
+          .setLngLat([stopLon, stopLat])
+          .setPopup(new mapboxgl.Popup({ offset: 12, closeButton: true }).setHTML(popupHTML))
+          .addTo(map);
+
+        itineraryMarkers.push({ marker, stopIndex: i });
+      }
+    }
+
+    // STEP 2: Non-blocking background geocode refinement
+    refineItineraryMarkersBackground(destCity);
+  }
+
+  async function refineItineraryMarkersBackground(destCity) {
+    for (let i = 0; i < tripItineraryStops.length; i++) {
+      const stop = tripItineraryStops[i];
+      if (stop.lat && stop.lon) continue;
+
+      let query = stop.place_name.replace(/^(Day \d+:?|Visit|Check-in at|Dinner at|Lunch at)\s*/i, '').trim();
+      if (destCity && !query.toLowerCase().includes(destCity.toLowerCase())) {
+        query = `${query}, ${destCity}`;
+      }
+
+      try {
+        const coords = await geocode(query);
+        if (coords && coords.lat && coords.lon) {
+          const item = itineraryMarkers.find(m => m.stopIndex === i);
+          if (item && item.marker) {
+            item.marker.setLngLat([coords.lon, coords.lat]);
+          }
+        }
+      } catch (e) {
+        // Keep instant position
+      }
     }
   }
 
@@ -5016,9 +5179,11 @@ async function loadPartnerFuelStationsOnMap() {
     activeCarRouteIndex = idx;
     const selectedRoute = loadedCarRoutes[idx];
 
-    drawAllCarRoutesOnMap(loadedCarRoutes, activeCarRouteIndex, true);
-
+    // Set currentPolyline FIRST so it is available to plotItineraryStopsOnMap!
     currentPolyline = selectedRoute.geometry.coordinates.map(c => ({ lat: c[1], lng: c[0], lon: c[0] }));
+
+    drawAllCarRoutesOnMap(loadedCarRoutes, activeCarRouteIndex, true);
+    plotItineraryStopsOnMap();
 
     const distKm = (selectedRoute.distance / 1000).toFixed(1);
     const durHrs = Math.floor(selectedRoute.duration / 3600);
@@ -6082,6 +6247,19 @@ async function loadPartnerFuelStationsOnMap() {
     const navType = urlParams.get('nav_type') || "{{ nav_type|default('') }}";
     const rawHotelName = urlParams.get('hotel_name') || "{{ hotel_name|default('') }}";
 
+    const isViewRoute = (urlParams.get('mode') === 'view_route') || ("{{ mode|default('') }}" === 'view_route') || {% if trip and trip.status == 'completed' %}true{% else %}false{% endif %};
+    if (isViewRoute) {
+      document.body.classList.add('view-route-mode');
+      const navBtn = document.getElementById('nav-toggle-btn');
+      if (navBtn) navBtn.style.display = 'none';
+      const hotelStartBtn = document.getElementById('hotel-nav-start-btn');
+      if (hotelStartBtn) hotelStartBtn.style.display = 'none';
+      const nightBtn = document.getElementById('night-btn');
+      if (nightBtn) nightBtn.style.display = 'none';
+      const splitBtns = document.querySelectorAll('.splitwise-trigger-btn');
+      splitBtns.forEach(b => b.style.display = 'none');
+    }
+
     if (navType === 'hotel' || rawHotelName) {
       document.body.classList.add('hotel-nav-mode');
       const banner = document.getElementById('hotel-route-banner');
@@ -6095,6 +6273,11 @@ async function loadPartnerFuelStationsOnMap() {
     if ((prefillOrigin && prefillDestination) || prefillDestination) {
       setTimeout(() => {
         getRoutes();
+        plotItineraryStopsOnMap();
+      }, 500);
+    } else if (tripItineraryStops && tripItineraryStops.length > 0) {
+      setTimeout(() => {
+        plotItineraryStopsOnMap();
       }, 500);
     }
     

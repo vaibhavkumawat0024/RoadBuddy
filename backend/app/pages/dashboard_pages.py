@@ -503,6 +503,7 @@ def start_trip_page(
     date: str = "",
     nav_type: str = "",
     hotel_name: str = "",
+    mode: str = "",
     db: Session = Depends(get_db)
 ):
     user = get_user_from_cookie(request, db)
@@ -629,7 +630,8 @@ def start_trip_page(
         "booked_flight": booked_flight,
         "booked_cab": booked_cab,
         "nav_type": nav_type,
-        "hotel_name": hotel_name
+        "hotel_name": hotel_name,
+        "mode": mode
     })
 
 
