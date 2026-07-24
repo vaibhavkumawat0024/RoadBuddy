@@ -501,6 +501,8 @@ def start_trip_page(
     origin: str = "",
     destination: str = "",
     date: str = "",
+    nav_type: str = "",
+    hotel_name: str = "",
     db: Session = Depends(get_db)
 ):
     user = get_user_from_cookie(request, db)
@@ -625,7 +627,9 @@ def start_trip_page(
         "booked_bus": booked_bus,
         "booked_train": booked_train,
         "booked_flight": booked_flight,
-        "booked_cab": booked_cab
+        "booked_cab": booked_cab,
+        "nav_type": nav_type,
+        "hotel_name": hotel_name
     })
 
 

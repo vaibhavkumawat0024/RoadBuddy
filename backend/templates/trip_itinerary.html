@@ -794,7 +794,7 @@
                               <span class="bg-emerald-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">Hotel Check-in</span>
                               <strong class="text-xs text-slate-800">{{ booked_hotel.hotel_name }}</strong>
                             </div>
-                            <a href="/start-trip?origin=My+Location&destination={{ (booked_hotel.hotel_name + ', ' + (trip.destination if trip else '')) | urlencode }}" class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-2 py-1 rounded-lg transition-colors">
+                            <a href="/start-trip?origin=My+Location&destination={{ (booked_hotel.hotel_name + ', ' + (trip.destination if trip else '')) | urlencode }}&nav_type=hotel&hotel_name={{ booked_hotel.hotel_name | urlencode }}" class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-2 py-1 rounded-lg transition-colors">
                               🗺️ Get Route
                             </a>
                           </div>

@@ -566,7 +566,32 @@
   }
   .spinner-sm {
     width: 22px; height: 22px;
-    border: 2px solid var(--border-  /* ─── MOBILE MEDIA RESPONSIVENESS OVERRIDES (DASHBOARD PARITY) ─── */
+    border: 2px solid var(--border-  /* ─── DIRECT HOTEL NAVIGATION MODE (UNCLUTTERED VIEW) ─── */
+  body.hotel-nav-mode .transport-bar,
+  body.hotel-nav-mode .left-panel,
+  body.hotel-nav-mode #trip-expense-splitter {
+    display: none !important;
+  }
+  body.hotel-nav-mode .main-layout {
+    height: calc(100vh - 54px - env(safe-area-inset-top, 0px)) !important;
+    position: relative !important;
+    width: 100% !important;
+    overflow: hidden !important;
+  }
+  body.hotel-nav-mode .right-map-area {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    z-index: 1 !important;
+  }
+  body.hotel-nav-mode #map {
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  /* ─── MOBILE MEDIA RESPONSIVENESS OVERRIDES (DASHBOARD PARITY) ─── */
   @media (max-width: 768px) {
     .topbar {
       height: calc(54px + env(safe-area-inset-top, 0px)) !important;
@@ -1207,6 +1232,23 @@
   </div>
 
   <div class="right-map-area">
+    <!-- Hotel Navigation Header Banner -->
+    <div id="hotel-route-banner" style="position: absolute; top: calc(14px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); width: 92%; max-width: 520px; background: rgba(15, 23, 42, 0.94); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1.5px solid rgba(255, 255, 255, 0.15); border-radius: 20px; padding: 14px 20px; display: none; align-items: center; justify-content: space-between; gap: 14px; z-index: var(--z-nav-hud, 40); box-shadow: 0 10px 30px rgba(0,0,0,0.4); color: #fff; text-align: left;">
+      <div style="display: flex; align-items: center; gap: 14px; min-width: 0; flex: 1;">
+        <div style="width: 42px; height: 42px; background: linear-gradient(135deg, #10b981, #059669); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);">
+          🏨
+        </div>
+        <div style="min-width: 0;">
+          <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #10b981; letter-spacing: 0.05em;">Booked Hotel Destination</div>
+          <div id="hotel-banner-name" style="font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 800; color: #ffffff; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Hotel</div>
+          <div id="hotel-banner-meta" style="font-size: 12px; color: #94a3b8; font-weight: 600; margin-top: 2px;">Calculating route from your location...</div>
+        </div>
+      </div>
+      <button id="hotel-nav-start-btn" onclick="startNavigation()" style="background: linear-gradient(135deg, #10b981, #059669); color: white; border: none; border-radius: 24px; padding: 10px 20px; font-size: 13px; font-weight: 700; cursor: pointer; flex-shrink: 0; box-shadow: 0 6px 18px rgba(16, 185, 129, 0.3); transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)';" onmouseout="this.style.transform='none';">
+        🚀 Start Navigation
+      </button>
+    </div>
+
     <!-- POI Sidebar Toolbar (Vertical Left Side of Map) -->
     <div class="poi-categories-bar" id="poi-sidebar-bar">
       <button class="poi-btn" onclick="searchNearby('fuel', event)">
@@ -4944,6 +4986,12 @@ async function loadPartnerFuelStationsOnMap() {
     const distKm = (selectedRoute.distance / 1000).toFixed(1);
     const durHrs = Math.floor(selectedRoute.duration / 3600);
     const durMins = Math.floor((selectedRoute.duration % 3600) / 60);
+    const timeStr = durHrs > 0 ? `${durHrs} hr ${durMins} min` : `${durMins} min`;
+
+    const hotelMeta = document.getElementById('hotel-banner-meta');
+    if (hotelMeta) {
+      hotelMeta.innerHTML = `🚗 <strong>${distKm} km</strong> &nbsp;·&nbsp; ⏱️ <strong>${timeStr}</strong> from your location`;
+    }
 
     const instructions = [];
     if (selectedRoute.legs) {
@@ -5192,6 +5240,9 @@ async function loadPartnerFuelStationsOnMap() {
     document.getElementById('nav-toggle-btn').textContent = '🛑 Stop Navigation';
     document.body.classList.add('nav-active');
     
+    const hotelBanner = document.getElementById('hotel-route-banner');
+    if (hotelBanner) hotelBanner.style.display = 'none';
+
     initDeviceOrientation();
     
     const hudCard = document.getElementById('nav-hud-card');
@@ -5333,6 +5384,11 @@ async function loadPartnerFuelStationsOnMap() {
     }
     document.getElementById('nav-toggle-btn').textContent = '🚀 Start Navigation';
     
+    if (document.body.classList.contains('hotel-nav-mode')) {
+      const hotelBanner = document.getElementById('hotel-route-banner');
+      if (hotelBanner) hotelBanner.style.display = 'flex';
+    }
+
     const hudCard = document.getElementById('nav-hud-card');
     if (hudCard) {
       hudCard.style.display = 'none';
@@ -5977,7 +6033,21 @@ async function loadPartnerFuelStationsOnMap() {
     }
     checkEnableRouteBtn();
 
-    if (prefillOrigin && prefillDestination) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const navType = urlParams.get('nav_type') || "{{ nav_type|default('') }}";
+    const rawHotelName = urlParams.get('hotel_name') || "{{ hotel_name|default('') }}";
+
+    if (navType === 'hotel' || rawHotelName) {
+      document.body.classList.add('hotel-nav-mode');
+      const banner = document.getElementById('hotel-route-banner');
+      if (banner) {
+        banner.style.display = 'flex';
+        const nameEl = document.getElementById('hotel-banner-name');
+        if (nameEl) nameEl.textContent = rawHotelName || prefillDestination;
+      }
+    }
+
+    if ((prefillOrigin && prefillDestination) || prefillDestination) {
       setTimeout(() => {
         getRoutes();
       }, 500);
