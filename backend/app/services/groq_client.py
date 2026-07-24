@@ -25,7 +25,9 @@ async def call_groq_native(messages: list[dict], temperature: float = 0.7, max_t
         "messages": messages,
         "temperature": temperature,
         "max_tokens": max_tokens,
+        "response_format": {"type": "json_object"},
     }
+
 
     last_exc = None
     async with httpx.AsyncClient(timeout=60) as client:
@@ -122,14 +124,20 @@ async def call_groq(prompt: str, system_prompt: str = None, temperature: float =
     if not content:
         content = await call_gemini_native(prompt, system_prompt, temperature, max_tokens)
     
-    if content.startswith("```"):
-        m = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", content)
-        if m:
-            content = m.group(1).strip()
+    # Strip markdown block formatting if present anywhere in content
+    m = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", content)
+    if m:
+        content = m.group(1).strip()
+
     try:
         return json.loads(content)
     except json.JSONDecodeError:
+        # Fallback: find outer braces
         m2 = re.search(r"(\{[\s\S]*\})", content)
         if m2:
-            return json.loads(m2.group(1))
+            raw_json = m2.group(1)
+            # Clean trailing commas before closing braces/brackets
+            cleaned = re.sub(r",\s*([\}\]])", r"\1", raw_json)
+            return json.loads(cleaned)
         raise
+
