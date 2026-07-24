@@ -3188,20 +3188,60 @@ async function loadPartnerFuelStationsOnMap() {
     }
   });
 
+  function getCurrentGpsCoordsPromise() {
+    return new Promise((resolve) => {
+      if (gpsLocked && gpsCoords) {
+        return resolve(gpsCoords);
+      }
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            gpsCoords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+            gpsLocked = true;
+            resolve(gpsCoords);
+          },
+          (err) => {
+            console.warn("Geolocation error in promise:", err);
+            resolve(null);
+          },
+          { enableHighAccuracy: true, timeout: 8000, maximumAge: 10000 }
+        );
+      } else {
+        resolve(null);
+      }
+    });
+  }
+
   // ─── GEOCODE ─────────────────────────────────────────────
   async function geocode(query) {
     if (!query) return null;
     const q = query.trim();
+    if (q.toLowerCase() === 'my location') return null;
+
     if (/^[-\d.]+\s*,\s*[-\d.]+$/.test(q)) {
       const [lat, lon] = q.split(',').map(Number);
       return { lat, lon };
     }
-    const cleanQ = q.toLowerCase().includes('india') ? q : q + ', India';
-    try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanQ)}&countrycodes=in&limit=1`);
-      const data = await res.json();
-      if (data && data.length > 0) return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
-    } catch(e) { console.error(e); }
+
+    const queriesToTry = [
+      q.toLowerCase().includes('india') ? q : q + ', India'
+    ];
+
+    if (q.includes(',')) {
+      const parts = q.split(',');
+      const cityPart = parts[parts.length - 1].trim();
+      if (cityPart) {
+        queriesToTry.push(cityPart.toLowerCase().includes('india') ? cityPart : cityPart + ', India');
+      }
+    }
+
+    for (const searchStr of queriesToTry) {
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchStr)}&countrycodes=in&limit=1`);
+        const data = await res.json();
+        if (data && data.length > 0) return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+      } catch(e) { console.error(e); }
+    }
     return null;
   }
 
@@ -3213,80 +3253,53 @@ async function loadPartnerFuelStationsOnMap() {
     showLoading('Finding best routes...');
     resetDirections(false);
 
-    if(window.innerWidth <= 768) {
+    if (window.innerWidth <= 768) {
       document.getElementById('sidebar-panel').classList.add('collapsed-view');
     }
 
-    if (isGPSModeActive()) {
-      let originCoords = null;
-      let originVal = 'My Location';
+    const originInput = document.getElementById('origin-manual');
+    const originVal = originInput ? originInput.value.trim() : '';
 
-      if (gpsLocked && gpsCoords) {
-        originCoords = gpsCoords;
-        originVal = 'My Location';
-      } else if (prefillOrigin) {
-        const originInput = document.getElementById('origin-manual');
-        originVal = originInput.value.trim();
+    let originCoords = null;
+    const isMyLoc = originVal.toLowerCase() === 'my location' || !originVal;
+
+    if (isGPSModeActive() || isMyLoc) {
+      originCoords = await getCurrentGpsCoordsPromise();
+      if (!originCoords && originVal && originVal.toLowerCase() !== 'my location') {
         originCoords = (originInput.dataset.lat && originInput.dataset.lon) ? 
           { lat: parseFloat(originInput.dataset.lat), lon: parseFloat(originInput.dataset.lon) } : await geocode(originVal);
-      } else {
-        originCoords = gpsCoords;
       }
-
-      let destCoords = (destInput.dataset.lat && destInput.dataset.lon) ? 
-        { lat: parseFloat(destInput.dataset.lat), lon: parseFloat(destInput.dataset.lon) } : await geocode(destVal);
-      
-      if (!originCoords || !destCoords) {
-        hideLoading();
-        showDirEmpty('Could not find origin or destination. Try a clearer city name.');
-        return;
-      }
-      // Save geocoded coords back to dataset
-      if (prefillOrigin) {
-        const originInput = document.getElementById('origin-manual');
-        originInput.dataset.lat = originCoords.lat;
-        originInput.dataset.lon = originCoords.lon;
-      }
-      destInput.dataset.lat = destCoords.lat;
-      destInput.dataset.lon = destCoords.lon;
-
-      hideLoading();
-      drawCarRoute(originCoords, destCoords, destVal);
-      collapseSearchForm(originVal, destVal);
     } else {
-      const originInput = document.getElementById('origin-manual');
-      const originVal = originInput.value.trim();
-      let originCoords = (originInput.dataset.lat && originInput.dataset.lon) ? 
+      originCoords = (originInput.dataset.lat && originInput.dataset.lon) ? 
         { lat: parseFloat(originInput.dataset.lat), lon: parseFloat(originInput.dataset.lon) } : await geocode(originVal);
-      
-      let destCoords = (destInput.dataset.lat && destInput.dataset.lon) ? 
-        { lat: parseFloat(destInput.dataset.lat), lon: parseFloat(destInput.dataset.lon) } : await geocode(destVal);
+    }
 
-      if (!originCoords || !destCoords) {
-        hideLoading();
-        showDirEmpty('Could not find one or both locations. Please check spelling.');
-        return;
-      }
+    let destCoords = (destInput.dataset.lat && destInput.dataset.lon) ? 
+      { lat: parseFloat(destInput.dataset.lat), lon: parseFloat(destInput.dataset.lon) } : await geocode(destVal);
+    
+    if (!originCoords || !destCoords) {
+      hideLoading();
+      showDirEmpty('Could not locate origin or hotel destination. Please enable GPS location access or type a city name.');
+      return;
+    }
 
-      // Save geocoded coords back to dataset
+    if (originInput && originCoords) {
       originInput.dataset.lat = originCoords.lat;
       originInput.dataset.lon = originCoords.lon;
-      destInput.dataset.lat = destCoords.lat;
-      destInput.dataset.lon = destCoords.lon;
-
-      hideLoading();
-
-      if (currentMode === 'cab') {
-        drawTransitOptions(currentMode, originCoords, destCoords, originVal, destVal);
-        loadCabServices(originVal, destVal);
-      } else if (currentMode === 'bus' || currentMode === 'train' || currentMode === 'flight') {
-        drawTransitOptions(currentMode, originCoords, destCoords, originVal, destVal);
-        loadTransitOptions(currentMode, originVal, destVal);
-      } else {
-        drawTransitOptions(currentMode, originCoords, destCoords, originVal, destVal);
-      }
-      collapseSearchForm(originVal, destVal);
     }
+    hideLoading();
+    if (currentMode === 'car' || currentMode === 'own_vehicle') {
+      drawCarRoute(originCoords, destCoords, destVal);
+    } else if (currentMode === 'cab') {
+      drawTransitOptions(currentMode, originCoords, destCoords, originVal || 'My Location', destVal);
+      loadCabServices(originVal || 'My Location', destVal);
+    } else if (['bus', 'train', 'flight'].includes(currentMode)) {
+      drawTransitOptions(currentMode, originCoords, destCoords, originVal || 'My Location', destVal);
+      loadTransitOptions(currentMode, originVal || 'My Location', destVal);
+    } else {
+      drawCarRoute(originCoords, destCoords, destVal);
+    }
+    collapseSearchForm(originVal || 'My Location', destVal);
   }
 
   function openMobileTicketModal() {
