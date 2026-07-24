@@ -205,6 +205,42 @@ Place types: sightseeing, hotel, destination_food"""
 from app.services.groq_client import call_groq
 
 
+DESTINATION_ATTRACTIONS = {
+    "manali": [
+        ("09:00 AM - Hadimba Devi Temple & Cedar Forest", "sightseeing", "Explore the iconic 16th-century wooden temple surrounded by giant Deodar cedar forests. Breathe fresh mountain pine air and take yak rides."),
+        ("01:30 PM - Old Manali Cafe & Riverbed Lunch", "destination_food", "Enjoy wood-fired trout pizza, fresh apple cider, and mountain view coffee at a peaceful streamside cafe in Old Manali."),
+        ("05:30 PM - Solang Valley Sunset & Adventure Lookout", "sightseeing", "Enjoy paragliding, ropeway rides, and breathtaking sunset views over snow-capped Himalayan peaks."),
+        ("08:30 PM - Mall Road Stroll & Kullu Trout Dinner", "destination_food", "Walk down the bustling Mall Road market, shop for Himachali shawls, and savor traditional Kullu trout fish dinner.")
+    ],
+    "udaipur": [
+        ("09:00 AM - City Palace & Maharana Museum", "sightseeing", "Explore Rajasthan's largest royal palace complex overlooking Lake Pichola. Marvel at peacock mosaics, mirror halls, and royal armory."),
+        ("01:30 PM - Ambrai Ghat & Lakeview Rajasthani Lunch", "destination_food", "Dine right by the waters of Lake Pichola with magnificent views of Jagmandir and City Palace. Taste authentic Laal Maas and Gatte ki Sabzi."),
+        ("05:30 PM - Lake Pichola Sunset Boat Cruise", "sightseeing", "Take a picturesque evening boat ride around Jagmandir island while watching the golden sunset paint the white marble palaces."),
+        ("08:30 PM - Bagore ki Haveli Cultural Dance & Dinner", "destination_food", "Watch traditional Dharohar folk dance and puppet shows at Gangaur Ghat, followed by a romantic rooftop dinner.")
+    ],
+    "jaipur": [
+        ("09:00 AM - Amber Fort & Sheesh Mahal", "sightseeing", "Ascend the majestic hilltop Amber Fort. Tour the mirror-adorned Sheesh Mahal, royal courtyards, and panoramic Maota Lake vistas."),
+        ("01:30 PM - Laxmi Mishthan Bhandar (LMB) — Traditional Thali", "destination_food", "Feast on famous authentic Rajasthani Dal Baati Churma, Ker Sangri, and Ghewar at LMB in Johari Bazaar."),
+        ("05:30 PM - Hawa Mahal & Pink City Bazaar Walk", "sightseeing", "Photograph the iconic honeycomb pink sandstone facade of Hawa Mahal, and shop for handcrafted mojris and blue pottery."),
+        ("08:30 PM - Nahargarh Fort Sunset View & Dinner", "destination_food", "Drive up the winding hills to Nahargarh Fort for a breathtaking night panorama of illuminated Jaipur city while dining.")
+    ],
+    "goa": [
+        ("09:00 AM - Fort Aguada & Sinquerim Beach Lookout", "sightseeing", "Visit the 17th-century Portuguese fortress and lighthouse standing over the Arabian Sea with panoramic coastal views."),
+        ("01:30 PM - Fisherman's Wharf — Goan Seafood Lunch", "destination_food", "Savor fresh Goan fish curry rice, prawn balchão, and kokum feni at a scenic riverside shack."),
+        ("05:30 PM - Baga Beach Sunset & Water Sports", "sightseeing", "Watch golden sunset waves, enjoy parasailing or jet skiing, and soak in the vibrant beach shack atmosphere."),
+        ("08:30 PM - Panjim Fontainhas Latin Quarter Night Walk & Dinner", "destination_food", "Stroll through colorful Portuguese heritage streets in Panjim and dine at a boutique Goan-Mediterranean bistro.")
+    ]
+}
+
+
+def get_destination_attractions(destination: str):
+    dest = (destination or "").strip().lower()
+    for key, items in DESTINATION_ATTRACTIONS.items():
+        if key in dest:
+            return items
+    return None
+
+
 def mock_own_vehicle(trip: TripCreate, vehicle_info: dict = None) -> dict:
     from datetime import datetime
     season = get_season(trip.start_date)
@@ -302,16 +338,25 @@ def mock_own_vehicle(trip: TripCreate, vehicle_info: dict = None) -> dict:
             ])
         else:
             # Middle Exploration Days
-            stops.extend([
-                {"day": day, "time_slot": "morning", "place_name": f"09:00 AM - Scenic Spot & Nature Walk, {trip.destination}",
-                 "place_type": "sightseeing", "description": f"Visit beautiful waterfalls or valleys in {trip.destination}. Take pictures, breathe fresh air, and enjoy local nature hikes.", "estimated_cost_inr": 100 * num_p, "highway": None, "lat": None, "lng": None},
-                {"day": day, "time_slot": "afternoon", "place_name": f"01:30 PM - Rooftop Cafe & Lunch, {trip.destination}",
-                 "place_type": "destination_food", "description": f"Savor fresh coffee, mocktails, and wood-fired pizzas with a panoramic view of the mountains or old town streets.", "estimated_cost_inr": 250 * num_p, "highway": None, "lat": None, "lng": None},
-                {"day": day, "time_slot": "evening", "place_name": f"05:30 PM - Museum & Historical Walk, {trip.destination}",
-                 "place_type": "sightseeing", "description": "Explore local heritage museums, handicrafts showrooms, and buy traditional artwork or woolens.", "estimated_cost_inr": 100 * num_p, "highway": None, "lat": None, "lng": None},
-                {"day": day, "time_slot": "night", "place_name": f"08:30 PM - Gourmet Dinner, {trip.destination}",
-                 "place_type": "destination_food", "description": "Treat yourself to a candlelight dinner under the stars at a highly-rated local courtyard restaurant.", "estimated_cost_inr": 350 * num_p, "highway": None, "lat": None, "lng": None}
-            ])
+            custom_attr = get_destination_attractions(trip.destination)
+            if custom_attr:
+                stops.extend([
+                    {"day": day, "time_slot": "morning", "place_name": custom_attr[0][0], "place_type": custom_attr[0][1], "description": custom_attr[0][2], "estimated_cost_inr": 150 * num_p, "highway": None, "lat": None, "lng": None},
+                    {"day": day, "time_slot": "afternoon", "place_name": custom_attr[1][0], "place_type": custom_attr[1][1], "description": custom_attr[1][2], "estimated_cost_inr": 250 * num_p, "highway": None, "lat": None, "lng": None},
+                    {"day": day, "time_slot": "evening", "place_name": custom_attr[2][0], "place_type": custom_attr[2][1], "description": custom_attr[2][2], "estimated_cost_inr": 150 * num_p, "highway": None, "lat": None, "lng": None},
+                    {"day": day, "time_slot": "night", "place_name": custom_attr[3][0], "place_type": custom_attr[3][1], "description": custom_attr[3][2], "estimated_cost_inr": 350 * num_p, "highway": None, "lat": None, "lng": None}
+                ])
+            else:
+                stops.extend([
+                    {"day": day, "time_slot": "morning", "place_name": f"09:00 AM - Top Sightseeing Spot, {trip.destination}",
+                     "place_type": "sightseeing", "description": f"Visit iconic landmarks and scenic viewpoints in {trip.destination}. Take pictures, breathe fresh air, and enjoy local nature hikes.", "estimated_cost_inr": 100 * num_p, "highway": None, "lat": None, "lng": None},
+                    {"day": day, "time_slot": "afternoon", "place_name": f"01:30 PM - Famous Local Cafe & Lunch, {trip.destination}",
+                     "place_type": "destination_food", "description": f"Savor authentic regional cuisine and wood-fired specialties at a highly recommended eatery in {trip.destination}.", "estimated_cost_inr": 250 * num_p, "highway": None, "lat": None, "lng": None},
+                    {"day": day, "time_slot": "evening", "place_name": f"05:30 PM - Heritage Walk & Sunset Point, {trip.destination}",
+                     "place_type": "sightseeing", "description": f"Explore local heritage streets, handicrafts showrooms, and buy traditional artwork in {trip.destination}.", "estimated_cost_inr": 100 * num_p, "highway": None, "lat": None, "lng": None},
+                    {"day": day, "time_slot": "night", "place_name": f"08:30 PM - Traditional Dinner & Nightwalk, {trip.destination}",
+                     "place_type": "destination_food", "description": f"Enjoy dinner at a courtyard restaurant and stroll through illuminated night market lanes in {trip.destination}.", "estimated_cost_inr": 350 * num_p, "highway": None, "lat": None, "lng": None}
+                ])
             
     return {
         "total_distance_km": dist * 2,
